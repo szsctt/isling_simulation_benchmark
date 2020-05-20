@@ -1,0 +1,6 @@
+[submodule "intvi_pipeline"]
+	path = intvi_pipeline
+	url = https://bitbucket.csiro.au/scm/~sco305/intvi_pipeline.git
+[submodule "intvi_simultion"]
+	path = intvi_simultion
+	url = https://bitbucket.csiro.au/scm/~sco305/intvi_simultion.git

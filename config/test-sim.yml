@@ -1,0 +1,22 @@
+out_directory: "../out_sim/test" # root directory for output
+replicates: 1 # number of replicates for each condition
+
+# fasta files to use for simulating integrations
+hosts: 
+    "longer_host" : "../data/references/longer_host.fa"
+viruses:
+    "test_virus" :  "../data/references/test_virus.fa"
+
+
+# parameters for integration simulation
+initial_seed: 1 # random seed for first replicate - will be incremented on successive replicates
+num_ints: 5 # number of integrations to perform
+
+# parameters for read simulation
+read_len: 150
+fcov: 10 # fold coverage (-f)
+frag_len: 500 # mean fragment length (-m)
+frag_std: 30 # fragment length standard deviation (-s)
+seq_sys: "HS25" # sequencing system profile for art-illumna
+art_seed: 42 # random seed for first replicate
+

@@ -14,15 +14,18 @@ mkdir -p ${OUTDIR}
 
 i=0
 INTS="${OUTDIR}integrations_${i}.fa"
-LOCS="${OUTDIR}info_${i}.txt"
+LOCS="${OUTDIR}ints_info_${i}.txt"
+EPI="${OUTDIR}epi_info_${i}.txt"
 
 python3 ${SCRIPT} \
  --host ${HOST} \
  --virus ${VIRUS} \
  --ints ${INTS} \
- --info ${LOCS} \
- --int_num 1 \
+ --int_info ${LOCS} \
+ --int_num 10 \
  --seed 1 \
+ --epi_num 5 \
+ --epi_info ${EPI} \
  --verbose
 
 

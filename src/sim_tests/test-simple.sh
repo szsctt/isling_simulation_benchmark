@@ -26,6 +26,14 @@ python3 ${SCRIPT} \
  --seed 1 \
  --epi_num 5 \
  --epi_info ${EPI} \
+ --p_host_deletion 0.9 \
+ --lambda_host_deletion 2 \
  --verbose
+ 
+TESTHOSTSCRIPT="../../intvi_simulation/reconstruct_host.py"
+python3 ${TESTHOSTSCRIPT} \
+--int-fa ${INTS} \
+--int-info ${LOCS} \
+--host-fa ${HOST} \
 
 

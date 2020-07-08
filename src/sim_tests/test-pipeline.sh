@@ -5,4 +5,4 @@ eval "$(conda shell.bash hook)"
 conda activate simvi
 
 cd ../../intvi_simulation 
-snakemake --configfile ../config/test-sim.yml --cores 1
+snakemake --configfile ../config/experiment1/simulation.yml --cores 1

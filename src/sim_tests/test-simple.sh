@@ -4,7 +4,7 @@ set -e
 eval "$(conda shell.bash hook)"
 conda activate simvi
 
-SCRIPT="../../intvi_simulation/insert_virus_simple.py"
+SCRIPT="../../intvi_simulation/insert_virus.py"
 HOST="../../data/references/test_host.fa"
 VIRUS="../../data/references/test_virus.fa"
 

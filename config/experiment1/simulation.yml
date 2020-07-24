@@ -6,16 +6,16 @@
 experiment1:
 
     ### experiment parameters ###
-    out_directory: "../out/sim" # root directory for output
+    out_directory: "../out/" # root directory for output
     replicates: 2 # number of replicates for each condition
 
     ### parameters for integration simulation (python script) ###
     # fasta files to use for simulating integrations
     # and names for each 
     hosts: 
-        "longer_host" : "../data/references/longer_host.fa"
+        "chr20" : "../data/references/chrs/chr20.fa"
     viruses:
-        "test_virus" :  "../data/references/test_virus.fa"
+        "AAV2" :  "../data/references/NC_001401.2.fa"
 
     # random seed for first replicate - will be incremented on successive replicates
     # use the same seed for the python script and ART

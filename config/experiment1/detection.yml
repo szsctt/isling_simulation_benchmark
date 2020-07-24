@@ -1,14 +1,14 @@
 experiment1:
-  read_folder: "../out/sim/experiment1/sim_reads/"
-  host_name: "longer_host"
-  host_fasta: "../data/references/longer_host.fa"
-  virus_name: "test_virus"
-  virus_fasta: "../data/references/test_virus.fa"
+  read_folder: "../out/experiment1/sim_reads/"
+  host_name: "chr20"
+  host_fasta: "../data/references/chrs/chr20.fa"
+  virus_name: "AAV2"
+  virus_fasta: "../data/references/NC_001401.2.fa"
   merge: True
   dedup: True
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
   bam_suffix: ".sam"
-  out_dir: "../out/sim/experiment1/pipeline/"
+  out_dir: "../out/"
   post:
     - dedup

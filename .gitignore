@@ -1,4 +1,13 @@
 .DS_Store
 out
 out_sim
-data/references/longer_host.fa.fai
+data/references/*.fa.fai
+logs/
+
+data/references/GRCh38.fa
+data/references/NC_001401.2.fa
+data/references/chrs/
+src/.snakemake/
+results/
+test_singularity/
+src/snakemake_sim_analysis/.snakemake/

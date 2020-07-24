@@ -1,0 +1,42 @@
+### snakemake workflow to simulated data, run our pipeline on it, and then analyse the results
+
+import sys
+import os
+import pdb
+
+# parse config file and create data frame containing parameters for running analysis (from config file)
+# this is a bit of a hack
+sys.path.insert(0, os.path.realpath(os.path.join(os.getcwd(), "../../intvi_simulation/")))
+from snakemake_rules import parse_config
+
+pdb.set_trace()
+config, df, ref_dict = parse_config(config)
+
+
+# make a dataframe with analysis parameters - toDo
+
+
+
+#####################################################
+################### target files ####################
+#####################################################
+
+rule all:
+	input: 
+		expand("{outpath}/{exp}/experiment_summary.tsv", 
+			zip,
+			exp = list(config.keys()), # config is imported as ordered dict
+			outpath = [config[exp]['out_directory'] for exp in config.keys()]
+			),
+		df.loc[:,'read_sam_filename'],
+
+#####################################################
+############### simulate integrations ###############
+#####################################################
+
+
+include: "../../intvi_simulation/snakemake_rules/simulate_integrations.smk"
+
+
+include: "../../intvi_simulation/snakemake_rules/art.smk"
+

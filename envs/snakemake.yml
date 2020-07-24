@@ -1,0 +1,12 @@
+name: snakemake
+channels:
+  - bioconda
+  - r
+  - defaults
+  - conda-forge
+dependencies:
+  - mamba=0.3.7
+  - snakemake=5.20.1
+
+
+

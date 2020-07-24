@@ -1,0 +1,14 @@
+test:      
+  read_folder: "../out/test/sim_reads/"
+  host_name: "human"
+  host_fasta: "../data/references/test_human.fa"
+  virus_name: "AAV"
+  virus_fasta: "../data/references/test_AAV.fa"
+  merge: True
+  dedup: True
+  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  bam_suffix: ".sam"
+  out_dir: "../out/"
+  post:
+    - dedup

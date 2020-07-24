@@ -1,0 +1,49 @@
+test:
+    out_directory: "../../out/"
+    # integration simulation
+    replicates: 2 
+    hosts: 
+        "human" : "../../data/references/test_human.fa"
+    viruses:
+        "AAV" :  "../../data/references/test_AAV.fa"
+    initial_seed: 12345
+    seed_increment: 123 
+    int_num: 
+        - 10
+    epi_num:
+        - 0
+    p_whole:
+        - 1
+    p_rearrange:
+        - 0
+    p_delete:
+        - 0
+    lambda_split:
+        - 1
+    p_overlap:
+        - 0
+    p_gap:
+        - 0
+    lambda_junction:
+        - 1
+    p_host_deletion:
+        - 0
+    lambda_host_deletion:
+        - 500
+    # read simulation
+    read_len: 
+        - 150
+    fcov: 
+        - 10 
+    frag_len: 
+        - 500 
+    frag_std: 
+        - 30
+    seq_sys: 
+        - "HS25"
+    # analysis
+    merge: True
+    dedup: True
+    post:
+        - dedup
+    

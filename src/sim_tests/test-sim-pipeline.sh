@@ -7,4 +7,5 @@ conda activate snakemake
 module load singularity
 
 cd ../../intvi_simulation 
-snakemake --configfile ../config/test/simulation.yml --cores 1 --use-singularity
+snakemake --configfile ../config/test/simulation.yml --jobs 10 --use-singularity --profile slurm --rerun-incomplete
+

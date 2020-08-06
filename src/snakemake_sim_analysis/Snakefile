@@ -9,12 +9,7 @@ import pdb
 sys.path.insert(0, os.path.realpath(os.path.join(os.getcwd(), "../../intvi_simulation/")))
 from snakemake_rules import parse_config
 
-pdb.set_trace()
 config, df, ref_dict = parse_config(config)
-
-
-# make a dataframe with analysis parameters - toDo
-
 
 
 #####################################################
@@ -28,7 +23,7 @@ rule all:
 			exp = list(config.keys()), # config is imported as ordered dict
 			outpath = [config[exp]['out_directory'] for exp in config.keys()]
 			),
-		df.loc[:,'read_sam_filename'],
+		df.loc[:,'annotated_info_filename'],
 
 #####################################################
 ############### simulate integrations ###############
@@ -37,6 +32,10 @@ rule all:
 
 include: "../../intvi_simulation/snakemake_rules/simulate_integrations.smk"
 
-
 include: "../../intvi_simulation/snakemake_rules/art.smk"
 
+include: "../../intvi_simulation/snakemake_rules/annotate_reads.smk"
+
+#####################################################
+################### analyse reads ###################
+#####################################################

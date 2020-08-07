@@ -59,6 +59,7 @@ test:
     # fragment length standard deviation (-s)
     frag_std: 
         - 30
+        - 100
     # sequencing system profile for art-illumna
     seq_sys: 
         - "HS25"

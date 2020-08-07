@@ -2,14 +2,26 @@
 
 import sys
 import os
+import yaml
 import pdb
+
+simulation_pipeline_path = "../../intvi_simulation/"
 
 # parse config file and create data frame containing parameters for running analysis (from config file)
 # this is a bit of a hack
-sys.path.insert(0, os.path.realpath(os.path.join(os.getcwd(), "../../intvi_simulation/")))
+sys.path.insert(0, os.path.realpath(os.path.join(os.getcwd(), simulation_pipeline_path)))
 from snakemake_rules import parse_config
 
+
 config, df, ref_dict = parse_config(config)
+
+sim_targets = df.loc[:,'annotated_info_filename']
+sim_summaries = expand("{outpath}/{exp}/experiment_summary.tsv", 
+			zip,
+			exp = list(config.keys()), # config is imported as ordered dict
+			outpath = [config[exp]['out_directory'] for exp in config.keys()]
+			)
+sim_targets = list(sim_targets) + list(sim_summaries)
 
 
 #####################################################
@@ -18,23 +30,26 @@ config, df, ref_dict = parse_config(config)
 
 rule all:
 	input: 
-		expand("{outpath}/{exp}/experiment_summary.tsv", 
-			zip,
-			exp = list(config.keys()), # config is imported as ordered dict
-			outpath = [config[exp]['out_directory'] for exp in config.keys()]
-			),
-		df.loc[:,'annotated_info_filename'],
+		sim_targets
 
 #####################################################
 ############### simulate integrations ###############
 #####################################################
 
+# subworkflow simulation:
+# 	workdir:
+# 		lambda wildcards: config['simulation_pipeline_path']
+# 	snakefile:
+# 		lambda wildcards: config['simulation_snakefile_path']
+# 	configfile:
+# 		lambda wildcards: config['analysis_pipeline_path']
 
-include: "../../intvi_simulation/snakemake_rules/simulate_integrations.smk"
 
-include: "../../intvi_simulation/snakemake_rules/art.smk"
+include: os.path.join(simulation_pipeline_path, "snakemake_rules/simulate_integrations.smk")
 
-include: "../../intvi_simulation/snakemake_rules/annotate_reads.smk"
+include: os.path.join(simulation_pipeline_path, "snakemake_rules/art.smk")
+
+include: os.path.join(simulation_pipeline_path, "snakemake_rules/annotate_reads.smk")
 
 #####################################################
 ################### analyse reads ###################

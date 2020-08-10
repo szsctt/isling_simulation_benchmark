@@ -4,53 +4,264 @@ import sys
 import os
 import yaml
 import pdb
+import copy
+import itertools
+import pandas as pd
 
-simulation_pipeline_path = "../../intvi_simulation/"
+from python_scripts.parse_config import parse_config
+from python_scripts.make_df import make_df, make_post_args, make_reference_dict
 
-# parse config file and create data frame containing parameters for running analysis (from config file)
-# this is a bit of a hack
-sys.path.insert(0, os.path.realpath(os.path.join(os.getcwd(), simulation_pipeline_path)))
-from snakemake_rules import parse_config
+from python_scripts.make_df import check_input_files, Error, InputError, check_dataset_sample_unique, make_reference_dict, make_post_args, check_fastas_unique
 
 
+# https://sapac.support.illumina.com/bulletins/2016/12/what-sequences-do-i-use-for-adapter-trimming.html
+HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA", 
+				'read2-adapt' : "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"}
+				
+
+adapter_seqs = {'HS25':HS25, 'MSv3':HS25}
+
+
+
+#####################################################
+############# simulation parameters #################
+#####################################################
+
+
+# make dataframe with parameters for simulation
 config, df, ref_dict = parse_config(config)
 
-sim_targets = df.loc[:,'annotated_info_filename']
-sim_summaries = expand("{outpath}/{exp}/experiment_summary.tsv", 
-			zip,
-			exp = list(config.keys()), # config is imported as ordered dict
-			outpath = [config[exp]['out_directory'] for exp in config.keys()]
-			)
-sim_targets = list(sim_targets) + list(sim_summaries)
 
+
+#####################################################
+############## analysis parameters ##################
+#####################################################
+
+# add fields reuired for analysis to config: 
+# bam_suffix, read_dir, out_dir, read1-adapt, read2-adapt, host, virus
+analysis_condition_names = []
+datasets = list(config.keys())
+for dataset in datasets:
+		
+	# add read directory
+	read_folder = os.path.join(config[dataset]['out_directory'], dataset, "sim_reads")
+	
+	# if we want to process the same data with different parameters, 
+	# need to copy the dataset dict and give each a unique name
+	tmp = copy.deepcopy(config[dataset])
+	del config[dataset]
+	analysis_conditions = []
+	i = 0
+	
+	assert hasattr(tmp['merge'], '__iter__')
+	assert hasattr(tmp['dedup'], '__iter__')
+	assert hasattr(tmp['merge'], '__iter__')
+	assert hasattr(tmp['post'], '__iter__')
+	assert hasattr(tmp['bwa_mem'], '__iter__')
+	
+	for merge, dedup, post, seq_sys, bwa_mem_params in itertools.product(tmp['merge'], 
+																											 									tmp['dedup'],
+																											 									tmp['post'],
+																											 									tmp['seq_sys'],
+																											 									tmp['bwa_mem']):
+		
+		condition = f"{dataset}_analysis{i}"
+		analysis_condition_names.append(condition)
+		i += 1
+		config[condition] =  copy.deepcopy(tmp)
+		config[condition]['merge'] = merge
+		config[condition]['dedup'] = dedup
+		config[condition]['post'] = " ".join(post)
+		config[condition]['read1-adapt'] = adapter_seqs[seq_sys]['read1-adapt']
+		config[condition]['read2-adapt'] = adapter_seqs[seq_sys]['read2-adapt']
+		config[condition]['read_dir'] = os.path.join(config[condition]['out_directory'], dataset, "sim_reads")
+		
+		analysis_conditions.append(
+			(dataset, condition, ".sam", read_folder, tmp['out_directory'], merge, dedup, post, 
+			 seq_sys, config[condition]['read1-adapt'], config[condition]['read2-adapt'], bwa_mem_params)
+		)
+	
+	# save information about analysis conditions to outdir for current dataset
+	analysis_df = pd.DataFrame(analysis_conditions, 
+								columns = ['experiment', 'analysis_condition', 'bam_suffix', 'read_folder', 'output_directory',
+														'merge', 'dedup', 'post', 'seq_sys', 'read1_adapter', 'read2_adapter', 'bwa_mem']
+							)
+	
+
+	
+# make dataframe with parameters for analysis
+rows = []
+for dataset in config:
+	# get a list of the samples for this analysis condition/dataset
+	experiment = analysis_df.loc[(analysis_df['analysis_condition'] == dataset).idxmax(), 'experiment']
+	conditions = df[df['experiment'] == experiment]['condition']
+	replicates = df[df['experiment'] == experiment]['replicate']
+	
+	samples = [f"{cond}.rep{rep}" for cond, rep, in zip(conditions, replicates)]
+	
+	# also get host/virus cominbations
+	host_names =  df[df['experiment'] == experiment]['host_name']
+	virus_names =  df[df['experiment'] == experiment]['virus_name']
+	
+	# figure out if 'dedup' and 'merge' are true or false for this dataset
+	if isinstance(config[dataset]["dedup"], bool):
+		dedup = int(config[dataset]["dedup"])
+	elif isinstance(config[dataset]["dedup"], str):
+		if config[dataset]["dedup"].lower() == "true":
+			dedup = 1
+		else:
+			dedup = 0
+	else:
+		raise InputError(f"Please specify True or False for 'dedup' in dataset {dataset}")
+	if isinstance(config[dataset]["merge"], bool):
+		merge = int(config[dataset]["merge"])
+	elif isinstance(config[dataset]["merge"], str):
+		if config[dataset]["merge"].lower() == "true":
+			merge = 1
+		else:
+			merge = 0
+	else:
+		raise InputError(f"Please specify True or False for 'merge' in dataset {dataset}")
+	
+	# for each sample, host and virus combination, add a row to rows
+	for sample, host, virus in itertools.product(samples, host_names, virus_names):
+		
+		# the analysis pipline requires that host and virus be appended to dataset
+		# in order to make the dataset names unique for each combination of virus and host for the dataset
+		dataset_name = f"{dataset}_{host}_{virus}"
+		
+		# we also require a unique identifier for each sample
+		unique = f"{dataset_name}+++{sample}"
+		
+		# other sample-specific information
+		config[dataset]["R1_suffix"] = "_1.fq.gz"
+		config[dataset]["R2_suffix"] = "_2.fq.gz"
+		R1_file = f"{os.path.normpath(config[dataset]['out_directory'])}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
+		R2_file = f"{os.path.normpath(config[dataset]['out_directory'])}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
+		bam_file = os.path.join(config[dataset]['read_dir'],  f"{sample}.sam")
+		
+		rows.append(
+			(dataset_name, dataset, sample, host, config[dataset]["hosts"][host], virus, config[dataset]["viruses"][virus], merge, 
+			dedup, unique, config[dataset]["out_directory"], bwa_mem_params, R1_file, R2_file, bam_file, 
+			config[dataset]['read1-adapt'], config[dataset]['read2-adapt'], config[dataset]['post'])
+		)
+	
+
+toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs'])
+
+# make dictionary of reference names and fasta files
+ref_names = make_reference_dict(toDo)
+
+# construct arguments for postprocess.R script for each dataset
+
+POSTARGS, TOSORT, SORTED = make_post_args(config)
 
 #####################################################
 ################### target files ####################
 #####################################################
 
+# target files for simulation
+sim_targets = df.loc[:,'annotated_info_filename']
+
+exp_targets = {}
+for i, row in df.iterrows():
+	exp_targets[row['experiment']] = row['out_directory']
+experiments = list(exp_targets.keys())
+
+sim_summaries = expand("{outpath}/{exp}/simulation_summary.tsv", 
+			zip,
+			exp = experiments, 
+			outpath = [exp_targets[exp] for exp in experiments]
+			)
+
+
+													
+analysis_summaries = set([f"{outdir}/{experiment}/analysis_conditions.tsv" for outdir, experiment in 
+												zip(df.loc[:,'out_directory'],
+														df.loc[:,'experiment']
+														)
+											])
+								
+
+post_targets = expand("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt",
+												outpath = toDo['outdir'],
+												dset = toDo['dataset'],
+												samp = toDo['sample'],
+												host = toDo['host'],
+												virus = toDo['virus'])
+
+
+# target files for both (comparing analysis with simulation)
+both_targets = []
+
+for i, row in analysis_df.iterrows():
+	experiment = row['experiment']
+	outpath = row['output_directory']
+	analysis_condition = row['analysis_condition']
+	samples = set(toDo[toDo['config_dataset'] == analysis_condition]['sample'])
+	
+	both_targets += [f"{outpath}/{experiment}/scored_reads/{samp}_{analysis_condition}.tsv" for samp in samples]
+
+
 rule all:
 	input: 
-		sim_targets
+		sim_targets,
+		sim_summaries,
+		analysis_summaries,
+		post_targets
 
 #####################################################
 ############### simulate integrations ###############
 #####################################################
 
-# subworkflow simulation:
-# 	workdir:
-# 		lambda wildcards: config['simulation_pipeline_path']
-# 	snakefile:
-# 		lambda wildcards: config['simulation_snakefile_path']
-# 	configfile:
-# 		lambda wildcards: config['analysis_pipeline_path']
 
-
-include: os.path.join(simulation_pipeline_path, "snakemake_rules/simulate_integrations.smk")
-
-include: os.path.join(simulation_pipeline_path, "snakemake_rules/art.smk")
-
-include: os.path.join(simulation_pipeline_path, "snakemake_rules/annotate_reads.smk")
+include: "snakemake_rules/simulate_integrations.smk"
+include: "snakemake_rules/art.smk"
+include: "snakemake_rules/annotate_reads.smk"
 
 #####################################################
-################### analyse reads ###################
+################### analyse data ####################
 #####################################################
+
+include: "snakemake_rules/preprocessing.smk"
+include: "snakemake_rules/alignment.smk"
+include: "snakemake_rules/find_ints.smk"
+include: "snakemake_rules/postprocessing.smk"
+
+#####################################################
+############ compare sim with analysis ##############
+#####################################################
+
+
+rule write_analysis_summary:
+	output:
+		tsv_conditions = "{outdir}/{experiment}/analysis_conditions.tsv",
+	run:
+		toDo.to_csv(output.tsv_conditions, sep='\t', index=False)
+
+		
+rule score_reads:
+	input:
+		sim_bam = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
+		sim_info = "{outpath}/{exp}/sim_reads/{samp}.bam",
+		analysis_info = "{outpath}/{exp}_{analysis_condition}/ints/{samp}.integrations{type}.txt"
+	output:
+		scored_reads = "{outpath}/{exp}/scored_reads/{samp}_{analysis_condition}.tsv"
+	wildcard_constraints:
+		type = "|.post",
+		exp = "|".join(set(df['experiment'])),
+		samp = "|".join(set(toDo['sample'])),
+		analysis_condition = "|".join(analysis_condition_names),
+		outpath = "|".join(set(toDo['outdir']))
+	container:
+		"docker://szsctt/simvi:2"
+	shell:
+		"""
+		python3 scripts/score_reads.py \
+		--sim-info {input.sim_info} \
+		--sim-bam {input.sim_bam} \
+		--analysis-info {input.analysis_info}
+		--output {output.scored_reads}
+		"""
+		
+

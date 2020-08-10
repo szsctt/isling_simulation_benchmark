@@ -1,5 +1,6 @@
-test:
-   out_directory: "../../out_sim-and-analysis/"
+sim-and-analysis_test:
+   out_directory: "../../out/"
+   
    # integration simulation
    replicates: 2 
    hosts: 
@@ -41,9 +42,25 @@ test:
        - 30
    seq_sys: 
        - "HS25"
+
+
    # analysis
-   merge: True
-   dedup: True
+#   bam_suffix: ".human.AAV.sam"
+#   out_dir: "../out/"
+#  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+#  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+#   host: 
+#       "human" : "../../data/references/test_human.fa"
+#   virus:
+#       "AAV" :  "../../data/references/test_AAV.fa"
+   merge: 
+       - True
+       - False
+   dedup: 
+       - False
    post:
-       - dedup
+       -
+         - dedup
+   bwa_mem:
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    

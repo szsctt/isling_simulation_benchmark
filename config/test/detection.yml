@@ -1,29 +1,47 @@
 test_merged:      
   read_folder: "../out/test/sim_reads/"
-  host_name: "human"
-  host_fasta: "../data/references/test_human.fa"
-  virus_name: "AAV"
-  virus_fasta: "../data/references/test_AAV.fa"
+  
+  host: 
+    "human" : "../data/references/test_human.fa"
+  virus:
+    "AAV" :  "../data/references/test_AAV.fa"
+    
   merge: True
   dedup: False
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
-  bam_suffix: ".human.AAV.sam"
+  bam_suffix: ".sam"
   out_dir: "../out/"
   post:
     - dedup
     
-test_notmerged:      
-  read_folder: "../out/test/sim_reads/"
-  host_name: "human"
-  host_fasta: "../data/references/test_human.fa"
-  virus_name: "AAV"
-  virus_fasta: "../data/references/test_AAV.fa"
-  merge: False
-  dedup: False
-  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
-  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
-  bam_suffix: ".human.AAV.sam"
-  out_dir: "../out/"
-  post:
-    - dedup
+#test_notmerged:      
+#  read_folder: "../out/test/sim_reads/"
+#  host_name: "human"
+#  host_fasta: "../data/references/test_human.fa"
+#  virus_name: "AAV"
+#  virus_fasta: "../data/references/test_AAV.fa"
+#  merge: False
+#  dedup: False
+#  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+#  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+#  bam_suffix: ".sam"
+#  out_dir: "../out/"
+#  post:
+#    - dedup
+    
+#test_notmerged_tworefs:      
+#  read_folder: "../out/test/sim_reads/"
+#  host: 
+#    "human" : "../data/references/test_human.fa"
+#  virus:
+#    "AAV" :  "../data/references/test_AAV.fa"
+#    "test" :  "../data/references/test_virus.fa"
+#  merge: False
+#  dedup: False
+#  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+#  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+#  bam_suffix: ".sam"
+#  out_dir: "../out/"
+#  post:
+#    - dedup

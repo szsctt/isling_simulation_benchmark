@@ -31,4 +31,7 @@ src/snakemake_sim_analysis/short.pl
 src/snakemake_sim_analysis/softClip.pl
 src/snakemake_sim_analysis/summarise_ints.R
 src/snakemake_sim_analysis/writeBed.R
+src/snakemake_sim_analysis/slurm*
+src/snakemake_sim_analysis/ViralIntegration.pm
+src/snakemake_sim_analysis/results.tsv
 

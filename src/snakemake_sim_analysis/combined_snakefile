@@ -124,7 +124,7 @@ for dataset in config:
 		raise InputError(f"Please specify True or False for 'merge' in dataset {dataset}")
 	
 	# for each sample, host and virus combination, add a row to rows
-	for sample, host, virus in itertools.product(samples, host_names, virus_names):
+	for sample, host, virus in itertools.product(samples, set(host_names), set(virus_names)):
 		
 		# the analysis pipline requires that host and virus be appended to dataset
 		# in order to make the dataset names unique for each combination of virus and host for the dataset
@@ -138,13 +138,15 @@ for dataset in config:
 		config[dataset]["R2_suffix"] = "_2.fq.gz"
 		R1_file = f"{os.path.normpath(config[dataset]['out_directory'])}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
 		R2_file = f"{os.path.normpath(config[dataset]['out_directory'])}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
-		bam_file = os.path.join(config[dataset]['read_dir'],  f"{sample}.sam")
+		bam_file = os.path.join(config[dataset]['read_dir'],  "{samp}.sam")
 		
-		rows.append(
-			(dataset_name, dataset, sample, host, config[dataset]["hosts"][host], virus, config[dataset]["viruses"][virus], merge, 
+		row = (dataset_name, dataset, sample, host, config[dataset]["hosts"][host], virus, config[dataset]["viruses"][virus], merge, 
 			dedup, unique, config[dataset]["out_directory"], bwa_mem_params, R1_file, R2_file, bam_file, 
 			config[dataset]['read1-adapt'], config[dataset]['read2-adapt'], config[dataset]['post'])
-		)
+		
+		assert row not in rows
+		
+		rows.append(row)
 	
 
 toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs'])
@@ -155,6 +157,22 @@ ref_names = make_reference_dict(toDo)
 # construct arguments for postprocess.R script for each dataset
 
 POSTARGS, TOSORT, SORTED = make_post_args(config)
+
+
+#####################################################
+############ wildcard constraints ###################
+#####################################################
+
+
+wildcard_constraints:
+	cond = "|".join(set(df.loc[:, 'condition'])),
+	exp = "|".join(set(df.loc[:, 'experiment'])),
+	rep = "|".join(set([str(i) for i in df.loc[:, 'replicate']])),
+	dset = "|".join(set(toDo.loc[:, 'dataset'])),
+	samp = "|".join(set(toDo.loc[:, 'sample'])),
+	host = "|".join(set(toDo.loc[:, 'host'])),
+	virus = "|".join(set(toDo.loc[:, 'virus']))
+	
 
 #####################################################
 ################### target files ####################
@@ -182,7 +200,6 @@ analysis_summaries = [f"{outdir}/{experiment}/analysis_conditions.tsv" for outdi
 														)
 											]
 								
-
 post_targets = expand("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt",
 												zip,
 												outpath = toDo['outdir'],
@@ -204,20 +221,19 @@ for i, row in analysis_df.iterrows():
 	samples = set(toDo[toDo['config_dataset'] == analysis_condition]['sample'])
 	hosts = set(toDo[toDo['config_dataset'] == analysis_condition]['host'])
 	viruses = set(toDo[toDo['config_dataset'] == analysis_condition]['virus'])
-	
+	#post = ['', '.post']
+	post = ['.post']
 	
 	both_targets += [f"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv" for samp, post, host, virus 
-										in itertools.product(samples, ['', '.post'], hosts, viruses)
+										in itertools.product(samples, post, hosts, viruses)
 									]
-
-
 
 rule all:
 	input: 
 		set(sim_targets),
 		set(sim_summaries),
 		set(analysis_summaries),
-		set(post_targets),
+		#set(post_targets),
 		set(both_targets)
 		
 		
@@ -256,7 +272,7 @@ rule score_reads:
 	input:
 		sim_info = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
 		sim_bam = "{outpath}/{exp}/sim_reads/{samp}.sorted.bam",
-		analysis_info = "{outpath}/{exp}_{host}_{virus}/ints/{samp}.{host}.{virus}.integrations{post}.txt" 
+		analysis_info = "{outpath}/{analysis_condition}_{host}_{virus}/ints/{samp}.{host}.{virus}.integrations{post}.txt" 
 	output:
 		scored_reads = "{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv"
 	wildcard_constraints:

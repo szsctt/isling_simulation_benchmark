@@ -1,4 +1,4 @@
-sim-and-analysis_test:
+test-combined:
    out_directory: "../../out/"
    
    # integration simulation

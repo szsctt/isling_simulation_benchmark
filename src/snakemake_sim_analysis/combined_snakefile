@@ -176,14 +176,15 @@ sim_summaries = expand("{outpath}/{exp}/simulation_summary.tsv",
 
 
 													
-analysis_summaries = set([f"{outdir}/{experiment}/analysis_conditions.tsv" for outdir, experiment in 
+analysis_summaries = [f"{outdir}/{experiment}/analysis_conditions.tsv" for outdir, experiment in 
 												zip(df.loc[:,'out_directory'],
 														df.loc[:,'experiment']
 														)
-											])
+											]
 								
 
 post_targets = expand("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt",
+												zip,
 												outpath = toDo['outdir'],
 												dset = toDo['dataset'],
 												samp = toDo['sample'],
@@ -195,20 +196,31 @@ post_targets = expand("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.
 both_targets = []
 
 for i, row in analysis_df.iterrows():
-	experiment = row['experiment']
+	exp = row['experiment']
 	outpath = row['output_directory']
 	analysis_condition = row['analysis_condition']
-	samples = set(toDo[toDo['config_dataset'] == analysis_condition]['sample'])
 	
-	both_targets += [f"{outpath}/{experiment}/scored_reads/{samp}_{analysis_condition}.tsv" for samp in samples]
+	# get samples, hosts, viruses for this analysis condition
+	samples = set(toDo[toDo['config_dataset'] == analysis_condition]['sample'])
+	hosts = set(toDo[toDo['config_dataset'] == analysis_condition]['host'])
+	viruses = set(toDo[toDo['config_dataset'] == analysis_condition]['virus'])
+	
+	
+	both_targets += [f"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv" for samp, post, host, virus 
+										in itertools.product(samples, ['', '.post'], hosts, viruses)
+									]
+
 
 
 rule all:
 	input: 
-		sim_targets,
-		sim_summaries,
-		analysis_summaries,
-		post_targets
+		set(sim_targets),
+		set(sim_summaries),
+		set(analysis_summaries),
+		set(post_targets),
+		set(both_targets)
+		
+		
 
 #####################################################
 ############### simulate integrations ###############
@@ -242,25 +254,29 @@ rule write_analysis_summary:
 		
 rule score_reads:
 	input:
-		sim_bam = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
-		sim_info = "{outpath}/{exp}/sim_reads/{samp}.bam",
-		analysis_info = "{outpath}/{exp}_{analysis_condition}/ints/{samp}.integrations{type}.txt"
+		sim_info = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
+		sim_bam = "{outpath}/{exp}/sim_reads/{samp}.sorted.bam",
+		analysis_info = "{outpath}/{exp}_{host}_{virus}/ints/{samp}.{host}.{virus}.integrations{post}.txt" 
 	output:
-		scored_reads = "{outpath}/{exp}/scored_reads/{samp}_{analysis_condition}.tsv"
+		scored_reads = "{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv"
 	wildcard_constraints:
-		type = "|.post",
+		post = "|\.post",
 		exp = "|".join(set(df['experiment'])),
 		samp = "|".join(set(toDo['sample'])),
-		analysis_condition = "|".join(analysis_condition_names),
-		outpath = "|".join(set(toDo['outdir']))
+		analysis_condition = "|".join(analysis_df['analysis_condition']),
+		outpath = "|".join(set(toDo['outdir'])),
+		host = "|".join(set(toDo['host'])),
+		virus = "|".join(set(toDo['virus']))
 	container:
 		"docker://szsctt/simvi:2"
+	conda:
+		"envs/simvi.yml"
 	shell:
 		"""
 		python3 scripts/score_reads.py \
 		--sim-info {input.sim_info} \
 		--sim-bam {input.sim_bam} \
-		--analysis-info {input.analysis_info}
+		--analysis-info {input.analysis_info} \
 		--output {output.scored_reads}
 		"""
 		

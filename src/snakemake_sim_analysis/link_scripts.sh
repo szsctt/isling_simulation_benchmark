@@ -24,3 +24,8 @@ ln -sf $ANALYSIS/post .
 mkdir -p python_scripts
 ln -sf $(realpath "$SIM/snakemake_rules/parse_config.py") $(realpath python_scripts)
 ln -sf $(realpath "$ANALYSIS/snakemake_rules/make_df.py") $(realpath python_scripts)
+
+# conda envs
+mkdir -p envs
+ln -sf $(realpath "$SIM/envs/*") $(realpath envs)
+ln -sf $(realpath "$ANALYSIS/envs/*") $(realpath envs)

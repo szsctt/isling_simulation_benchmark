@@ -1,0 +1,82 @@
+test-combined:
+   out_directory: "../../out/"
+   
+   # integration simulation
+   replicates: 3 
+   hosts: 
+       "chr1" : "../../data/references/chrs/chr1.fa",
+       "chr2" : "../../data/references/chrs/chr2.fa",
+       "chr3" : "../../data/references/chrs/chr3.fa",
+       "chr4" : "../../data/references/chrs/chr4.fa",
+       "chr5" : "../../data/references/chrs/chr5.fa",
+       "chr6" : "../../data/references/chrs/chr6.fa",
+       "chr7" : "../../data/references/chrs/chr7.fa",
+       "chr8" : "../../data/references/chrs/chr8.fa",
+       "chr9" : "../../data/references/chrs/chr9.fa"
+       "chr10" : "../../data/references/chrs/chr10.fa"
+       "chr11" : "../../data/references/chrs/chr11.fa"
+       "chr12" : "../../data/references/chrs/chr12.fa"
+       "chr13" : "../../data/references/chrs/chr13.fa"
+       "chr14" : "../../data/references/chrs/chr14.fa"
+       "chr15" : "../../data/references/chrs/chr15.fa"
+       "chr16" : "../../data/references/chrs/chr16.fa"
+       "chr17" : "../../data/references/chrs/chr17.fa"
+       "chr18" : "../../data/references/chrs/chr18.fa"
+       "chr19" : "../../data/references/chrs/chr19.fa"
+       "chr20" : "../../data/references/chrs/chr20.fa"
+       "chr21" : "../../data/references/chrs/chr21.fa"
+       "chr22" : "../../data/references/chrs/chr22.fa"
+       "chrX" : "../../data/references/chrs/chrX.fa"
+       "chrY" : "../../data/references/chrs/chrY.fa"
+       
+   viruses:
+       "AAV2" :  "../../data/references/NC_001401.2.fa"
+   
+   initial_seed: 12345
+   seed_increment: 123 
+   int_num: 
+       - 10
+   epi_num:
+       - 0
+   p_whole:
+       - .7
+   p_rearrange:
+       - 0.1
+   p_delete:
+       - 0.1
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0.2
+   p_gap:
+       - 0.2
+   lambda_junction:
+       - 5
+   p_host_deletion:
+       - 0
+   lambda_host_deletion:
+       - 500
+   # read simulation
+   read_len: 
+       - 150
+   fcov: 
+       - 5 
+   frag_len: 
+       - 500 
+   frag_std: 
+       - 30
+   seq_sys: 
+       - "HS25"
+
+
+   # analysis
+   merge: 
+       - True
+   dedup: 
+       - False
+   post:
+       -
+         - dedup
+   bwa_mem:
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   

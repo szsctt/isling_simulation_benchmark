@@ -1,5 +1,5 @@
-chromosomes:
-   out_directory: "../../out/experiment1_WT"
+episomes:
+   out_directory: "../../out/experiment2_AAV-vector"
    
    # integration simulation
    replicates: 3 

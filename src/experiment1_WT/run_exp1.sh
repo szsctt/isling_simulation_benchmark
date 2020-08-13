@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
 
-bash 1_simulation.sh
+bash 1_chromosomes.sh
 
-bash 2_pipeline.sh

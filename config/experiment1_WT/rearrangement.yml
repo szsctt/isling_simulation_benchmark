@@ -1,4 +1,4 @@
-chromosomes:
+rearrangement:
    out_directory: "../../out/experiment1_WT"
    
    # integration simulation

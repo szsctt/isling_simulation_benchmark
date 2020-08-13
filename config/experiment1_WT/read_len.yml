@@ -1,4 +1,4 @@
-chromosomes:
+read_len:
    out_directory: "../../out/experiment1_WT"
    
    # integration simulation

@@ -1,4 +1,4 @@
-chromosomes:
+no_integration:
    out_directory: "../../out/experiment1_WT"
    
    # integration simulation
@@ -17,7 +17,7 @@ chromosomes:
    initial_seed: 12345
    seed_increment: 123 
    int_num: 
-       - 10
+       - 0
    epi_num:
        - 0
    p_whole:

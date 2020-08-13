@@ -1,4 +1,4 @@
-chromosomes:
+frag_dist:
    out_directory: "../../out/experiment1_WT"
    
    # integration simulation

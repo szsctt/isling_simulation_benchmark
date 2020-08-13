@@ -1,4 +1,4 @@
-chromosomes:
+whole:
    out_directory: "../../out/experiment1_WT"
    
    # integration simulation

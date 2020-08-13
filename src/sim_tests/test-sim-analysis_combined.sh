@@ -8,6 +8,7 @@ module load singularity
 
 cd ../snakemake_sim_analysis 
 
+mkdir -p ../../out
 snakemake --configfile ../../config/test/sim_and_detect.yml --snakefile combined_snakefile --dag | dot -Tsvg > ../../out/test_combined.dag.svg
 
 snakemake \

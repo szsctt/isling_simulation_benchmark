@@ -45,14 +45,6 @@ test-combined:
 
 
    # analysis
-#   bam_suffix: ".human.AAV.sam"
-#   out_dir: "../out/"
-#  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
-#  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
-#   host: 
-#       "human" : "../../data/references/test_human.fa"
-#   virus:
-#       "AAV" :  "../../data/references/test_AAV.fa"
    merge: 
        - True
        - False

@@ -5,11 +5,6 @@ chromosomes:
    replicates: 3 
    hosts: 
       chr1 : "../../data/references/chrs/chr1.fa"
-      chr2 : "../../data/references/chrs/chr2.fa"
-      chr14 : "../../data/references/chrs/chr14.fa"
-      chr20 : "../../data/references/chrs/chr20.fa"
-      chrX : "../../data/references/chrs/chrX.fa"
-      chrY : "../../data/references/chrs/chrY.fa"
        
    viruses:
       AAV2 :  "../../data/references/NC_001401.2.fa"
@@ -36,8 +31,16 @@ chromosomes:
        - 5
    p_host_deletion:
        - 0
+       - 0.2
+       - 0.4
+       - 0.6
+       - 0.8
+       - 1
    lambda_host_deletion:
+       - 50
        - 500
+       - 5000
+       - 50000
    # read simulation
    read_len: 
        - 150

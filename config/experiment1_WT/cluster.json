@@ -6,6 +6,34 @@
 		"time" : "2:00:00",
 		"output" : "../logs/{rule}.{wildcards}.log"
 	},
+	"simulate_integrations":
+	{	
+		"mem" : "100GB",
+		"time" : "24:00:00",
+		"job-name" : "simvi-sim"
+
+	},
+	"convert":
+	{	
+		"mem" : "20GB",
+		"time" : "24:00:00",
+		"job-name" : "simvi-convert"
+
+	},
+	"art":
+	{	
+		"mem" : "50GB",
+		"time" : "24:00:00",
+		"job-name" : "simvi-art"
+
+	},
+	"annotate_reads":
+	{	
+		"mem" : "10GB",
+		"time" : "24:00:00",
+		"job-name" : "simvi-annotated"
+
+	},
 	"bamtobed":
 	{	
 		"mem" : "20GB",

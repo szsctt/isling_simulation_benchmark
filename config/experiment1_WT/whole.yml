@@ -5,11 +5,6 @@ chromosomes:
    replicates: 3 
    hosts: 
       chr1 : "../../data/references/chrs/chr1.fa"
-      chr2 : "../../data/references/chrs/chr2.fa"
-      chr14 : "../../data/references/chrs/chr14.fa"
-      chr20 : "../../data/references/chrs/chr20.fa"
-      chrX : "../../data/references/chrs/chrX.fa"
-      chrY : "../../data/references/chrs/chrY.fa"
        
    viruses:
       AAV2 :  "../../data/references/NC_001401.2.fa"
@@ -21,7 +16,12 @@ chromosomes:
    epi_num:
        - 0
    p_whole:
-       - .7
+       - 1
+       - 0.8
+       - 0.6
+       - 0.4
+       - 0.2
+       - 0
    p_rearrange:
        - 0.1
    p_delete:

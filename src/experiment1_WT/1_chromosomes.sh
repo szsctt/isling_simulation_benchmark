@@ -14,7 +14,7 @@ module load singularity
 cd ../snakemake_sim_analysis 
 
 mkdir -p ${OUTPATH}
-snakemake --configfile ${CONFIG} --snakefile combined_snakefile --dag | dot -Tsvg > ${OUTPATH}/${name}.dag.svg
+snakemake --configfile ${CONFIG} --snakefile combined_snakefile --dag | dot -Tsvg > ${OUTPATH}/${NAME}.dag.svg
 
 snakemake \
  --snakefile combined_snakefile \

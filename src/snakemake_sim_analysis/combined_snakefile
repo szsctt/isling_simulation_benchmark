@@ -192,8 +192,7 @@ sim_summaries = expand("{outpath}/{exp}/simulation_summary.tsv",
 			outpath = [exp_targets[exp] for exp in experiments]
 			)
 
-
-													
+			
 analysis_summaries = [f"{outdir}/{experiment}/analysis_conditions.tsv" for outdir, experiment in 
 												zip(df.loc[:,'out_directory'],
 														df.loc[:,'experiment']
@@ -222,7 +221,7 @@ for i, row in analysis_df.iterrows():
 	hosts = set(toDo[toDo['config_dataset'] == analysis_condition]['host'])
 	viruses = set(toDo[toDo['config_dataset'] == analysis_condition]['virus'])
 	#post = ['', '.post']
-	post = ['.post']
+	post = ['.post', '']
 	
 	both_targets += [f"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv" for samp, post, host, virus 
 										in itertools.product(samples, post, hosts, viruses)
@@ -272,9 +271,10 @@ rule score_reads:
 	input:
 		sim_info = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
 		sim_bam = "{outpath}/{exp}/sim_reads/{samp}.sorted.bam",
-		analysis_info = "{outpath}/{analysis_condition}_{host}_{virus}/ints/{samp}.{host}.{virus}.integrations{post}.txt" 
+		analysis_info = "{outpath}/{analysis_condition}_{host}_{virus}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
 	output:
-		scored_reads = "{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv"
+		scored_reads = "{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv",
+		summary = "{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv"
 	wildcard_constraints:
 		post = "|\.post",
 		exp = "|".join(set(df['experiment'])),
@@ -293,7 +293,8 @@ rule score_reads:
 		--sim-info {input.sim_info} \
 		--sim-bam {input.sim_bam} \
 		--analysis-info {input.analysis_info} \
-		--output {output.scored_reads}
+		--output {output.scored_reads} \
+		--output-summary {output.summary}
 		"""
 		
 

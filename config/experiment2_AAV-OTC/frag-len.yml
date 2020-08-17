@@ -1,0 +1,62 @@
+episomes:
+   out_directory: "../../out/experiment2_AAV-OTC"
+   
+   # integration simulation
+   replicates: 3 
+   hosts: 
+      chr1 : "../../data/references/chrs/chr1.fa"
+       
+   viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   
+   initial_seed: 12345
+   seed_increment: 123 
+   int_num: 
+       - 1000
+   epi_num:
+       - 0
+   p_whole:
+       - .7
+   p_rearrange:
+       - 0.1
+   p_delete:
+       - 0.1
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0.2
+   p_gap:
+       - 0.2
+   lambda_junction:
+       - 5
+   p_host_deletion:
+       - 0
+   lambda_host_deletion:
+       - 500
+   # read simulation
+   read_len: 
+       - 150
+   fcov: 
+       - 5 
+   frag_len:
+       - 150 
+       - 300
+       - 500 
+       - 1000 
+   frag_std: 
+       - 30
+   seq_sys: 
+       - "HS25"
+
+
+   # analysis
+   merge: 
+       - True
+   dedup: 
+       - False
+   post:
+       -
+         - dedup
+   bwa_mem:
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   

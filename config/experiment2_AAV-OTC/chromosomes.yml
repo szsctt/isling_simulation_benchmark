@@ -52,13 +52,29 @@ chromosomes:
 
 
    # analysis
+   analysis_hosts: 
+      chr1 : "../../data/references/chrs/chr1.fa"
+      chr2 : "../../data/references/chrs/chr2.fa"
+      chr14 : "../../data/references/chrs/chr14.fa"
+      chr20 : "../../data/references/chrs/chr20.fa"
+      chrX : "../../data/references/chrs/chrX.fa"
+      chrY : "../../data/references/chrs/chrY.fa"
+      hg38: "../../data/references/GRCh38.fa"
+       
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+      
    merge: 
        - True
    dedup: 
        - False
    post:
        -
-         - dedup
+         - filter
+       -
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
+           
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    

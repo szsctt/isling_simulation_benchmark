@@ -71,7 +71,7 @@ for dataset in datasets:
 		config[condition] =  copy.deepcopy(tmp)
 		config[condition]['merge'] = merge
 		config[condition]['dedup'] = dedup
-		config[condition]['post'] = " ".join(post)
+		config[condition]['post'] = make_post_args({dataset: {'post':post}})[0][dataset]
 		config[condition]['read1-adapt'] = adapter_seqs[seq_sys]['read1-adapt']
 		config[condition]['read2-adapt'] = adapter_seqs[seq_sys]['read2-adapt']
 		config[condition]['read_dir'] = os.path.join(config[condition]['out_directory'], dataset, "sim_reads")
@@ -100,8 +100,8 @@ for dataset in config:
 	samples = [f"{cond}.rep{rep}" for cond, rep, in zip(conditions, replicates)]
 	
 	# also get host/virus cominbations
-	host_names =  df[df['experiment'] == experiment]['host_name']
-	virus_names =  df[df['experiment'] == experiment]['virus_name']
+	host_names =  config[dataset]['analysis_hosts'].keys()
+	virus_names = config[dataset]['analysis_viruses'].keys()
 	
 	# figure out if 'dedup' and 'merge' are true or false for this dataset
 	if isinstance(config[dataset]["dedup"], bool):
@@ -138,9 +138,12 @@ for dataset in config:
 		config[dataset]["R2_suffix"] = "_2.fq.gz"
 		R1_file = f"{os.path.normpath(config[dataset]['out_directory'])}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
 		R2_file = f"{os.path.normpath(config[dataset]['out_directory'])}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
-		bam_file = os.path.join(config[dataset]['read_dir'],  "{samp}.sam")
+		bam_file = os.path.join(config[dataset]['read_dir'],  f"{sample}.sam")
+			
+		host_fasta = config[dataset]["analysis_hosts"][host]
+		virus_fasta = config[dataset]["analysis_viruses"][virus]
 		
-		row = (dataset_name, dataset, sample, host, config[dataset]["hosts"][host], virus, config[dataset]["viruses"][virus], merge, 
+		row = (dataset_name, dataset, sample, host, host_fasta, virus, virus_fasta, merge, 
 			dedup, unique, config[dataset]["out_directory"], bwa_mem_params, R1_file, R2_file, bam_file, 
 			config[dataset]['read1-adapt'], config[dataset]['read2-adapt'], config[dataset]['post'])
 		
@@ -226,6 +229,13 @@ for i, row in analysis_df.iterrows():
 	both_targets += [f"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv" for samp, post, host, virus 
 										in itertools.product(samples, post, hosts, viruses)
 									]
+									
+# summary files
+scored_summaries = expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv', 
+			zip,
+			exp = experiments, 
+			outpath = [exp_targets[exp] for exp in experiments]
+			)
 
 rule all:
 	input: 
@@ -233,7 +243,8 @@ rule all:
 		set(sim_summaries),
 		set(analysis_summaries),
 		#set(post_targets),
-		set(both_targets)
+		set(both_targets),
+		set(scored_summaries)
 		
 		
 
@@ -283,6 +294,11 @@ rule score_reads:
 		outpath = "|".join(set(toDo['outdir'])),
 		host = "|".join(set(toDo['host'])),
 		virus = "|".join(set(toDo['virus']))
+	resources:
+		mem_mb= lambda wildcards, attempt: attempt * 50000,
+		time = "24:00:00",
+		nodes = 1
+	
 	container:
 		"docker://szsctt/simvi:2"
 	conda:
@@ -296,5 +312,52 @@ rule score_reads:
 		--output {output.scored_reads} \
 		--output-summary {output.summary}
 		"""
+
+def scores_to_combine(wildcards):
+	targets = []
+	
+	
+	
+	for i, row in analysis_df.iterrows():
+
+		if row['experiment'] != wildcards.exp:
+			continue
+		analysis_condition = row['analysis_condition']
+	
+	
+		# get samples, hosts, viruses for this analysis condition
+		samples = set(toDo[toDo['config_dataset'] == analysis_condition]['sample'])
+		hosts = set(toDo[toDo['config_dataset'] == analysis_condition]['host'])
+		viruses = set(toDo[toDo['config_dataset'] == analysis_condition]['virus'])
+		post = ['', '.post']
+	
+		targets += [f"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv"
+		 						for samp, host, post, virus 
+								in itertools.product(samples, hosts, post, viruses)
+									]
+									
+	return set(targets)
+
+
+rule combine_scores:
+	input:
+		scores_to_combine
+	output:
+		"{outpath}/{exp}/{exp}.scored_reads_summary.tsv"
+	container:
+		"docker://ubuntu:18.04"	
+	resources:
+		mem_mb= lambda wildcards, attempt: attempt * 1000,
+		time = "24:00:00",
+		nodes = 1
+	shell:
+		"""
+		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
+		"""
+		
+	
+		
+		
+		
 		
 

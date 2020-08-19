@@ -19,7 +19,7 @@ snakemake --configfile ${CONFIG} --snakefile combined_snakefile --dag | dot -Tsv
 snakemake \
  --snakefile combined_snakefile \
  --configfile ${CONFIG}\
- --jobs 50 \
+ --jobs 100 \
  --use-singularity \
  --profile slurm \
  --cluster-config ${CLUSTER}

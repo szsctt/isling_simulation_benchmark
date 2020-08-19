@@ -52,13 +52,19 @@ episomes:
 
 
    # analysis
+   analysis_hosts: 
+      chr1 : "../../data/references/chrs/chr1.fa"
+      hg38: "../../data/references/GRCh38.fa"
+       
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    merge: 
        - True
    dedup: 
        - False
    post:
        -
-         - dedup
+         - filter
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    

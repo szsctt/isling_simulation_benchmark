@@ -35,3 +35,4 @@ src/snakemake_sim_analysis/slurm*
 src/snakemake_sim_analysis/ViralIntegration.pm
 src/snakemake_sim_analysis/results.tsv
 
+.Rproj.user

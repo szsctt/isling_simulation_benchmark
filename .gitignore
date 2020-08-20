@@ -34,5 +34,11 @@ src/snakemake_sim_analysis/writeBed.R
 src/snakemake_sim_analysis/slurm*
 src/snakemake_sim_analysis/ViralIntegration.pm
 src/snakemake_sim_analysis/results.tsv
-
+analysis/.RData
 .Rproj.user
+analysis/.Rhistory
+analysis/analysis.Rproj
+analysis/*.tsv
+analysis/*.html
+data/references/chr*.fa
+*.svg

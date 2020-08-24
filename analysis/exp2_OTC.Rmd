@@ -1,0 +1,52 @@
+---
+title: "Experiment 2 - OTC vector"
+output: html_notebook
+---
+
+
+```{r}
+library(tidyverse)
+source("sim_functions.R")
+```
+
+```{r}
+df <- importData(sim_sum_path = "../out/experiment2_AAV-OTC/chromosomes/simulation_summary.tsv",
+           analy_sum_path = "../out/experiment2_AAV-OTC/chromosomes/analysis_conditions.tsv",
+           results_sum_path = "../out/experiment2_AAV-OTC/chromosomes/scored_reads_summary.tsv")
+df
+
+```
+
+```{r}
+df %>% 
+  filter(sim_host == analysis_host) %>% 
+  filter(!post) %>% 
+  select(sim_host, replicate,  sim_virus, true_positive, false_positive, true_negative, false_negative)
+
+df %>% 
+  filter(sim_host == analysis_host) %>% 
+  filter(!post) %>% 
+  select(sim_host, replicate,  sim_virus, true_positive, false_positive, true_negative, false_negative) %>% 
+  write_tsv("chromosomes.tsv")
+```
+
+
+
+```{r}
+df %>% 
+  filter(!post) %>% 
+  group_by(condition, analysis_condition, analysis_host, analysis_virus, sim_host) %>% 
+  summarise(TNR = mean(TNR),
+            TNR_sem = sd(TNR)/sqrt(n()),
+            TPR = mean(TPR),
+            TPR_sem = sd(TPR)/sqrt(n())
+            ) %>% 
+  ggplot(aes(x = TNR, y = TPR, color = sim_host, shape = sim_host == analysis_host)) + 
+  geom_point(alpha = 0.8, size=3) +
+  geom_errorbar(aes(xmin=TNR-TNR_sem, xmax=TNR-TNR_sem, ymin=TPR-TPR_sem, ymax=TPR-TPR_sem)) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate')
+```
+

@@ -296,9 +296,8 @@ rule score_reads:
 		virus = "|".join(set(toDo['virus']))
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 50000,
-		time = "24:00:00",
+		time = lambda wildcards, attempt: f"{int(24 * attempt)}:00:00",
 		nodes = 1
-	
 	container:
 		"docker://szsctt/simvi:2"
 	conda:
@@ -315,8 +314,6 @@ rule score_reads:
 
 def scores_to_combine(wildcards):
 	targets = []
-	
-	
 	
 	for i, row in analysis_df.iterrows():
 
@@ -347,8 +344,8 @@ rule combine_scores:
 	container:
 		"docker://ubuntu:18.04"	
 	resources:
-		mem_mb= lambda wildcards, attempt: attempt * 1000,
-		time = "24:00:00",
+		mem_mb= lambda wildcards, attempt: attempt * 50000,
+		time = lambda wildcards, attempt: f"{int(24 * attempt)}:00:00",
 		nodes = 1
 	shell:
 		"""

@@ -99,7 +99,7 @@ for dataset in config:
 	
 	samples = [f"{cond}.rep{rep}" for cond, rep, in zip(conditions, replicates)]
 	
-	# also get host/virus cominbations
+	# also get host/virus cominbation
 	host_names =  config[dataset]['analysis_hosts'].keys()
 	virus_names = config[dataset]['analysis_viruses'].keys()
 	
@@ -295,7 +295,7 @@ rule score_reads:
 		host = "|".join(set(toDo['host'])),
 		virus = "|".join(set(toDo['virus']))
 	resources:
-		mem_mb= lambda wildcards, attempt: attempt * 50000,
+		mem_mb= lambda wildcards, attempt: attempt * 100000,
 		time = lambda wildcards, attempt: f"{int(24 * attempt)}:00:00",
 		nodes = 1
 	container:

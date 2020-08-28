@@ -45,6 +45,10 @@ test-combined:
 
 
    # analysis
+   analysis_hosts: 
+       "human" : "../../data/references/test_human.fa"
+   analysis_viruses:
+       "AAV" :  "../../data/references/test_AAV.fa"
    merge: 
        - True
        - False

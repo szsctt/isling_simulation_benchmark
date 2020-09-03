@@ -4,3 +4,6 @@
 [submodule "intvi_simultion"]
 	path = intvi_simulation
 	url = https://bitbucket.csiro.au/scm/~sco305/intvi_simultion.git
+[submodule "polyidus"]
+	path = polyidus
+	url = https://github.com/hoffmangroup/polyidus.git

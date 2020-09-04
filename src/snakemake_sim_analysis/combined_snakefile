@@ -40,6 +40,7 @@ config, df, ref_dict = parse_config(config)
 # add fields reuired for analysis to config: 
 # bam_suffix, read_dir, out_dir, read1-adapt, read2-adapt, host, virus
 analysis_condition_names = []
+analysis_conditions = []
 datasets = list(config.keys())
 for dataset in datasets:
 		
@@ -50,7 +51,7 @@ for dataset in datasets:
 	# need to copy the dataset dict and give each a unique name
 	tmp = copy.deepcopy(config[dataset])
 	del config[dataset]
-	analysis_conditions = []
+	#analysis_conditions = []
 	i = 0
 	
 	assert hasattr(tmp['merge'], '__iter__')
@@ -60,10 +61,10 @@ for dataset in datasets:
 	assert hasattr(tmp['bwa_mem'], '__iter__')
 	
 	for merge, dedup, post, seq_sys, bwa_mem_params in itertools.product(tmp['merge'], 
-																											 									tmp['dedup'],
-																											 									tmp['post'],
-																											 									tmp['seq_sys'],
-																											 									tmp['bwa_mem']):
+																		tmp['dedup'],
+																		tmp['post'],
+																		tmp['seq_sys'],
+																		tmp['bwa_mem']):
 		
 		condition = f"{dataset}_analysis{i}"
 		analysis_condition_names.append(condition)
@@ -82,9 +83,9 @@ for dataset in datasets:
 		)
 	
 	# save information about analysis conditions to outdir for current dataset
-	analysis_df = pd.DataFrame(analysis_conditions, 
-								columns = ['experiment', 'analysis_condition', 'bam_suffix', 'read_folder', 'output_directory',
-														'merge', 'dedup', 'post', 'seq_sys', 'read1_adapter', 'read2_adapter', 'bwa_mem']
+analysis_df = pd.DataFrame(analysis_conditions, 
+			columns = ['experiment', 'analysis_condition', 'bam_suffix', 'read_folder', 'output_directory',
+						'merge', 'dedup', 'post', 'seq_sys', 'read1_adapter', 'read2_adapter', 'bwa_mem']
 							)
 	
 
@@ -150,8 +151,7 @@ for dataset in config:
 		assert row not in rows
 		
 		rows.append(row)
-	
-
+			
 toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs'])
 
 # make dictionary of reference names and fasta files
@@ -318,9 +318,9 @@ rule score_reads:
 
 def scores_to_combine(wildcards):
 	targets = []
-	
-	for i, row in analysis_df.iterrows():
 
+	for i, row in analysis_df.iterrows():
+		
 		if row['experiment'] != wildcards.exp:
 			continue
 		analysis_condition = row['analysis_condition']
@@ -332,11 +332,11 @@ def scores_to_combine(wildcards):
 		viruses = set(toDo[toDo['config_dataset'] == analysis_condition]['virus'])
 		post = ['', '.post']
 	
-		targets += [f"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv"
+		targets += [f"{outpath}/{wildcards.exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv"
 		 						for samp, host, post, virus 
 								in itertools.product(samples, hosts, post, viruses)
 									]
-									
+							
 	return set(targets)
 
 

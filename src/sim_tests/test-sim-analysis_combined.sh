@@ -16,13 +16,15 @@ snakemake \
  --configfile ../../config/test/sim_and_detect.yml\
  --jobs 50 \
  --use-singularity \
- --profile slurm
+ --profile slurm \
+ --rerun-incomplete
  
 # for local execution
 #snakemake \
 # --snakefile combined_snakefile \
 # --configfile ../../config/test/sim_and_detect.yml\
-# --jobs 50 \
+# --jobs 1 \
 # --use-conda \
-# --conda-frontend mamba 
+# --conda-frontend mamba \
+# --rerun-incomplete
 

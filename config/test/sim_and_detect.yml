@@ -10,7 +10,7 @@ test-easier:
    initial_seed: 12345
    seed_increment: 123 
    int_num: 
-       - 10
+       - 5
    epi_num:
        - 0
    p_whole:
@@ -50,7 +50,7 @@ test-easier:
    analysis_viruses:
        "AAV" :  "../../data/references/test_AAV.fa"
    merge: 
-#       - True
+       - True
        - False
    dedup: 
        - False
@@ -72,9 +72,9 @@ test-harder:
    initial_seed: 12345
    seed_increment: 123 
    int_num: 
-       - 10
+       - 5
    epi_num:
-       - 0
+       - 10
    p_whole:
        - 0.5
    p_rearrange:
@@ -112,7 +112,7 @@ test-harder:
    analysis_viruses:
        "AAV" :  "../../data/references/test_AAV.fa"
    merge: 
-       - False
+       - True
    dedup: 
        - False
    post:

@@ -281,7 +281,7 @@ rule write_analysis_summary:
 rule score_reads:
 	input:
 		sim_info = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
-		sim_bam = "{outpath}/{exp}/sim_reads/{samp}.sorted.bam",
+		sim_sam = "{outpath}/{exp}/sim_reads/{samp}.sam",
 		analysis_info = "{outpath}/{analysis_condition}_{host}_{virus}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
 	output:
 		scored_reads = "{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv",
@@ -298,6 +298,9 @@ rule score_reads:
 		mem_mb= lambda wildcards, attempt: attempt * 100000,
 		time = lambda wildcards, attempt: f"{int(24 * attempt)}:00:00",
 		nodes = 1
+	threads: 10
+	benchmark:
+		"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}_benchmark.tsv"
 	container:
 		"docker://szsctt/simvi:2"
 	conda:
@@ -306,10 +309,11 @@ rule score_reads:
 		"""
 		python3 scripts/score_reads.py \
 		--sim-info {input.sim_info} \
-		--sim-bam {input.sim_bam} \
+		--sim-sam {input.sim_sam} \
 		--analysis-info {input.analysis_info} \
 		--output {output.scored_reads} \
-		--output-summary {output.summary}
+		--output-summary {output.summary} \
+		--threads {threads}
 		"""
 
 def scores_to_combine(wildcards):

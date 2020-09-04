@@ -27,5 +27,5 @@ find "$ANALYSIS/snakemake_rules" -name 'make_df.py' -exec ln -sf "$(realpath '{}
 
 # conda envs
 mkdir -p envs
-ln -sf $(realpath "$SIM/envs/*") "$(realpath envs)"
-ln -sf $(realpath "$ANALYSIS/envs/*") "$(realpath envs)"
+find "$SIM/envs" -name '*.yml' -exec ln -sf "$(realpath '{}')" "$(realpath envs)" \;
+find "$ANALYSIS/envs" -name '*.yml' -exec ln -sf "$(realpath '{}')" "$(realpath envs)" \;

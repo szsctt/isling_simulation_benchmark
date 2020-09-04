@@ -42,3 +42,5 @@ analysis/*.tsv
 analysis/*.html
 data/references/chr*.fa
 *.svg
+src/snakemake_sim_analysis/*.bam
+notes/

@@ -50,7 +50,7 @@ test-combined:
    analysis_viruses:
        "AAV" :  "../../data/references/test_AAV.fa"
    merge: 
-       - True
+#       - True
        - False
    dedup: 
        - False

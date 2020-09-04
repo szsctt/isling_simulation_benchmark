@@ -17,7 +17,7 @@ chromosomes:
    initial_seed: 12345
    seed_increment: 123 
    int_num: 
-       - 10
+       - 1000
    epi_num:
        - 0
    p_whole:

@@ -8,7 +8,7 @@ ANALYSIS="../../intvi_pipeline"
 
 # simulation stuff
 mkdir -p snakemake_rules
-find "$SIM/snakemake_rules" -name '*smk' -exec ln -sf "{}" "$(realpath snakemake_rules)" \;
+find "$SIM/snakemake_rules" -name '*smk' -exec ln -sf  "$(realpath '{}')" "$(realpath snakemake_rules)" \;
 ln -sf "$SIM/snakemake_rules/make_df.py" "$(realpath snakemake_rules)"
 ln -sf "$SIM/scripts" .
 

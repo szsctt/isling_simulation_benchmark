@@ -8,10 +8,8 @@ module load singularity
 
 cd ../snakemake_sim_analysis 
 
-DAGDIR="../../out/test"
-
-mkdir -p ${DAGDIR}
-snakemake --configfile ../../config/test/sim_and_detect.yml --snakefile combined_snakefile --dag | dot -Tsvg > ${DAGDIR}/test_combined.dag.svg
+mkdir -p ../../out/test
+snakemake --configfile ../../config/test/sim_and_detect.yml --snakefile combined_snakefile --dag | dot -Tsvg > ../../out/test/test_combined.dag.svg
 
 snakemake \
  --snakefile combined_snakefile \
@@ -20,7 +18,11 @@ snakemake \
  --use-singularity \
  --profile slurm
  
- 
-
-
+# for local execution
+#snakemake \
+# --snakefile combined_snakefile \
+# --configfile ../../config/test/sim_and_detect.yml\
+# --jobs 50 \
+# --use-conda \
+# --conda-frontend mamba 
 

@@ -88,7 +88,6 @@ analysis_df = pd.DataFrame(analysis_conditions,
 						'merge', 'dedup', 'post', 'seq_sys', 'read1_adapter', 'read2_adapter', 'bwa_mem']
 							)
 	
-
 	
 # make dataframe with parameters for analysis
 rows = []
@@ -123,7 +122,7 @@ for dataset in config:
 			merge = 0
 	else:
 		raise InputError(f"Please specify True or False for 'merge' in dataset {dataset}")
-	
+
 	# for each sample, host and virus combination, add a row to rows
 	for sample, host, virus in itertools.product(samples, set(host_names), set(virus_names)):
 		
@@ -295,7 +294,7 @@ rule score_reads:
 		host = "|".join(set(toDo['host'])),
 		virus = "|".join(set(toDo['virus']))
 	resources:
-		mem_mb= lambda wildcards, attempt: attempt * 100000,
+		mem_mb= lambda wildcards, attempt: attempt * 50000,
 		time = lambda wildcards, attempt: f"{int(24 * attempt)}:00:00",
 		nodes = 1
 	threads: 10

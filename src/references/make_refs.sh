@@ -14,7 +14,6 @@ mv GCA_000001405.15_GRCh38_no_alt_analysis_set.fna GRCh38.fa
 perl -pe 's/^>(\w+?) .+/>$1/' GRCh38.fa | awk '/^>chr/ {OUT=substr($0,2) ".fa"}; OUT {print >OUT}'
 
 # get AAV2 sequence (NCBI Reference Sequence: NC_001401.2)
-
 conda activate eutils
 esearch -db nucleotide -query NC_001401.2 | efetch -format fasta > NC_001401.2.fa
 

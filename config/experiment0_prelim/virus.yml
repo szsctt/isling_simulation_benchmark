@@ -61,11 +61,11 @@ rep68-easier:
          - filter
        -
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
        -
          - filter
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
   
@@ -133,11 +133,11 @@ OTC-vect-easier:
          - filter
        -
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
        -
          - filter
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
   
@@ -205,11 +205,11 @@ AAV2-easier:
          - filter
        -
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
        -
          - filter
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200" 
        
@@ -276,11 +276,11 @@ OTC-vect-harder:
          - filter
        -
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
        -
          - filter
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 
@@ -347,11 +347,11 @@ AAV2-harder:
          - filter
        -
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
        -
          - filter
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200" 
        

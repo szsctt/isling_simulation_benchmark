@@ -1,6 +1,12 @@
 ---
 title: "Experiment 2 - OTC vector"
-output: html_notebook
+output:
+  html_notebook:
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
 ---
 
 
@@ -9,6 +15,69 @@ library(tidyverse)
 source("sim_functions.R")
 ```
 
+```{css, echo=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+## Episomes
+
+Simulated 1000 integrations of the OTC vector into human chromsome 1 (from hg38).  To these integrations, added some episomes - between 0 and 100,000.  Included some non-whole OTC genomes, some gaps and overlaps at junctions, some vector rearrangements and deletions, but no deletions from the host.  
+
+For analysis, used two different host references - all of hg38, or just chr1.  
+
+### Config file
+
+The config file for this experiment was as follows:
+```{bash class.output="scroll-100"}
+cat "../config/experiment2_AAV-OTC/episomes.yml"
+```
+
+### Table of results
+
+```{r include=FALSE}
+epi <- importData(sim_sum_path = "../out/experiment2_AAV-OTC/episomes/simulation_summary.tsv",
+           analy_sum_path = "../out/experiment2_AAV-OTC/episomes/analysis_conditions.tsv",
+           results_sum_path = "../out/experiment2_AAV-OTC/episomes/episomes.scored_reads_summary.tsv")
+
+epi_results <- epi %>% 
+  filter(score_type == 'found_score') %>% 
+  filter(!post) %>% 
+  select(condition, replicate, epi_num, junc_type, analysis_host, true_positive, true_negative, false_positive, false_negative)
+
+```
+
+### True and false positive rates
+
+Examine the true and false positve rates for various numbers of episomes added to the simulated fasta.  
+
+Analysis was performed with only chr1 as a reference sequence or all of chr1.  Postprocessing was either performed (filter for any suspicious-looking events) or not (TRUE/FALSE)
+
+```{r}
+epi %>% 
+  filter(score_type == "found_score") %>% 
+  group_by(condition, analysis_condition, analysis_host, analysis_virus, sim_host, post, epi_num, score_type, junc_type) %>% 
+  summarise(TNR_mean = mean(TNR),
+            TNR_sem = sd(TNR)/sqrt(n()),
+            TPR_mean = mean(TPR),
+            TPR_sem = sd(TPR)/sqrt(n())) %>% 
+  ggplot(aes(x = TNR_mean, y = TPR_mean, color = epi_num, shape = junc_type)) +
+  geom_point(alpha = 0.8, size=3) +
+  geom_errorbar(aes(xmin = TNR_mean - TNR_sem, xmax = TNR_mean + TNR_sem,
+                    ymin=TPR_mean - TPR_sem, ymax=TPR_mean + TPR_sem)) + 
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate') +
+  facet_grid(rows=vars(post), cols=vars(analysis_host))
+```
+
+
+## Chromosomes
+ 
 ```{r}
 df <- importData(sim_sum_path = "../out/experiment2_AAV-OTC/chromosomes/simulation_summary.tsv",
            analy_sum_path = "../out/experiment2_AAV-OTC/chromosomes/analysis_conditions.tsv",

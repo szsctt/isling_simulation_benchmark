@@ -34,7 +34,7 @@ bwa index /home/repo/data/hg19_hbv.fas
 INPUT_DIR="/scratch1/sco305/intvi_simulation-experiments/polyidus/data/fastqfiles"
 READ1="SiHa_R1.fastq.gz"
 READ2="SiHa_R2.fastq.gz"
-OUTPUT_DIR=$PWD/test_output
+OUTPUT_DIR=$PWD/test_output_0
 mkdir -p $OUTPUT_DIR
 CPUS="1"
 

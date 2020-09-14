@@ -2,7 +2,7 @@
 set -e
 
 CONFIG="../../config/experiment0_prelim/virus.yml"
-CLUSTER="../../config/experiment2_AAV-OTC/cluster.json"
+CLUSTER="../../config/experiment0_prelim/cluster.json"
 OUTPATH="../../out/experiment0_prelim/"
 NAME="viruses"
 

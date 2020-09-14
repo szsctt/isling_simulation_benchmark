@@ -295,7 +295,7 @@ rule score_reads:
 		virus = "|".join(set(toDo['virus']))
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 50000,
-		time = lambda wildcards, attempt: f"{int(24 * attempt)}:00:00",
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	threads: 10
 	benchmark:
@@ -348,7 +348,7 @@ rule combine_scores:
 		"docker://ubuntu:18.04"	
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 50000,
-		time = lambda wildcards, attempt: f"{int(24 * attempt)}:00:00",
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	shell:
 		"""

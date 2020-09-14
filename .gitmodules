@@ -7,3 +7,6 @@
 [submodule "polyidus"]
 	path = polyidus
 	url = https://github.com/hoffmangroup/polyidus.git
+[submodule "ViFi"]
+	path = ViFi
+	url = https://github.com/namphuon/ViFi.git

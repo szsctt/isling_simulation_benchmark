@@ -3,7 +3,6 @@ out
 out_sim
 data/references/*.fa.fai
 logs/
-
 data/references/GRCh38.fa
 data/references/NC_001401.2.fa
 data/references/chrs/
@@ -44,3 +43,10 @@ data/references/chr*.fa
 *.svg
 src/snakemake_sim_analysis/*.bam
 notes/
+vifi-test/HMM_HPV_HBV.zip
+vifi-test/data/
+vifi-test/data_repo.tar.gz
+vifi-test/data_repo/
+vifi-test/test_output_0/
+vifi-test/vifi_latest.sif
+

@@ -1,5 +1,5 @@
 ---
-title: "Viral integration simulations - pilot experiment"
+title: "Viral integration simulations"
 output:
   html_notebook:
     code_folding: hide

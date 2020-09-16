@@ -175,6 +175,7 @@ wildcard_constraints:
 	host = "|".join(set(toDo.loc[:, 'host'])),
 	virus = "|".join(set(toDo.loc[:, 'virus']))
 	
+localrules: write_summary, write_analysis_summary, combine_scores
 
 #####################################################
 ################### target files ####################

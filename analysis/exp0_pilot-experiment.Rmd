@@ -90,6 +90,7 @@ cat "../config/test/sim_and_detect.yml"
 The DAG from snakemake looks like this:
 ![DAG for this experiment](../out/test/test_combined.dag.svg)
 
+
 ## Results
 
 There are a few different ways of scoring the results from these experiments.  One thing to look at is just simply if all the reads that cross integrations in the simulated fasta are found in the output.  Within those reads that are found, we can also look at if the locations of the integration in the host and vector genomes are correct.
@@ -119,6 +120,16 @@ Each read was considered to be a potential chimeric read, and additionally each 
 ```{r}
 results %>% 
   filter(!post) %>%
+  select(experiment, merge, score_type, junc_type, true_positive, true_negative, false_positive, false_negative) %>% 
+  filter(merge == 1) %>% 
+  kable() %>%
+  kable_styling()
+  
+```
+
+```{r}
+results %>% 
+  filter(!post) %>%
   filter(score_type == 'found_score') %>% 
   select(experiment, merge, junc_type, true_positive, true_negative, false_positive, false_negative) %>% 
   mutate(merge = ifelse(merge ==1, TRUE, FALSE))   %>% 
@@ -140,7 +151,9 @@ awk 'match($3, /fn/)' "../out/test/test-harder/scored_reads/test-harder_analysis
 
 So all the missing integrations come from two (of five) integrations - with ids '3' and '4'.  For context, the properties of all the integrations were:
 ```{r}
-read_tsv(harder_ints)
+read_tsv(harder_ints) %>% 
+kable() %>% 
+  kable_styling()
 ```
 
 These two integrations are of rearranged virus fragments.  The most obvious difference between these two integrations and the other integrations is that they have some pieces that are particularly short (relative to the 150pb reads) - integration 4 has a second fragment which is `r 1545-1487`bp long, and integration 3 has a second fragment which is `r 476-423`bp long.  It's possible that a read could start in the first rearranged piece, and extend through the second rearranged piece into the host.  This hypothetical read would be mapped either to the first reaarranged piece (and have a lot more soft-clipped reads than it should), or to the second rearranged piece (and be soft-clipped on each end of the read).  
@@ -221,9 +234,8 @@ results %>%
 
 So it looks like in the 'harder' condition, we have a few reads that have an incorrect position within the virus.  Check if these reads come from a particular integration, which perhaps some particularly difficult properties.  
 
-Check out the reads that were true positives based on 
+Check out the reads that were true positives for found_score but false negatives for virus_score
 
-Print out the properties of the simulated integrations
 
 ```{bash, engine.opts='-e'}
 LIST=$(awk 'match($5,/fn/) && match($3, /tp/) && match($10,/discord/)' "../out/test/test-harder/scored_reads/test-harder_analysis0.cond0.rep0.human.AAV.tsv" | cut -f2 | sort | uniq)
@@ -233,6 +245,8 @@ for l in $LIST; do
 done
 
 ```
+
+Again, these false positives seem to come from integrations 3 and 4.
 
 # Experiment 2 - using different vectors/viruses
 
@@ -291,7 +305,7 @@ The parameters used for each were:
 cat "../config/experiment0_prelim/virus.yml"
 ```
 
-```{r}
+```{r include=FALSE}
 sim <- c("../out/experiment0_prelim/AAV2-easier/simulation_summary.tsv",
         "../out/experiment0_prelim/AAV2-harder/simulation_summary.tsv",
         "../out/experiment0_prelim/OTC-vect-easier/simulation_summary.tsv",
@@ -321,7 +335,6 @@ for (i in seq(2, length(sim))){
   tmp <- importData(sim[i],  analysis[i], scored[i])
   results <- bind_rows(results, tmp)
 }
-
 ```
 
 ### Are all the reads that cross integrations found?
@@ -455,8 +468,11 @@ results %>%
   kable_styling()
 ```
 
-There are a few false positves amongst the discordant read pairs.
-
+First check out the false negatives - which integrations do they come from?
+```{bash, engine.opts='-e', class.output="scroll-100"}
+echo " count int_id  type"
+awk 'match($3, /fn/)' "../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep0.chr1.rep68.post.tsv" | cut -f2,10 | sort -k1,1n -k2 | uniq -c
+```
 
 # Experiment 3 - breaking down the 'easer' and 'harder' conditions
 
@@ -469,6 +485,45 @@ The only data required for simulation experiments are host and virus references.
 For the host, I used chromsome 1 from hg38.   
 
 For the virus I used only rep68 from AAV2 (NC_001401.2_cds_YP_680422.1_1, protein_id=YP_680422.1, db_xref=GeneID:4192013).
+
+
+
+
+
+```{r include=FALSE}
+sim <- c("../out/experiment0_prelim/rep68-whole/simulation_summary.tsv",
+        "../out/experiment0_prelim/rep68-rearrange/simulation_summary.tsv",
+        "../out/experiment0_prelim/rep68-host_deletion/simulation_summary.tsv",
+        "../out/experiment0_prelim/rep68-gap/simulation_summary.tsv",
+        "../out/experiment0_prelim/rep68-epi/simulation_summary.tsv",
+        "../out/experiment0_prelim/rep68-deletion/simulation_summary.tsv")
+
+analysis <- c("../out/experiment0_prelim/rep68-whole/analysis_conditions.tsv",
+        "../out/experiment0_prelim/rep68-rearrange/analysis_conditions.tsv",
+        "../out/experiment0_prelim/rep68-host_deletion/analysis_conditions.tsv",
+        "../out/experiment0_prelim/rep68-gap/analysis_conditions.tsv",
+        "../out/experiment0_prelim/rep68-epi/analysis_conditions.tsv",
+        "../out/experiment0_prelim/rep68-deletion/analysis_conditions.tsv")
+
+scored <- c("../out/experiment0_prelim/rep68-whole/rep68-whole.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/rep68-rearrange/rep68-rearrange.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/rep68-host_deletion/rep68-host_deletion.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/rep68-gap/rep68-gap.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/rep68-epi/rep68-epi.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/rep68-deletion/rep68-deletion.scored_reads_summary.tsv")
+
+```
+
+```{r include=FALSE}
+results <- importData(sim[1],  analysis[1], scored[1])
+for (i in seq(2, length(sim))){
+  print(i)
+  tmp <- importData(sim[i],  analysis[i], scored[i])
+  results <- bind_rows(results, tmp)
+}
+
+```
+
 
 
 ## Session info

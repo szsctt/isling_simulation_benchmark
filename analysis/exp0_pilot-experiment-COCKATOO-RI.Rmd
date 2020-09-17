@@ -1,0 +1,478 @@
+---
+title: "Viral integration simulations"
+output:
+  html_notebook:
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: false
+---
+```{r setup, include=FALSE}
+library(tidyverse)
+library(kableExtra)
+source("sim_functions.R")
+
+easier_sim <- "../out/test/test-easier/simulation_summary.tsv"
+easier_analy <- "../out/test/test-easier/analysis_conditions.tsv"
+easier_results <- "../out/test/test-easier/test-easier.scored_reads_summary.tsv"
+
+harder_sim <- "../out/test/test-harder/simulation_summary.tsv"
+harder_analy <- "../out/test/test-harder/analysis_conditions.tsv"
+harder_results <- "../out/test/test-harder/test-harder.scored_reads_summary.tsv"
+harder_ints <- "../out/test/test-harder/sim_ints/cond0.rep0.int-info.annotated.tsv"
+
+```
+
+
+
+```{css, echo=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+# Experiment 1 - toy example
+
+## Overview
+The first experiment I did was to test out the simulation pipeline, and try to analyse the data, and compare the results from analysis with what would be expected from the pipeline.  
+
+## Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chr2:100000:102999 and chr3:100000:102999 from hg38.   
+
+For the virus I used rep68 from AAV2 (NC_001401.2_cds_YP_680422.1_1, protein_id=YP_680422.1, db_xref=GeneID:4192013)
+
+## Simulation parameters
+
+I simulated two different situations using this data: one that I thought would be 'easier' for the pipeline to handle, and one that is 'harder'.
+
+'easier' condition:  
+
+- integrations: python script
+  - 5 integrations into random location in either chromosome
+  - whole reference only 
+  - no rearrangements of viral reference
+  - no deletions from viral reference
+  - no overlaps or gaps at junction (except coincidental ones)
+  - no deletions from host at integration site
+- reads: art_illumina
+  - 2x150 bp reads
+  - 5-fold coverage
+  - 500bp fragment length, 30bp standard deviation
+  - illumina error profile ("HS25")
+- analysis options:
+  - seqPrep trims adapters and merges overlapping R1 and R2
+  - use either only chr1 or all of hg38 for host reference
+
+'harder' condition:  
+
+- integrations: python script
+  - 5 integrations into random location
+  - 10 'episomes' included (with possible rearrangments and deletions)
+  - 30% chance of whole reference, 70% chance of random subsequence 
+  - 10% chance of rearrangement of inserted (sub-)sequence (Poisson number of fragments, mean 1)
+  - 10% chance of deletion of inserted (sub-)sequence (Poisson number of fragments, mean 1)
+  - at junctions, 30% chance of overlaps, 30% chance of gaps, 40% chance of neither (Poisson number of bases involved, mean 1)
+  - 50% chance of deletion from host at integration site (Poisson number of bases, mean 20bp)
+- reads: same as 'easier' condition
+- analysis options: same as 'easier' condition
+
+The parameters used for each were:
+```{bash class.output="scroll-100"}
+cat "../config/test/sim_and_detect.yml"
+
+```
+
+The DAG from snakemake looks like this:
+![DAG for this experiment](../out/test/test_combined.dag.svg)
+
+## Results
+
+There are a few different ways of scoring the results from these experiments.  One thing to look at is just simply if all the reads that cross integrations in the simulated fasta are found in the output.  Within those reads that are found, we can also look at if the locations of the integration in the host and vector genomes are correct.
+
+### Are all the reads that cross integrations found?
+
+```{r include=FALSE}
+easier <- importData(easier_sim, easier_analy, easier_results)
+harder <- importData(harder_sim, harder_analy, harder_results)
+results <- bind_rows(easier, harder)
+```
+
+Firstly, check each read in the simulation and compare the expected output with the actual output.  The reads were scored as follows:
+
+|  | True positive | True negative | False positive | False negative |
+|:-:|:-:|:-:|:-:|:-:|
+| Cross simulated integration junction? | Yes | No | No | Yes |
+| Found in analysis pipeline output? | Yes | No | Yes | No |
+
+The events of most concern are the false positives.
+
+In the 'easier' condition, reads were either merged (using seq-prep) or not during analysis.  In the 'harder' condition, reads were always merged.  
+
+Each read was considered to be a potential chimeric read, and additionally each pair was considered to be a posisble discordant read pair.  The chimeric reads and discordant pairs were scored separately.
+
+
+```{r}
+results %>% 
+  filter(!post) %>%
+  filter(score_type == 'found_score') %>% 
+  select(experiment, merge, junc_type, true_positive, true_negative, false_positive, false_negative) %>% 
+  mutate(merge = ifelse(merge ==1, TRUE, FALSE))   %>% 
+  kable() %>%
+  kable_styling()
+  
+```
+
+So we have some false negatives for the 'harder' condition, but the 'easier' condition is perfect.
+
+#### False negatives - missing reads
+
+Check out if the reads missed in the 'test-harder' condition come from particular integrations:
+```{bash, engine.opts='-e'}
+echo "int_id  type"
+awk 'match($3, /fn/)' "../out/test/test-harder/scored_reads/test-harder_analysis0.cond0.rep0.human.AAV.tsv" | cut -f2,10 | sort | uniq
+```
+
+
+So all the missing integrations come from two (of five) integrations - with ids '3' and '4'.  For context, the properties of all the integrations were:
+```{r}
+read_tsv(harder_ints)
+```
+
+These two integrations are of rearranged virus fragments.  The most obvious difference between these two integrations and the other integrations is that they have some pieces that are particularly short (relative to the 150pb reads) - integration 4 has a second fragment which is `r 1545-1487`bp long, and integration 3 has a second fragment which is `r 476-423`bp long.  It's possible that a read could start in the first rearranged piece, and extend through the second rearranged piece into the host.  This hypothetical read would be mapped either to the first reaarranged piece (and have a lot more soft-clipped reads than it should), or to the second rearranged piece (and be soft-clipped on each end of the read).  
+
+Check the CIGAR strings of these reads that were missed - first the chimeric reads:
+```{bash, engine.opts='-l', class.output="scroll-100"}
+conda activate simvi
+
+LIST=$(awk 'match($3, /fn/) && match($9, /chimeric/)' "../out/test/test-harder/scored_reads/test-harder_analysis0.cond0.rep0.human.AAV.tsv" | cut -f1 | sort | uniq)
+
+for l in $LIST; do
+  echo "viral alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0_human_AAV/virus_aligned/cond0.rep0.AAV.sam  $l
+  echo "host_alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0_human_AAV/host_aligned/cond0.rep0.human.readsFromAAV.sam $l  
+  echo 
+  
+done
+```
+
+For these reads, it makes sense that they're missed (eg chr2-114/1) - because one of the reads (the viral read) is clipped on both ends.  
+
+What about the discordant read pairs?
+
+```{bash, engine.opts='-l', class.output="scroll-100"}
+conda activate simvi
+
+LIST=$(awk 'match($3, /fn/) && match($9, /discord/)' "../out/test/test-harder/scored_reads/test-harder_analysis0.cond0.rep0.human.AAV.tsv" | cut -f1 | sort | uniq)
+
+for l in $LIST; do
+  echo "viral alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0_human_AAV/virus_aligned/cond0.rep0.AAV.sam  $l
+  echo "host_alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0_human_AAV/host_aligned/cond0.rep0.human.readsFromAAV.sam $l  
+  echo 
+  
+done
+```
+
+In the viral reads there are now too many bases clipped for the read to be considered 'mapped', so these pairs aren't found.
+
+### Are the integrations in the right locations?
+
+We can also check if the integrations are in the correct locations in the host and vector references.  To check this, score the reads in the same way as before, except that a read is only a true positve if it crosses a location, is found in the analysis output AND the output location in the analysis is correct. 
+
+A read is defined to be in the 'correct' location if:  
+ - the chromosome or virus is correctly identified
+ - the start and stop positions of the integration from the simulation overlap with those in the analysis results
+   - when checking for overlap, we allow a small amount of 'wiggle room' - a small number of bases are subtracted from the start and added to the stop coordates in the analysis output.  In this case, this number was 5
+ - for chimeric reads only, we check that the start and stop coordinates are within a set number of bases from their counterparts in the analysis results.  That is, the start in the analysis results and the start coordinate of the simulated integration must be within a certain number of bases of each other, and same for the stop coordinates.  In this case, this nubmer was 5.  This isn't possible to check for discordant read pairs because the integration coordinates cannot be accurately determined during analysis.
+
+#### Host
+When we check the location the host, the scores are the following:
+```{r}
+results %>% 
+  filter(!post) %>%
+  filter(score_type == 'host_score') %>% 
+  select(experiment, merge, junc_type, true_positive, true_negative, false_positive, false_negative) %>% 
+  mutate(merge = ifelse(merge ==1, TRUE, FALSE))   %>% 
+  kable() %>%
+  kable_styling()
+```
+
+So all of the reads that were output as integrations have the correct location within the host (because this table is identical to the one above).  The reads that were scored as 'false negatives' above, by definition must be false negatives when also checking for correct host location.
+
+#### Virus
+And for the location in the virus:
+```{r}
+results %>% 
+  filter(!post) %>%
+  filter(score_type == 'virus_score') %>% 
+  select(experiment, merge, junc_type, true_positive, true_negative, false_positive, false_negative) %>% 
+  mutate(merge = ifelse(merge ==1, TRUE, FALSE))   %>% 
+  kable() %>%
+  kable_styling()
+```
+
+
+So it looks like in the 'harder' condition, we have a few reads that have an incorrect position within the virus.  Check if these reads come from a particular integration, which perhaps some particularly difficult properties.  
+
+Check out the reads that were true positives based on 
+
+Print out the properties of the simulated integrations
+
+```{bash, engine.opts='-e'}
+LIST=$(awk 'match($5,/fn/) && match($3, /tp/) && match($10,/discord/)' "../out/test/test-harder/scored_reads/test-harder_analysis0.cond0.rep0.human.AAV.tsv" | cut -f2 | sort | uniq)
+
+for l in $LIST; do
+  awk "\$1 ~ /$l/" ../out/test/test-harder/sim_ints/cond0.rep0.int-info.tsv
+done
+
+```
+
+# Experiment 2 - using different vectors/viruses
+
+## Overview
+The second experiment I did was test the performance of the viral integration pipeline on simulated integrations with different viral references.  I again used an 'easier' condition and a 'harder' condition
+
+## Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chromsome 1 from hg38.   
+
+For the virus I used rep68 from AAV2 (NC_001401.2_cds_YP_680422.1_1, protein_id=YP_680422.1, db_xref=GeneID:4192013), or the whole AAV sequence (NC_001401.2), or the OTC vector rAAV genome (including OTC enhancer, hAAT promoter, codon optimised OTC genome, bovine b-actin poly A, both ITRs).
+
+## Simulation parameters
+
+Again, I simulated two different situations using this data: one  'easier' for the pipeline to handle, and one 'harder'.  
+
+'easier' condition:  
+
+- integrations: python script
+  - 1000 integrations into random location (minimum separation 500 bp)
+  - whole reference only 
+  - no rearrangements of viral reference
+  - no deletions from viral reference
+  - no overlaps or gaps at junction (except coincidental ones)
+  - no deletions from host at integration site
+- reads: art_illumina
+  - 2x150 bp reads
+  - 5-fold coverage
+  - 500bp fragment length, 30bp standard deviation
+  - illumina error profile ("HS25")
+- analysis options:
+  - seqPrep trims adapters and merges overlapping R1 and R2
+  - use either only chr1 or all of hg38 for host reference
+  - three options for post-processing:
+    - 'filter' - remove suspicious integrations
+    - 'mask-exclude' - remove integrations in regions of hg38 that have homology with vector
+    - both of the above
+
+'harder' condition:  
+
+- integrations: python script
+  - 1000 integrations into random location (minimum separation 500 bp)
+  - 1000 'episomes' included (with possible rearrangments and deletions)
+  - 30% chance of whole reference, 70% chance of random subsequence 
+  - 10% chance of rearrangement of inserted (sub-)sequence (Poisson number of fragments, mean 1)
+  - 10% chance of deletion of inserted (sub-)sequence (Poisson number of fragments, mean 1)
+  - at junctions, 30% chance of overlaps, 30% chance of gaps, 40% chance of neither (Poisson number of bases involved, mean 1)
+  - 50% chance of deletion from host at integration site (Poisson number of bases, mean 500bp)
+- reads: same as 'easier' condition
+- analysis options: same as 'easier' condition
+
+
+The parameters used for each were:
+```{bash class.output="scroll-100"}
+cat "../config/experiment0_prelim/virus.yml"
+```
+
+```{r}
+sim <- c("../out/experiment0_prelim/AAV2-easier/simulation_summary.tsv",
+        "../out/experiment0_prelim/AAV2-harder/simulation_summary.tsv",
+        "../out/experiment0_prelim/OTC-vect-easier/simulation_summary.tsv",
+        "../out/experiment0_prelim/OTC-vect-harder/simulation_summary.tsv",
+        "../out/experiment0_prelim/rep68-easier/simulation_summary.tsv",
+        "../out/experiment0_prelim/rep68-harder/simulation_summary.tsv")
+
+analysis <- c("../out/experiment0_prelim/AAV2-easier/analysis_conditions.tsv",
+        "../out/experiment0_prelim/AAV2-harder/analysis_conditions.tsv",
+        "../out/experiment0_prelim/OTC-vect-easier/analysis_conditions.tsv",
+        "../out/experiment0_prelim/OTC-vect-harder/analysis_conditions.tsv",
+        "../out/experiment0_prelim/rep68-easier/analysis_conditions.tsv",
+        "../out/experiment0_prelim/rep68-harder/analysis_conditions.tsv")
+
+scored <- c("../out/experiment0_prelim/AAV2-easier/AAV2-easier.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/AAV2-harder/AAV2-harder.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/OTC-vect-easier/OTC-vect-easier.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/OTC-vect-harder/OTC-vect-harder.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/rep68-easier/rep68-easier.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/rep68-harder/rep68-harder.scored_reads_summary.tsv")
+
+```
+
+```{r include=FALSE}
+results <- importData(sim[1],  analysis[1], scored[1])
+for (i in seq(2, length(sim))){
+  tmp <- importData(sim[i],  analysis[i], scored[i])
+  results <- bind_rows(results, tmp)
+}
+
+```
+
+### Are all the reads that cross integrations found?
+
+Reads were scored as before as true or false positives or negatives, based on whether they were expected and found in the output from the pipeline.
+
+```{r include=FALSE}
+results %>% 
+  filter(score_type == 'found_score')
+```
+
+We had a number of different parameters in this dataset.  We can plot the various viral references used, the simulation conditions ('easier' or 'harder'), and the various analysis conditions (no postprocessing, filtering, excluding based on position, or both filtering and excluding based on position).
+
+We can calculate the true positive rate (sensitivity, recall) as
+$$TPR = \frac{TP}{P} = \frac{TP}{TP+FN}$$
+
+and the true negative rate (specificity, selectivity)
+$$TNR = \frac{TN}{N} = \frac{TN}{TN+FP}$$
+
+#### No postprocessing
+
+First, looking at the data without any postprocessing:
+```{r}
+results %>% 
+  filter(score_type == 'found_score') %>% 
+  mutate(epi_num = as.factor(epi_num)) %>% 
+  filter(!post) %>% 
+  ggplot(aes(x = TNR, y = TPR, color = junc_type, shape = experiment)) +
+  geom_point(alpha = 0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate') +
+  facet_grid(rows = vars(analysis_host), cols = vars(analysis_virus))
+```
+
+There's a lot going on here.  Some observations:  
+
+- There are basically no false positives
+- The true positive rate varies depending on the simulation and analysis parameters, as well as the type of junction examined
+  - There are fewer false negatives when we use chr1 as the reference, rather than hg38
+  - When we use hg38 as a reference, there's a large increase in the number of false negatives that are discordant pairs
+  - We tend to do better (fewer false negatives) when analysing with chr1 compared to hg38
+  - We also tend to do better in the easier condition than the harder condition
+  - We tend to do better with chimeric reads than discordant pairs.  The difference is worse with hg38 as a host reference and with the OTC vector as a viral reference.
+  - It's curious that we do a bit better with AAV2 compared to rep68 - I would have expected this to be the other way around
+
+#### With postprocessing
+
+We can look at the data after post-processing. 
+
+'Filtering' refers to excluding any integrations that:  
+
+- have an edit distance in the host alignment of more than four
+- have an edit distance in the viral alignment of more than four
+- have more than 20 ambiguous bases (chimeric reads only)
+- are flagged as possible vector rearrangements
+- are flagged as possible host translocations
+
+The regions of hg38 that are homologous to the OTC vector are (in bed format):
+```{bash}
+cat ../data/references/hg38_homologoustoOTCvec.bed
+```
+
+Each analysis condition refers to a different kind of postprocessing, and 'post' refers to whether or not postprocessing was performed at all.  These conditions are:
+
+```{r}
+results_filt <- results %>% 
+  mutate(epi_num = as.factor(epi_num)) %>% 
+  mutate(analysis_condition = case_when(
+    post ~ analysis_condition,
+    !post ~ 'analysis3'
+  )) %>% 
+  mutate(postargs = ifelse(!post, "", postargs)) %>% 
+  distinct(experiment, analysis_virus, analysis_host, junc_type, sample, post, analysis_condition, postargs, .keep_all = TRUE)
+
+results_filt %>% 
+  select(analysis_condition, post, postargs) %>% 
+  distinct() %>% 
+  kable() %>% 
+  kable_styling()
+```
+
+
+```{r}
+results_filt %>% 
+  ggplot(aes(x = TNR, y = TPR, color = junc_type, shape = experiment)) +
+  geom_point(alpha = 0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate') +
+  facet_grid(rows = vars(analysis_host), cols = vars(analysis_condition))
+```
+
+```{r}
+conds = c("analysis0", "analysis1", "analysis2", "analysis3")
+
+for (cond in conds){
+  print(results_filt %>% 
+          filter(analysis_condition == cond) %>% 
+          ggplot(aes(x = TNR, y = TPR, color = junc_type, shape = experiment)) +
+          geom_point(alpha = 0.5) +
+          xlim(0, 1) +
+          ylim(0, 1) +
+          xlab('true negative rate') +
+          ylab('true positive rate') +
+          ggtitle(cond) +
+          facet_grid(rows = vars(analysis_host), cols = vars(analysis_virus)))
+}
+```
+
+Based on these results, it looks like excluding based on position (`mask-exclude`) makes no difference to the results, and `filter` makes things worse (more false negatives).
+
+### Interrogating reads
+
+In order to shed some light on these results, check out some individual reads to see if there are any systematic biases.
+
+#### rep68
+
+Start with rep68 integrations - are there any false positves or negatives in the 'easy' conditions?
+
+```{r}
+results %>% 
+  filter(experiment == "rep68-easier") %>% 
+  filter(!post) %>% 
+  filter(score_type == "found_score") %>% 
+  filter(analysis_condition == "analysis0") %>% 
+  select(replicate, analysis_host, junc_type,true_positive, true_negative, false_positive, false_negative) %>% 
+  kable() %>% 
+  kable_styling()
+```
+
+There are a few false positves amongst the discordant read pairs.
+
+
+# Experiment 3 - breaking down the 'easer' and 'harder' conditions
+
+## Overview
+The third experiment I did was test the performance of the viral integration pipeline on simulated integrations with simulated integrations of various types.  I used the 'easier' and 'harder' conditions from the previous experiment, but broke down the various factors contributing to the 'harder' condition one by one, in order to see which ones make it harder for the pipeline to pull out all the correct readsx.
+
+## Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chromsome 1 from hg38.   
+
+For the virus I used only rep68 from AAV2 (NC_001401.2_cds_YP_680422.1_1, protein_id=YP_680422.1, db_xref=GeneID:4192013).
+
+
+## Session info
+```{r}
+sessionInfo()
+```
+

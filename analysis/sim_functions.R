@@ -31,7 +31,8 @@ importData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
   
   # import scored reads summary
   scored_cols <- c('sim_info_file', 'sim_bam_file', 'analysis_info',
-                   'results_file', 'true_positive', 'true_negative',
+                   'results_file', 'junc_type', 'score_type',
+                   'true_positive', 'true_negative',
                    'false_positive', 'false_negative')
   
   # import and extract info for joining

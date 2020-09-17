@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-CONFIG="../../config/experiment0_prelim/virus.yml"
+CONFIG="../../config/experiment0_prelim/condition-breakdown.yml"
 CLUSTER="../../config/experiment0_prelim/cluster.json"
 OUTPATH="../../out/experiment0_prelim/"
-NAME="viruses"
+NAME="condition-breakdown"
 
 eval "$(conda shell.bash hook)"
 conda activate snakemake
@@ -19,7 +19,7 @@ snakemake --configfile ${CONFIG} --snakefile combined_snakefile --dag | dot -Tsv
 snakemake \
  --snakefile combined_snakefile \
  --configfile ${CONFIG}\
- --jobs 100 \
+ --jobs 1 \
  --use-singularity \
  --profile slurm \
  --cluster-config ${CLUSTER}

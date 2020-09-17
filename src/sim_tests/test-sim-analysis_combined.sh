@@ -28,3 +28,10 @@ snakemake \
 # --conda-frontend mamba \
 # --rerun-incomplete
 
+snakemake \
+ --snakefile combined_snakefile \
+ --configfile ../../config/test/sim_and_detect.yml\
+ --cores 20 \
+ --use-singularity \
+ --rerun-incomplete
+

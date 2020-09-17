@@ -3,8 +3,7 @@
 	{
 		"nodes" : "1",
 		"mail-user" : "suzanne.scott@csiro.au",
-		"time" : "2:00:00",
-		"output" : "../logs/{rule}.{wildcards}.log"
+		"output" : "../../logs/{rule}.%j.log"
 	},
 	"simulate_integrations":
 	{	

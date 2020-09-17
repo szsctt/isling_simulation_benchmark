@@ -1,0 +1,172 @@
+### snakemake workflow to simulated data, run our polyidus on it, and then analyse the results
+
+import sys
+import os
+import yaml
+import pdb
+import copy
+import itertools
+import pandas as pd
+
+from python_scripts.parse_config import parse_config
+from python_scripts.make_df import make_df, make_post_args, make_reference_dict
+
+from python_scripts.make_df import check_input_files, Error, InputError, check_dataset_sample_unique, make_reference_dict, make_post_args, check_fastas_unique
+
+
+# https://sapac.support.illumina.com/bulletins/2016/12/what-sequences-do-i-use-for-adapter-trimming.html
+HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA", 
+				'read2-adapt' : "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"}
+				
+
+adapter_seqs = {'HS25':HS25, 'MSv3':HS25}
+
+
+
+#####################################################
+############# simulation parameters #################
+#####################################################
+
+
+# make dataframe with parameters for simulation
+config, df, ref_dict = parse_config(config)
+
+
+
+
+#####################################################
+############## analysis parameters ##################
+#####################################################
+
+# get host and virus sequences to be used for analysis
+
+# required keys:
+#R1 file
+#R2 file
+#host name
+#host fasta
+#virus name
+#virus fasta
+#sample
+
+# make ref names dict
+ref_names = {}
+for i, row in df.iterrows():
+	for name_col, fasta_col in zip(('host_name', 'virus_name'), ('host_fasta', 'virus_fasta')):
+		if row[name_col] in ref_names:
+			assert ref_names[row[name_col]] == row[fasta_col]
+		else:
+			ref_names[row[name_col]] = row[fasta_col]
+
+#####################################################
+############ wildcard constraints ###################
+#####################################################
+
+wildcard_constraints:
+	cond = "|".join(set(df.loc[:, 'condition'])),
+	exp = "|".join(set(df.loc[:, 'experiment'])),
+	rep = "|".join(set([str(i) for i in df.loc[:, 'replicate']])),
+	samp = "|".join(set(df.loc[:, 'sample'])),
+	host = "|".join(set(df.loc[:, 'host_name'])),
+	virus = "|".join(set(df.loc[:, 'virus_name'])),
+	outdir = "|".join(set(df.loc[:, 'out_directory']))
+
+	
+
+#####################################################
+################### target files ####################
+#####################################################
+
+# target files for simulation
+sim_targets = df.loc[:,'annotated_info_filename']
+
+exp_targets = {}
+for i, row in df.iterrows():
+	exp_targets[row['experiment']] = row['out_directory']
+experiments = list(exp_targets.keys())
+
+sim_summaries = expand("{outpath}/{exp}/simulation_summary.tsv", 
+			zip,
+			exp = experiments, 
+			outpath = [exp_targets[exp] for exp in experiments]
+			)
+		
+polyidus_outputs = expand("{outpath}/{exp}/polyidus/{samp}_{host}_{virus}/results/HpvIntegrationInfo.tsv",
+														zip,
+														outpath = df.loc[:, 'out_directory'],
+														exp = df.loc[:, 'experiment'],
+														samp = df.loc[:, 'sample'],
+														host = df.loc[:, 'host_name'],
+														virus = df.loc[:, 'virus_name']
+													)
+rule all:
+	input: 
+		set(sim_targets),
+		set(sim_summaries),
+		set(polyidus_outputs)
+		
+		
+
+#####################################################
+############### simulate integrations ###############
+#####################################################
+
+
+include: "snakemake_rules/simulate_integrations.smk"
+include: "snakemake_rules/art.smk"
+include: "snakemake_rules/annotate_reads.smk"
+
+#####################################################
+################### analyse data ####################
+#####################################################
+
+
+rule bwt2_index:
+	input:
+		lambda wildcards: ref_names[wildcards.genome]
+	output:
+		"{outpath}/references/{genome}/{genome}.1.bt2"
+	container:
+		"docker://szsctt/polyidus:1"
+	params:
+		prefix = lambda wildcards, output: path.splitext(output[0])[0]
+	shell:
+		"bowtie2-build {params.prefix} {input}"
+
+
+def get_value_from_df(wildcards, column_name):
+
+	# get a value from the row of the df corresponding to this sample and dataset
+	unique = f"{wildcards.exp}__{wildcards.samp}"
+
+	return df.loc[(df['unique'] == unique).idxmax(), column_name] 
+
+
+rule polyidus:
+	input:
+		fastq1 = rules.art.output.r1,
+		fastq2 = rules.art.output.r2,
+		host_idx =  "{outpath}/references/{host}/{host}.1.bt2",
+		virus_idx = "{outpath}/references/{virus}/{virus}.1.bt2"
+	output:
+		ints = "{outpath}/{exp}/polyidus/{samp}_{host}_{virus}/results/HpvIntegrationInfo.tsv"
+	params:
+		output = lambda wildcards, output: path.dirname(path.dirname(output.ints))
+	container:
+		"docker://szsctt/polyidus:1"
+	shell:
+		"""
+		python3 polyidus.py \
+		{input.host_idx} \
+		{input.virus_idx} \
+		--fastq {input.fastq1} {input.fastq2} \
+		--outdir {params.output}
+		"""
+
+		
+	
+		
+		
+		
+		
+

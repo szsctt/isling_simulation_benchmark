@@ -6,7 +6,7 @@
 	url = https://bitbucket.csiro.au/scm/~sco305/intvi_simultion.git
 [submodule "polyidus"]
 	path = polyidus
-	url = https://github.com/hoffmangroup/polyidus.git
+	url = https://github.com/suzannesctt/polyidus.git
 [submodule "ViFi"]
 	path = ViFi
-	url = https://github.com/namphuon/ViFi.git
+	url = https://github.com/suzannesctt/ViFi.git

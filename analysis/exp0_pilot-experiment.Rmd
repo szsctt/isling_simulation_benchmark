@@ -87,9 +87,11 @@ cat "../config/test/sim_and_detect.yml"
 
 ```
 
+
+In the 'easier' condition, there are five integrations of the whole virus, with clean junctions and no rearrangements, deletions of the virus, and no host deletions either.  In the 'harder' condition the host and virus reference are the same, but there's a high probability of rearrangements, deletions, gaps and overlaps at the junctions, and host deletions.  There are also some 'episomal' sequences included in the output fasta.
+
 The DAG from snakemake looks like this:
 ![DAG for this experiment](../out/test/test_combined.dag.svg)
-
 
 ## Results
 
@@ -234,8 +236,9 @@ results %>%
 
 So it looks like in the 'harder' condition, we have a few reads that have an incorrect position within the virus.  Check if these reads come from a particular integration, which perhaps some particularly difficult properties.  
 
-Check out the reads that were true positives for found_score but false negatives for virus_score
+Check out the reads that were true positives  for found_score but false negatives for virus_score
 
+Print out the properties of the simulated integrations
 
 ```{bash, engine.opts='-e'}
 LIST=$(awk 'match($5,/fn/) && match($3, /tp/) && match($10,/discord/)' "../out/test/test-harder/scored_reads/test-harder_analysis0.cond0.rep0.human.AAV.tsv" | cut -f2 | sort | uniq)
@@ -523,7 +526,6 @@ for (i in seq(2, length(sim))){
 }
 
 ```
-
 
 
 ## Session info

@@ -50,4 +50,3 @@ singularity exec \
 $IMAGE \
 python /home/scripts/run_vifi.py -c ${CPUS} -f /usr/share/${READ1} -r /usr/share/${READ2} -v hpv -o /home/output/
 
-

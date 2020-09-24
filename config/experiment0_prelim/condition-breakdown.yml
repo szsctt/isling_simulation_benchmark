@@ -448,7 +448,7 @@ rep68-gap:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
        
-rep68-host_deletion:
+rep68-host-deletion:
    out_directory: "../../out/experiment0_prelim"
    
    # integration simulation

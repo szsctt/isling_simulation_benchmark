@@ -1,0 +1,83 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Comparisons with other tools.
+
+
+
+# Experiment 1 - toy example
+
+## Overview
+The first experiment I did was to test out the simulation pipeline, and try to analyse the data, and compare the results from analysis with what would be expected from the pipeline.  
+
+## Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chr2:100000:102999 and chr3:100000:102999 from hg38.   
+
+For the virus I used rep68 from AAV2 (NC_001401.2_cds_YP_680422.1_1, protein_id=YP_680422.1, db_xref=GeneID:4192013)
+
+## Simulation parameters
+
+I simulated two different situations using this data: one that I thought would be 'easier' for the pipeline to handle, and one that is 'harder'.
+
+'easier' condition:  
+
+- integrations: python script
+  - 5 integrations into random location in either chromosome
+  - whole reference only 
+  - no rearrangements of viral reference
+  - no deletions from viral reference
+  - no overlaps or gaps at junction (except coincidental ones)
+  - no deletions from host at integration site
+- reads: art_illumina
+  - 2x150 bp reads
+  - 5-fold coverage
+  - 500bp fragment length, 30bp standard deviation
+  - illumina error profile ("HS25")
+- analysis options:
+  - seqPrep trims adapters and merges overlapping R1 and R2
+  - use either only chr1 or all of hg38 for host reference
+
+
+The simulated integrations were:
+```{r}
+read_tsv("../out/test/test-easier/sim_ints/cond0.rep0.int-info.annotated.tsv")
+```
+
+
+
+## Our pipeline
+
+The results from our pipeline:
+
+```{r}
+read_tsv("../out/test/test-easier_analysis0_human_AAV/ints/cond0.rep0.human.AAV.integrations.txt") %>% 
+  arrange(Chr, IntStart)
+```
+
+## Polyidus
+
+The results from polyidus:
+
+`HpvIntegrationInfo.tsv`
+
+```{r}
+read_tsv("../polyidus/test/easier/results/HpvIntegrationInfo.tsv") %>% 
+  arrange(ChromHost)
+```
+
+```{r}
+read_tsv("../polyidus/test/easier/results/exactHpvIntegrations.tsv")
+```
+
+
+
+## ViFi
+
+```{bash}
+cat /scratch1/sco305/intvi_simulation-experiments/vifi-test/test_output_2/output.clusters.txt
+```
+

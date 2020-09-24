@@ -36,7 +36,9 @@ importData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
                    'false_positive', 'false_negative')
   
   # import and extract info for joining
-  scored <- read_tsv(results_sum_path, col_names = scored_cols, skip = 1)  %>% 
+  scored <- read_tsv(results_sum_path, col_names = scored_cols, skip = 1)  
+    
+  scored <- scored %>% 
     mutate(results_info = basename(results_file)) %>% 
     mutate(experiment = str_split(results_info, "_", simplify=TRUE)[,1]) %>% 
     mutate(results_info_2 = str_split(results_info, "_", simplify=TRUE)[,2]) %>% 
@@ -51,6 +53,8 @@ importData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
     mutate(post = str_detect(results_info_2, "post")) %>% 
     mutate(config_dataset = paste0(experiment, "_", analysis_condition)) %>% 
     arrange(sample, analysis_host, analysis_virus, post) 
+  
+
   
   scored <- scored %>% 
     mutate(TPR = true_positive / (true_positive + false_negative)) %>% 
@@ -67,3 +71,21 @@ importData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
                           'config_dataset', 'analysis_condition', 'experiment')))
   
 }
+
+# make bins across a chromosome with a specified length
+makeBins <- function(width, chr_len) {
+  
+  # number of bins
+  n_bins <- ceiling(chr_len/width)
+  
+  # make bins
+  bins <- tibble(
+    start = seq(0, (n_bins-1)*width, width),
+    stop = seq(width, n_bins*width, width)
+  )
+  
+  return(bins)
+}
+
+# use a position column to sum events falling into bins
+

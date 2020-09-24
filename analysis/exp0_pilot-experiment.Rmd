@@ -238,7 +238,7 @@ So it looks like in the 'harder' condition, we have a few reads that have an inc
 
 Check out the reads that were true positives  for found_score but false negatives for virus_score
 
-Print out the properties of the simulated integrations
+Print out the properties of the simulated integrations:
 
 ```{bash, engine.opts='-e'}
 LIST=$(awk 'match($5,/fn/) && match($3, /tp/) && match($10,/discord/)' "../out/test/test-harder/scored_reads/test-harder_analysis0.cond0.rep0.human.AAV.tsv" | cut -f2 | sort | uniq)
@@ -249,7 +249,7 @@ done
 
 ```
 
-Again, these false positives seem to come from integrations 3 and 4.
+Again, these false positives seem to come from integrations 3 and 4.  Check out the reads that are only f
 
 # Experiment 2 - using different vectors/viruses
 
@@ -477,6 +477,98 @@ echo " count int_id  type"
 awk 'match($3, /fn/)' "../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep0.chr1.rep68.post.tsv" | cut -f2,10 | sort -k1,1n -k2 | uniq -c
 ```
 
+
+If we plot a histogram the number of reads missing from each integration, it looks like this:
+
+```{bash, engine.opts='-e', include=FALSE}
+awk 'match($3, /fn/)' "../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep0.chr1.rep68.post.tsv" | cut -f2,10 | sort -k1,1n -k2 | uniq -c > tmp.tsv
+```
+
+
+```{r include=FALSE}
+fn_ints <- read_table2("tmp.tsv", col_names = c("n_missing", "int_id", "type"))
+```
+
+
+```{r}
+fn_ints %>% 
+  ggplot(aes(x = n_missing, color = type)) +
+  geom_freqpoly()
+```
+
+
+So it's definetly the case that most integrations that have missing reads have only one or two reads missing, but a few have a lot of missing reads.  It would be good to examine the properties of these integrations, to see if there's anything consistent about the integrations with a lot of missing reads.  Since these are clean, whole integrations with no deletions or rearrangements, the only thing to examine is the position in the host.  So it would be good to plot the density of missing integrations within the host chromosome.
+
+
+```{r include=FALSE}
+ints <- read_tsv("../out/experiment0_prelim/rep68-easier/sim_ints/cond0.rep0.int-info.annotated.tsv")
+
+fn_ints <- fn_ints %>% 
+  pivot_wider(names_from = 'type', values_from = 'n_missing')
+
+ints <- left_join(ints, fn_ints, by = c("id" = "int_id"))
+
+ints <- ints %>% 
+  mutate(chimeric = replace_na(chimeric, 0)) %>% 
+  mutate(discord = replace_na(discord, 0))
+```
+
+As a first step, just categorise integrations based on if they having missing reads or not.  Plot the density of both types of integrations across chromosome 1.
+
+```{r}
+ints %>% 
+  mutate(missing_reads = (chimeric != 0 | discord != 0)) %>% 
+  ggplot(aes(x=hPos, color=missing_reads)) +
+  geom_density(bw=1e4)
+```
+
+
+But it would be nice to be able to weight these densities in terms of how many integrations are missing. Make bins of width 1000 that span the length of the chromosome and count how many integrations are in each
+
+```{r}
+
+# bin width
+width <- 10000
+
+# length of chromosome 1
+chr_len <- 248956422
+
+#
+n_bins <- ceiling(chr_len/width)
+tmp <- ints %>% 
+  group_by(bin = cut(hPos, breaks=seq(0, width*n_bins, width), labels(seq(n_bins)))) 
+
+tmp %>% 
+  summarise(chimeric = sum(chimeric),
+            discordant = sum(discord)) %>% 
+  mutate(bin = as.numeric(bin)) %>% 
+  mutate(start = width*bin) %>% 
+  pivot_longer(chimeric:discordant, names_to = "type", values_to = "count") %>% 
+  ggplot(aes(x = start, y = count, color = type)) +
+  geom_line() + 
+  facet_grid(vars(type))
+
+```
+There's a few things here. It looks like a lot of the misisng reads are just sprinkled thoroughout the chromosome.  There's a big patch in the middle of the chromosome (centromere??) with no missing reads
+
+Start with the discordant pairs, and check out the top 10 bins with missing discordant pairs:
+```{r}
+tmp %>% 
+  summarise(n_chimeric_missing = sum(chimeric),
+            n_discordant_missing = sum(discord)) %>% 
+  arrange(desc(n_discordant_missing)) %>% 
+  slice(1:10)
+
+tmp %>% 
+  summarise(n_chimeric_missing = sum(chimeric),
+            n_discordant_missing = sum(discord)) %>% 
+  arrange(desc(n_discordant_missing)) %>% 
+  slice(1:10)
+```
+
+
+
+
 # Experiment 3 - breaking down the 'easer' and 'harder' conditions
 
 ## Overview
@@ -489,28 +581,24 @@ For the host, I used chromsome 1 from hg38.
 
 For the virus I used only rep68 from AAV2 (NC_001401.2_cds_YP_680422.1_1, protein_id=YP_680422.1, db_xref=GeneID:4192013).
 
-
-
-
-
 ```{r include=FALSE}
 sim <- c("../out/experiment0_prelim/rep68-whole/simulation_summary.tsv",
         "../out/experiment0_prelim/rep68-rearrange/simulation_summary.tsv",
-        "../out/experiment0_prelim/rep68-host_deletion/simulation_summary.tsv",
+        "../out/experiment0_prelim/rep68-host-deletion/simulation_summary.tsv",
         "../out/experiment0_prelim/rep68-gap/simulation_summary.tsv",
         "../out/experiment0_prelim/rep68-epi/simulation_summary.tsv",
         "../out/experiment0_prelim/rep68-deletion/simulation_summary.tsv")
 
 analysis <- c("../out/experiment0_prelim/rep68-whole/analysis_conditions.tsv",
         "../out/experiment0_prelim/rep68-rearrange/analysis_conditions.tsv",
-        "../out/experiment0_prelim/rep68-host_deletion/analysis_conditions.tsv",
+        "../out/experiment0_prelim/rep68-host-deletion/analysis_conditions.tsv",
         "../out/experiment0_prelim/rep68-gap/analysis_conditions.tsv",
         "../out/experiment0_prelim/rep68-epi/analysis_conditions.tsv",
         "../out/experiment0_prelim/rep68-deletion/analysis_conditions.tsv")
 
 scored <- c("../out/experiment0_prelim/rep68-whole/rep68-whole.scored_reads_summary.tsv",
         "../out/experiment0_prelim/rep68-rearrange/rep68-rearrange.scored_reads_summary.tsv",
-        "../out/experiment0_prelim/rep68-host_deletion/rep68-host_deletion.scored_reads_summary.tsv",
+        "../out/experiment0_prelim/rep68-host-deletion/rep68-host-deletion.scored_reads_summary.tsv",
         "../out/experiment0_prelim/rep68-gap/rep68-gap.scored_reads_summary.tsv",
         "../out/experiment0_prelim/rep68-epi/rep68-epi.scored_reads_summary.tsv",
         "../out/experiment0_prelim/rep68-deletion/rep68-deletion.scored_reads_summary.tsv")
@@ -520,13 +608,26 @@ scored <- c("../out/experiment0_prelim/rep68-whole/rep68-whole.scored_reads_summ
 ```{r include=FALSE}
 results <- importData(sim[1],  analysis[1], scored[1])
 for (i in seq(2, length(sim))){
-  print(i)
   tmp <- importData(sim[i],  analysis[i], scored[i])
   results <- bind_rows(results, tmp)
 }
 
 ```
 
+
+
+```{r}
+results %>% 
+  filter(score_type == 'found_score') %>% 
+  filter(!post) %>% 
+  ggplot(aes(x = TNR, y = TPR, color = junc_type, shape = experiment)) +
+  geom_point(alpha = 0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate') +
+  facet_grid(rows = vars(analysis_host), cols = vars(experiment))
+```
 
 ## Session info
 ```{r}

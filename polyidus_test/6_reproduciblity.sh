@@ -2,7 +2,7 @@
 
 cd ..
 IMAGE="polyidus.sif"
-DOCKER="docker://szsctt/polyidus:2"
+DOCKER="docker://szsctt/polyidus:3"
 
 module load singularity
 

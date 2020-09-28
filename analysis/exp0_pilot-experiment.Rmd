@@ -249,7 +249,7 @@ done
 
 ```
 
-Again, these false positives seem to come from integrations 3 and 4.  Check out the reads that are only f
+Again, these false positives seem to come from integrations 3 and 4. 
 
 # Experiment 2 - using different vectors/viruses
 
@@ -536,20 +536,46 @@ chr_len <- 248956422
 #
 n_bins <- ceiling(chr_len/width)
 tmp <- ints %>% 
-  group_by(bin = cut(hPos, breaks=seq(0, width*n_bins, width), labels(seq(n_bins)))) 
+  group_by(bin = cut(hPos, breaks=seq(0, width*n_bins, width), labels= seq(0, n_bins-1))) 
 
 tmp %>% 
   summarise(chimeric = sum(chimeric),
             discordant = sum(discord)) %>% 
-  mutate(bin = as.numeric(bin)) %>% 
-  mutate(start = width*bin) %>% 
+  mutate(start = as.numeric(as.character(bin))*width) %>% 
   pivot_longer(chimeric:discordant, names_to = "type", values_to = "count") %>% 
   ggplot(aes(x = start, y = count, color = type)) +
   geom_line() + 
   facet_grid(vars(type))
 
 ```
-There's a few things here. It looks like a lot of the misisng reads are just sprinkled thoroughout the chromosome.  There's a big patch in the middle of the chromosome (centromere??) with no missing reads
+There's a few things here. It looks like a lot of the misisng reads are just sprinkled thoroughout the chromosome.  There's a big patch in the middle of the chromosome (centromere??) with no missing reads.
+
+Also plot the fraction of missing reads in each bin, so we can get an idea of if there are any particular 'blind spots':
+```{r}
+tmp %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(chimeric_reads = paste0(left_chimeric, ";", right_chimeric)) %>% 
+  mutate(discord_reads = paste0(left_discord, ";", right_discord)) %>% 
+  select(-one_of("left_discord", "right_discord", "left_chimeric", "right_chimeric")) %>% 
+  ungroup() %>% 
+  pivot_longer(chimeric_reads:discord_reads, names_to = "read_type", values_to = "read_names") %>% 
+  mutate(read_names = str_replace(read_names, ";NA", "")) %>% 
+  mutate(read_names = str_replace(read_names, "NA;", "")) %>% 
+  rowwise() %>% 
+  mutate(read_count = length(str_split(read_names, ";")[[1]])) %>% 
+  mutate(read_count = ifelse(str_detect(read_names, "NA"), 0, read_count)) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = "read_type", values_from = c("read_names", "read_count")) %>% 
+  group_by(bin) %>% 
+  summarise(frac_missing_chimeric = chimeric/read_count_chimeric_reads,
+            frac_missing_discord = discord/read_count_discord_reads) 
+
+
+
+
+
+```
 
 Start with the discordant pairs, and check out the top 10 bins with missing discordant pairs:
 ```{r}
@@ -557,13 +583,25 @@ tmp %>%
   summarise(n_chimeric_missing = sum(chimeric),
             n_discordant_missing = sum(discord)) %>% 
   arrange(desc(n_discordant_missing)) %>% 
-  slice(1:10)
+  slice(1:10) %>% 
+  mutate(bin = as.numeric(as.character(bin))) %>% 
+  mutate(start = bin*width) %>% 
+  mutate(stop = (bin+1)*width)
+```
 
-tmp %>% 
-  summarise(n_chimeric_missing = sum(chimeric),
-            n_discordant_missing = sum(discord)) %>% 
-  arrange(desc(n_discordant_missing)) %>% 
-  slice(1:10)
+Take the top bin - which integrations are in this bin
+
+```{r}
+
+ints %>% 
+  filter(hPos >= 120020000 & hPos <= 120030000) %>% 
+  mutate(chimeric_reads = paste0(left_chimeric, ';', right_chimeric)) %>% 
+  mutate(discordant_reads =  paste0(left_discord, ';', right_discord)) %>% 
+  mutate(n_chimeric_reads = length(str_split(chimeric_reads, ";")[[1]])) %>% 
+    mutate(n_chimeric_reads = length(str_split(discordant_reads, ";")[[1]]))  
+
+
+
 ```
 
 

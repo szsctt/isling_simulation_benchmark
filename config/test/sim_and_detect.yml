@@ -13,6 +13,8 @@ test-easier:
        - 5
    epi_num:
        - 0
+   min_sep: 
+       - 20
    p_whole:
        - 1
    p_rearrange:
@@ -59,6 +61,9 @@ test-easier:
          - dedup
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   
+   #run polyidus?
+   polyidus : True
        
 test-harder:
    out_directory: "../../out/test"
@@ -75,6 +80,8 @@ test-harder:
        - 5
    epi_num:
        - 10
+   min_sep: 
+       - 20
    p_whole:
        - 0.5
    p_rearrange:
@@ -122,5 +129,14 @@ test-harder:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
        
    #run polyidus?
-   polyidus : True
+   polyidus_params:
+     aligner:
+      - "bwa"
+      - "bowtie2"
+      
+   vifi: True
+        
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
    

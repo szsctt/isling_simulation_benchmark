@@ -49,3 +49,7 @@ python3 polyidus.py \
 ../test/virus/test_virus_bwt2 \
 --fastq $FQ1 $FQ2 \
 --outdir $OUTPUT
+
+
+
+

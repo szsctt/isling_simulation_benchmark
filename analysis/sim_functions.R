@@ -72,20 +72,99 @@ importData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
   
 }
 
-# make bins across a chromosome with a specified length
-makeBins <- function(width, chr_len) {
+# import reads from scored file with column 'col' (numbered starting from 1) with entry matching regex 'str'
+get_reads_matching_condition <- function(col, str, scored_reads_file) {
   
-  # number of bins
-  n_bins <- ceiling(chr_len/width)
+  # filter scored_reads_file into temporary file
+  tmp <- tempfile(tmpdir = ".")
+  command <- paste0("awk 'match($", col, ", /", str, "/)' ", scored_reads_file, " | uniq > ", tmp)
+  system(command, intern=TRUE)
   
-  # make bins
-  bins <- tibble(
-    start = seq(0, (n_bins-1)*width, width),
-    stop = seq(width, n_bins*width, width)
-  )
+  # read temporary file using read_tsv
+  colnames <- c("readID", "intID", "found_score", "host_score", "virus_score", "found", "n_found", "side", "correct_side",
+                "type",  "corect_type", "correct_host_chr", "host_start_dist", "host_stop_dist", "host_coords_overlap",
+                "correct_virus", "virus_coords_overlap", "virus_start_dist", "virus_stop_dist", "ambig_diff")
   
-  return(bins)
+  scored <- read_tsv(tmp, col_names = colnames)
+  file.remove(tmp)
+  
+  return(scored)
 }
 
-# use a position column to sum events falling into bins
 
+# import integrations from scored file with column 'col_num' (numbered starting from 1) with entry matching regex 'str'
+# ie for integrations with reads that are have 'found_score' (column 3) as false negatives, 
+# use get_ints_matching_contidion("3", "fn", ...), and number of reads for each integration matching this conditiona
+annotate_ints_matching_condition <- function(col_num, regex_str, scored_reads_file, annotated_int_file) {
+  
+  # get integration IDs and types in temp file
+  tmp <- tempfile(tmpdir = ".")
+  command <- paste0("awk 'match($", col_num, ", /", regex_str, "/)' ", scored_reads_file, " | sort | uniq | cut -f2,10 | sort | uniq -c > ", tmp)
+  system(command, intern=TRUE)
+
+  # read temp file
+  int_ids <- read_table2(tmp, col_names = c("n", "int_id", "type")) %>% 
+    pivot_wider(names_from = 'type', values_from = 'n', names_prefix=paste0("n_", regex_str, "_"))
+  file.remove(tmp)
+  
+  # import integrations
+  ints <- read_tsv(annotated_int_file)
+  
+  # join info from temp file with ints
+  ints <- left_join(ints, int_ids, by = c("id" = "int_id")) %>% 
+    ungroup()
+  
+  # replace NA counts with 0
+  # https://github.com/sparklyr/sparklyr/issues/1062
+
+  for (read_type in c("discord", "chimeric")) {
+    colname <- paste0("n_", regex_str, "_", read_type)
+    ints <- ints %>% 
+      mutate(!!colname := replace_na(.[[colname]], 0))
+  }
+  
+  # also add counts of how many left and right discordant and chimeric reads were annotated
+  for (read_type in c("discord", "chimeric")) {
+    for (side in c("left", "right")) {
+      new_colname <- paste0("annotated_", read_type, "_", side)
+      old_colname <- paste0(side, "_", read_type)
+      ints <- ints %>% 
+        mutate(!!new_colname := lengths(str_split(.[[old_colname]], ";"))) %>% 
+        mutate(!!new_colname := ifelse(is.na(.[[old_colname]]), 0, .[[new_colname]]))
+    }
+  }
+
+  # add total numbers for discordant and chimeric reads for each integration
+  ints <- ints %>% 
+    rowwise() %>% 
+    mutate(annotated_chimeric = annotated_chimeric_left + annotated_chimeric_right) %>% 
+    mutate(annotated_discord = annotated_discord_left + annotated_discord_right) %>% 
+    ungroup()
+  
+  return(ints)
+}
+
+
+#scored_file <- "../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep0.chr1.rep68.tsv"
+#int_file <- "../out/experiment0_prelim/rep68-easier/sim_ints/cond0.rep0.int-info.annotated.tsv"
+#test <- annotate_ints_matching_condition("3", "fn", scored_file, int_file)
+
+# bin integrations annotated with number of missing reads, etc, using `annotate_ints_matching_condition` function above.
+# note that this assumes that there's only one chromosome!
+add_bins_to_annotated_ints <- function(ints, width, chr_len) {
+  chrs <- unique(ints$chr)
+  if (length(chrs) > 1) {
+    stop("found more than one chromosome in dataset")
+  }
+  n_bins <- ceiling(chr_len/width)
+  ints <- ints %>% 
+    mutate(bin = cut(hPos, breaks=seq(0, width*n_bins, width), labels= seq(0, n_bins-1))) %>% 
+    mutate(bin = as.numeric(as.character(bin)))
+  
+  return(ints)
+}
+
+#scored_file <- "../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep0.chr1.rep68.tsv"
+#int_file <- "../out/experiment0_prelim/rep68-easier/sim_ints/cond0.rep0.int-info.annotated.tsv"
+#test <- annotate_ints_matching_condition("3", "fn", scored_file, int_file)
+#add_bins_to_annotated_ints(test, 10000, 248956422)

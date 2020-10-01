@@ -103,6 +103,9 @@ There are a few different ways of scoring the results from these experiments.  O
 easier <- importData(easier_sim, easier_analy, easier_results)
 harder <- importData(harder_sim, harder_analy, harder_results)
 results <- bind_rows(easier, harder)
+
+rm(easier, harder, easier_sim, easier_analy, easier_results, harder_sim, harder_analy, harder_results)
+
 ```
 
 Firstly, check each read in the simulation and compare the expected output with the actual output.  The reads were scored as follows:
@@ -338,6 +341,8 @@ for (i in seq(2, length(sim))){
   tmp <- importData(sim[i],  analysis[i], scored[i])
   results <- bind_rows(results, tmp)
 }
+rm(tmp, analysis, scored, sim)
+
 ```
 
 ### Are all the reads that cross integrations found?
@@ -471,59 +476,53 @@ results %>%
   kable_styling()
 ```
 
-First check out the false negatives - which integrations do they come from?
+First check out the false negatives - which integrations do they come from?  Look at the integrations that are missing reads from cond0.rep0:
 ```{bash, engine.opts='-e', class.output="scroll-100"}
 echo " count int_id  type"
-awk 'match($3, /fn/)' "../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep0.chr1.rep68.post.tsv" | cut -f2,10 | sort -k1,1n -k2 | uniq -c
+awk 'match($3, /fn/)' ../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep0.chr1.rep68.tsv | cut -f2,10 | sort -k1,1n -k2 | uniq -c
 ```
 
 
-If we plot a histogram the number of reads missing from each integration, it looks like this:
+Now looking at the three replicates of rep68 inserted into chr1 (and analysed against chr1) together.  If we plot a histogram the number of reads missing from each integration, it looks like this:
 
-```{bash, engine.opts='-e', include=FALSE}
-awk 'match($3, /fn/)' "../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep0.chr1.rep68.post.tsv" | cut -f2,10 | sort -k1,1n -k2 | uniq -c > tmp.tsv
-```
 
 
 ```{r include=FALSE}
-fn_ints <- read_table2("tmp.tsv", col_names = c("n_missing", "int_id", "type"))
+scored_files <- Sys.glob("../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep*.chr1.rep68.tsv")
+int_files <- Sys.glob("../out/experiment0_prelim/rep68-easier/sim_ints/cond0.rep*.int-info.annotated.tsv")
+
+i <- 1
+cond <- str_extract(basename(int_files[i]), "cond\\d\\.rep\\d")
+fn_ints <-  annotate_ints_matching_condition("3", "fn", scored_files[i], int_files[i]) %>% 
+  mutate(condition = cond)
+  
+for (i in seq(2, length(scored_files))) {
+  cond <- str_extract(basename(int_files[i]), "cond\\d\\.rep\\d")
+  tmp <- annotate_ints_matching_condition("3", "fn", scored_files[i], int_files[i]) %>% 
+    mutate(condition = cond)
+  fn_ints <- bind_rows(fn_ints, tmp)
+}
+
+rm(tmp)
+#fn_ints
+
+
 ```
 
 
 ```{r}
 fn_ints %>% 
-  ggplot(aes(x = n_missing, color = type)) +
-  geom_freqpoly()
+  pivot_longer(n_fn_discord:n_fn_chimeric, names_to = "type", values_to = 'n_missing') %>% 
+  filter(n_missing >= 1) %>% 
+  ggplot(aes(x = n_missing, fill = condition)) +
+  geom_bar() +
+  facet_wrap(vars(type))
 ```
 
 
-So it's definetly the case that most integrations that have missing reads have only one or two reads missing, but a few have a lot of missing reads.  It would be good to examine the properties of these integrations, to see if there's anything consistent about the integrations with a lot of missing reads.  Since these are clean, whole integrations with no deletions or rearrangements, the only thing to examine is the position in the host.  So it would be good to plot the density of missing integrations within the host chromosome.
+It looks like for the integrations that have missing reads, it's usually only one read missing.  Of course, this could be the only read crossing either junction for that integration.
 
-
-```{r include=FALSE}
-ints <- read_tsv("../out/experiment0_prelim/rep68-easier/sim_ints/cond0.rep0.int-info.annotated.tsv")
-
-fn_ints <- fn_ints %>% 
-  pivot_wider(names_from = 'type', values_from = 'n_missing')
-
-ints <- left_join(ints, fn_ints, by = c("id" = "int_id"))
-
-ints <- ints %>% 
-  mutate(chimeric = replace_na(chimeric, 0)) %>% 
-  mutate(discord = replace_na(discord, 0))
-```
-
-As a first step, just categorise integrations based on if they having missing reads or not.  Plot the density of both types of integrations across chromosome 1.
-
-```{r}
-ints %>% 
-  mutate(missing_reads = (chimeric != 0 | discord != 0)) %>% 
-  ggplot(aes(x=hPos, color=missing_reads)) +
-  geom_density(bw=1e4)
-```
-
-
-But it would be nice to be able to weight these densities in terms of how many integrations are missing. Make bins of width 1000 that span the length of the chromosome and count how many integrations are in each
+It would be good to examine the properties of the integrations missing reads, to see if there's anything consistent about the them.  Since these are clean, whole integrations with no deletions or rearrangements, the only thing to examine is the position in the host.  So it would be good to plot the density of missing integrations within the host chromosome. Make bins of width 1000 that span the length of the chromosome and count the fraction of missing integrations in each.
 
 ```{r}
 
@@ -534,13 +533,12 @@ width <- 10000
 chr_len <- 248956422
 
 #
-n_bins <- ceiling(chr_len/width)
-tmp <- ints %>% 
-  group_by(bin = cut(hPos, breaks=seq(0, width*n_bins, width), labels= seq(0, n_bins-1))) 
+fn_ints <- add_bins_to_annotated_ints(fn_ints, width, chr_len)
 
-tmp %>% 
-  summarise(chimeric = sum(chimeric),
-            discordant = sum(discord)) %>% 
+fn_ints %>% 
+  group_by(bin) %>% 
+  summarise(chimeric = sum(n_fn_chimeric),
+            discordant = sum(n_fn_discord)) %>% 
   mutate(start = as.numeric(as.character(bin))*width) %>% 
   pivot_longer(chimeric:discordant, names_to = "type", values_to = "count") %>% 
   ggplot(aes(x = start, y = count, color = type)) +
@@ -548,61 +546,71 @@ tmp %>%
   facet_grid(vars(type))
 
 ```
-There's a few things here. It looks like a lot of the misisng reads are just sprinkled thoroughout the chromosome.  There's a big patch in the middle of the chromosome (centromere??) with no missing reads.
+
+It looks like a lot of the missing reads are just sprinkled thoroughout the chromosome.  
+
+The reason there are no missing reads is beacuse there aren't any reads crossing integrations at all! Why doesn't `art` simulate reads there? Does it know that it's a repetitive area?
 
 Also plot the fraction of missing reads in each bin, so we can get an idea of if there are any particular 'blind spots':
 ```{r}
-tmp %>% 
-  ungroup() %>% 
-  rowwise() %>% 
-  mutate(chimeric_reads = paste0(left_chimeric, ";", right_chimeric)) %>% 
-  mutate(discord_reads = paste0(left_discord, ";", right_discord)) %>% 
-  select(-one_of("left_discord", "right_discord", "left_chimeric", "right_chimeric")) %>% 
-  ungroup() %>% 
-  pivot_longer(chimeric_reads:discord_reads, names_to = "read_type", values_to = "read_names") %>% 
-  mutate(read_names = str_replace(read_names, ";NA", "")) %>% 
-  mutate(read_names = str_replace(read_names, "NA;", "")) %>% 
-  rowwise() %>% 
-  mutate(read_count = length(str_split(read_names, ";")[[1]])) %>% 
-  mutate(read_count = ifelse(str_detect(read_names, "NA"), 0, read_count)) %>% 
-  ungroup() %>% 
-  pivot_wider(names_from = "read_type", values_from = c("read_names", "read_count")) %>% 
+fn_ints %>% 
   group_by(bin) %>% 
-  summarise(frac_missing_chimeric = chimeric/read_count_chimeric_reads,
-            frac_missing_discord = discord/read_count_discord_reads) 
-
-
-
-
-
+  summarise(pos = bin*width + width/2,
+            frac_missing_chimeric = n_fn_chimeric/annotated_chimeric,
+            frac_missing_discord = n_fn_discord/annotated_discord) %>% 
+  pivot_longer(frac_missing_chimeric:frac_missing_discord, names_to = "type", values_to = "frac", names_prefix = "frac_") %>% 
+  ggplot(aes(x = pos, y = frac, color = type)) +
+  geom_line() +
+  facet_grid(rows = vars(type))
 ```
 
-Start with the discordant pairs, and check out the top 10 bins with missing discordant pairs:
+Look at the regions missing the highest proportion of reads:
 ```{r}
-tmp %>% 
-  summarise(n_chimeric_missing = sum(chimeric),
-            n_discordant_missing = sum(discord)) %>% 
-  arrange(desc(n_discordant_missing)) %>% 
-  slice(1:10) %>% 
-  mutate(bin = as.numeric(as.character(bin))) %>% 
-  mutate(start = bin*width) %>% 
-  mutate(stop = (bin+1)*width)
-```
-
-Take the top bin - which integrations are in this bin
-
-```{r}
-
-ints %>% 
-  filter(hPos >= 120020000 & hPos <= 120030000) %>% 
-  mutate(chimeric_reads = paste0(left_chimeric, ';', right_chimeric)) %>% 
-  mutate(discordant_reads =  paste0(left_discord, ';', right_discord)) %>% 
-  mutate(n_chimeric_reads = length(str_split(chimeric_reads, ";")[[1]])) %>% 
-    mutate(n_chimeric_reads = length(str_split(discordant_reads, ";")[[1]]))  
-
-
+fn_ints %>% 
+  group_by(bin) %>% 
+  summarise(bin_start = bin*width,
+            frac_missing_chimeric = n_fn_chimeric/annotated_chimeric,
+            frac_missing_discord = n_fn_discord/annotated_discord) %>% 
+  left_join(fn_ints, by = "bin") %>% 
+  arrange(desc(frac_missing_discord), desc(frac_missing_chimeric))
 
 ```
+
+ 
+check out some of the missing discordant pairs:
+```{bash, engine.opts='-l', class.output="scroll-100"}
+conda activate simvi
+
+LIST=$(awk 'match($3, /fn/) && match($9, /discord/)' "../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep2.chr1.rep68.tsv" | head | cut -f1 | sort | uniq)
+
+for l in $LIST; do
+  echo "viral alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0_chr1_rep68/virus_aligned/cond0.rep2.rep68.sam  $l
+  echo "host_alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0_chr1_rep68/host_aligned/cond0.rep2.chr1.readsFromrep68.sam $l  
+  echo 
+  
+done
+```
+
+<!-- and chimeric reads: -->
+```{bash, engine.opts='-l', class.output="scroll-100"}
+conda activate simvi
+
+LIST=$(awk 'match($3, /fn/) && match($9, /chimeric/)' "../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep2.chr1.rep68.tsv" | head | cut -f1 | sort | uniq)
+
+for l in $LIST; do
+  echo "viral alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0_chr1_rep68/virus_aligned/cond0.rep2.rep68.sam  $l
+  echo "host_alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0_chr1_rep68/host_aligned/cond0.rep2.chr1.readsFromrep68.sam $l  
+  echo 
+  
+done
+```
+
+
+
 
 
 

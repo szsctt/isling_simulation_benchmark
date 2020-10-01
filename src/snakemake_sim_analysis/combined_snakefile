@@ -22,149 +22,218 @@ HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
 adapter_seqs = {'HS25':HS25, 'MSv3':HS25}
 
 
-
 #####################################################
 ############# simulation parameters #################
 #####################################################
 
 
 # make dataframe with parameters for simulation
-config, df, ref_dict = parse_config(config)
+config, sim_df, ref_dict = parse_config(config)
 
 
 #####################################################
 ############## analysis parameters ##################
 #####################################################
 
-# add fields reuired for analysis to config: 
-# bam_suffix, read_dir, out_dir, read1-adapt, read2-adapt, host, virus
-analysis_condition_names = []
+
+# get unique analysis conditions - these are combinations of the analysis parameters that
+# can be set in our pipeline (merging, de-duplicaiton, bwa mem prarameters, etc), or
+# the tool to be used in analysis
+
 analysis_conditions = []
 datasets = list(config.keys())
+
+column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host_fasta',
+								'virus', 'virus_fasta', 'bam_suffix',
+								'read_folder', 'R1_suffix', 'R2_suffix', 'outdir', 
+								'merge', 'dedup', 'postargs', 'seq_sys', 'adapter_1', 'adapter_2', 
+								'bwa_mem_params', 'score_ints', 'score_ints_window')
+
 for dataset in datasets:
-		
-	# add read directory
-	read_folder = os.path.join(config[dataset]['out_directory'], dataset, "sim_reads")
 	
-	# if we want to process the same data with different parameters, 
-	# need to copy the dataset dict and give each a unique name
-	tmp = copy.deepcopy(config[dataset])
-	del config[dataset]
+		#### parameters for comparison of analysis and simulation ####	
+	# are we doing per-integration comparison of simulation with results?
+	score_ints= 0
+	score_ints_window = None
+	if 'score_ints' in config[dataset]:
+		if config[dataset]['score_ints'] is True or config[dataset]['score_ints'].lower() == 'true':
+			score_ints = 1
+			# check if we've specified a window around simulated integrations to look
+			if 'score_ints_window' in config[dataset]:
+				score_ints_window = config[dataset]['score_ints_window']
+	
+	#### parameters for our pipeline ####
+	# paramters for our pipeline should be lists, so that we can do combinations
+	# of each 
+	assert hasattr(config[dataset]['merge'], '__iter__')
+	assert hasattr(config[dataset]['dedup'], '__iter__')
+	assert hasattr(config[dataset]['merge'], '__iter__')
+	assert hasattr(config[dataset]['post'], '__iter__')
+	assert hasattr(config[dataset]['bwa_mem'], '__iter__')	
+	assert hasattr(config[dataset]['seq_sys'], '__iter__')
+	
+	# each combination of these are a unique 'analysis condition' for our pipeline
 	i = 0
-	
-	assert hasattr(tmp['merge'], '__iter__')
-	assert hasattr(tmp['dedup'], '__iter__')
-	assert hasattr(tmp['merge'], '__iter__')
-	assert hasattr(tmp['post'], '__iter__')
-	assert hasattr(tmp['bwa_mem'], '__iter__')
-	
-	# do we want to do polyidus for this dataset?
-	if 'polyidus' in tmp:
-		if tmp['polyidus'] is True or tmp['polyidus'] == 'true' or tmp['polyidus'] == 'True':
-			tmp['polyidus'] = 1
-		else:
-			tmp['polyidus']= 0
-	else:
-		tmp['polyidus']= 0
-		
-			
-	# each combination of these are a unique 'analysis condition'
-	for merge, dedup, post, seq_sys, bwa_mem_params in itertools.product(tmp['merge'], 
-																		tmp['dedup'],
-																		tmp['post'],
-																		tmp['seq_sys'],
-																		tmp['bwa_mem']):
+	for merge, dedup, post, bwa_mem_params, seq_sys, host, virus in itertools.product(
+																		config[dataset]['merge'], 
+																		config[dataset]['dedup'],
+																		config[dataset]['post'],
+																		config[dataset]['bwa_mem'],
+																		config[dataset]['seq_sys'],
+																		config[dataset]['analysis_hosts'].keys(),
+																		config[dataset]['analysis_viruses'].keys()):
 		
 		condition = f"{dataset}_analysis{i}"
-		analysis_condition_names.append(condition)
-		config[condition] =  copy.deepcopy(tmp)
-		# only run polyidus once (for the first condition)
-		if i == 0:
-			config[condition]['polyidus'] = tmp['polyidus']
-		else:
-			config[condition]['polyidus'] = 0 
-		config[condition]['merge'] = merge
-		config[condition]['dedup'] = dedup
-		config[condition]['post'] = make_post_args({dataset: {'post':post}})[0][dataset]
-		config[condition]['read1-adapt'] = adapter_seqs[seq_sys]['read1-adapt']
-		config[condition]['read2-adapt'] = adapter_seqs[seq_sys]['read2-adapt']
-		config[condition]['read_dir'] = os.path.join(config[condition]['out_directory'], dataset, "sim_reads")
-		
-		analysis_conditions.append(
-			(dataset, condition, ".sam", read_folder, tmp['out_directory'], merge, dedup, post, 
-			 seq_sys, config[condition]['read1-adapt'], config[condition]['read2-adapt'], bwa_mem_params, config[condition]['polyidus'])
-		)
-		i += 1
-	
-	# save information about analysis conditions to outdir for current dataset
-analysis_df = pd.DataFrame(analysis_conditions, 
-			columns = ['experiment', 'analysis_condition', 'bam_suffix', 'read_folder', 'output_directory',
-						'merge', 'dedup', 'post', 'seq_sys', 'read1_adapter', 'read2_adapter', 'bwa_mem', 'polyidus']
-							)
 
-# make dataframe with parameters for analysis
-rows = []
-for dataset in config:
-	# get a list of the samples for this analysis condition/dataset
-	experiment = analysis_df.loc[(analysis_df['analysis_condition'] == dataset).idxmax(), 'experiment']
-	conditions = df[df['experiment'] == experiment]['condition']
-	replicates = df[df['experiment'] == experiment]['replicate']
-	
-	samples = [f"{cond}.rep{rep}" for cond, rep, in zip(conditions, replicates)]
-	
-	# also get host/virus cominbation
-	host_names =  config[dataset]['analysis_hosts'].keys()
-	virus_names = config[dataset]['analysis_viruses'].keys()
-	
-	# figure out if 'dedup' and 'merge' are true or false for this dataset
-	if isinstance(config[dataset]["dedup"], bool):
-		dedup = int(config[dataset]["dedup"])
-	elif isinstance(config[dataset]["dedup"], str):
-		if config[dataset]["dedup"].lower() == "true":
-			dedup = 1
-		else:
-			dedup = 0
-	else:
-		raise InputError(f"Please specify True or False for 'dedup' in dataset {dataset}")
-	if isinstance(config[dataset]["merge"], bool):
-		merge = int(config[dataset]["merge"])
-	elif isinstance(config[dataset]["merge"], str):
-		if config[dataset]["merge"].lower() == "true":
+		# format parameters required for this condition
+		post_args = make_post_args({dataset: {'post':post}})[0][dataset]
+		
+		# figure out which adapters to use, based on which sequencing system used for art
+		read1_adapt = adapter_seqs[seq_sys]['read1-adapt']
+		read2_adapt = adapter_seqs[seq_sys]['read2-adapt']
+		
+		# convert merge and dedup to 1 or 0
+		if merge is True or merge == 'true' or merge == 'True':
 			merge = 1
 		else:
 			merge = 0
-	else:
-		raise InputError(f"Please specify True or False for 'merge' in dataset {dataset}")
+			
+		if dedup is True or dedup == 'true' or dedup == 'True':
+			dedup = 1
+		else:
+			dedup = 0
 
-	# for each sample, host and virus combination, add a row to rows
-	for sample, host, virus in itertools.product(samples, set(host_names), set(virus_names)):
-		
-		# the analysis pipline requires that host and virus be appended to dataset
-		# in order to make the dataset names unique for each combination of virus and host for the dataset
-		dataset_name = f"{dataset}_{host}_{virus}"
-		
-		# we also require a unique identifier for each sample
-		unique = f"{dataset_name}+++{sample}"
-		
-		# other sample-specific information
-		config[dataset]["R1_suffix"] = "_1.fq.gz"
-		config[dataset]["R2_suffix"] = "_2.fq.gz"
-		R1_file = f"{os.path.normpath(config[dataset]['out_directory'])}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
-		R2_file = f"{os.path.normpath(config[dataset]['out_directory'])}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
-		bam_file = os.path.join(config[dataset]['read_dir'],  f"{sample}.sam")
+		analysis_conditions.append({
+			'experiment' : dataset,
+			'host' 			: host,
+			'host_fasta': config[dataset]['analysis_hosts'][host],
+			'virus'     : virus,
+			'virus_fasta': config[dataset]['analysis_viruses'][virus],
+			'analysis_condition': condition,
+			'merge'			 : merge,
+			'dedup'			 : dedup,
+			'postargs'  : make_post_args({dataset: {'post':post}})[0][dataset],
+			'adapter_1'  : read1_adapt,
+			'adapter_2'  : read2_adapt,
+			'bwa_mem_params': bwa_mem_params,
+			'tool'			 : 'pipeline',
+			'score_ints' : score_ints,
+			'score_ints_window' : score_ints_window			
+		})
+		i += 1
+	
+	#### parameters for polyidus ####
+	i = 0
+	if 'polyidus_params' in config[dataset]:
 			
-		host_fasta = config[dataset]["analysis_hosts"][host]
-		virus_fasta = config[dataset]["analysis_viruses"][virus]
+			# are we trying multiple aligners?
+			if 'aligner' in config[dataset]['polyidus_params']:
+				assert hasattr(config[dataset]['polyidus_params']['aligner'], '__iter__')
+				aligners = config[dataset]['polyidus_params']['aligner']
+			else:
+				aligners = ['bowtie2']
+				
+			for host, virus, aligner in itertools.product(
+																		config[dataset]['analysis_hosts'].keys(),
+																		config[dataset]['analysis_viruses'].keys(),
+																		aligners):
+				# give this analysis condition a name
+				condition = f"{dataset}_polyidus{i}"
+
+				analysis_conditions.append({
+					'experiment' : dataset,
+					'host' 			 : host,
+					'host_fasta' : config[dataset]['analysis_hosts'][host],
+					'virus'      : virus,
+					'virus_fasta': config[dataset]['analysis_viruses'][virus],
+					'analysis_condition': condition,
+					'aligner'		 : aligner,
+					'tool'			 : 'polyidus',
+					'score_ints' : score_ints,
+					'score_ints_window' : score_ints_window			
+					})	
+				i += 1
+	
+	#### parameters for vifi ####
+	# if we're also doing vifi
+	i = 0
+	if 'vifi' in config[dataset]:
+		if config[dataset]['vifi'] is True or config[dataset]['vifi'] == 'true' or config[dataset]['vifi'] == 'True':
+			for host, virus in itertools.product(
+																config[dataset]['analysis_hosts'].keys(),
+																config[dataset]['analysis_viruses'].keys()):
+				condition = f"{dataset}_vifi{i}"
+				analysis_conditions.append({
+					'experiment' : dataset,
+					'host' 			 : host,
+					'host_fasta' : config[dataset]['analysis_hosts'][host],
+					'virus'      : virus,		
+					'virus_fasta': config[dataset]['analysis_viruses'][virus],	
+					'analysis_condition': condition,
+					'tool'			 : 'vifi',			
+					'score_ints' : score_ints,
+					'score_ints_window' : score_ints_window
+				})
+				i += 1
+
+##### parameters that are common to each experiment ####
+for cond_dict in analysis_conditions:
+	dataset = cond_dict['experiment']
+	cond_dict['bam_suffix'] = '.sam'
+	cond_dict['R1_suffix'] = '1.fq'
+	cond_dict['R2_suffix'] = '2.fq'
+	cond_dict['read_folder'] = os.path.join(config[dataset]['out_directory'], dataset, "sim_reads")
+	cond_dict['outdir'] = config[dataset]['out_directory'] 
+	cond_dict['score_ints'] = score_ints
+	cond_dict['score_ints_window'] = score_ints_window
+	cond_dict['exp'] = cond_dict['experiment']
+
+	
+# make data frame 
+analysis_df = pd.DataFrame(analysis_conditions, columns = column_names)
+
+
+
+## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
+
+column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs']
+
+rows = []
+
+# build rows of toDo
+for i, row in analysis_df.iterrows():
+
+	# skip any rows we don't want to analyse with our pipeline
+	if row['tool'] != 'pipeline':
+		continue
+
+	# get samples for this simulated dataset
+	experiment = row['experiment']
+	dataset = row['analysis_condition']
+	samples = sim_df[sim_df['experiment'] == experiment]['sample']
+	
+	# make a row for each sample in this dataset
+	for sample in samples:
 		
-		row = (dataset_name, dataset, sample, host, host_fasta, virus, virus_fasta, merge, 
-			dedup, unique, config[dataset]["out_directory"], bwa_mem_params, R1_file, R2_file, bam_file, 
-			config[dataset]['read1-adapt'], config[dataset]['read2-adapt'], config[dataset]['post'])
+		# use information we already worked out from config
+		todo_row = dict(row)
+		todo_row['dataset'] = dataset
+		todo_row['config_dataset'] = experiment
 		
-		assert row not in rows
 		
-		rows.append(row)
-			
-toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs'])
+		# add sample name
+		todo_row['sample'] = sample
+		todo_row['unique'] = f"{dataset}+++{sample}"
+		
+		# read file names
+		read_prefix = os.path.join(row['outdir'], experiment, 'sim_reads', sample)
+		todo_row['R1_file'] = read_prefix + row['R1_suffix']
+		todo_row['R2_file'] = read_prefix + row['R2_suffix']
+		todo_row['bam_file'] = read_prefix + row['bam_suffix']
+		
+		rows.append(todo_row)
+		
+toDo = pd.DataFrame(rows, columns = column_names)
 
 # make dictionary of reference names and fasta files
 ref_names = make_reference_dict(toDo)
@@ -180,13 +249,16 @@ POSTARGS, TOSORT, SORTED = make_post_args(config)
 
 
 wildcard_constraints:
-	cond = "|".join(set(df.loc[:, 'condition'])),
-	exp = "|".join(set(df.loc[:, 'experiment'])),
-	rep = "|".join(set([str(i) for i in df.loc[:, 'replicate']])),
+	cond = "|".join(set(sim_df.loc[:, 'condition'])),
+	exp = "|".join(set(sim_df.loc[:, 'experiment'])),
+	rep = "|".join(set([str(i) for i in sim_df.loc[:, 'replicate']])),
 	dset = "|".join(set(toDo.loc[:, 'dataset'])),
 	samp = "|".join(set(toDo.loc[:, 'sample'])),
 	host = "|".join(set(toDo.loc[:, 'host'])),
-	virus = "|".join(set(toDo.loc[:, 'virus']))
+	virus = "|".join(set(toDo.loc[:, 'virus'])),
+	post = "|\.post",
+	analysis_condition = "|".join(analysis_df['analysis_condition']) + "|polyidus",
+	outpath = "|".join(set(toDo['outdir'])),
 	
 localrules: write_summary, write_analysis_summary, combine_scores
 
@@ -195,10 +267,10 @@ localrules: write_summary, write_analysis_summary, combine_scores
 #####################################################
 
 # target files for simulation
-sim_targets = df.loc[:,'annotated_info_filename']
+sim_targets = sim_df.loc[:,'annotated_info_filename']
 
 exp_targets = {}
-for i, row in df.iterrows():
+for i, row in sim_df.iterrows():
 	exp_targets[row['experiment']] = row['out_directory']
 experiments = list(exp_targets.keys())
 
@@ -210,39 +282,40 @@ sim_summaries = expand("{outpath}/{exp}/simulation_summary.tsv",
 
 			
 analysis_summaries = [f"{outdir}/{experiment}/analysis_conditions.tsv" for outdir, experiment in 
-												zip(df.loc[:,'out_directory'],
-														df.loc[:,'experiment']
+												zip(sim_df.loc[:,'out_directory'],
+														sim_df.loc[:,'experiment']
 														)
 											]
 								
-post_targets = expand("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt",
-												zip,
-												outpath = toDo['outdir'],
-												dset = toDo['dataset'],
-												samp = toDo['sample'],
-												host = toDo['host'],
-												virus = toDo['virus'])
 
 
-# target files for both (comparing analysis with simulation)
-both_targets = []
 
+# target files for per-read comparison of analysis with simulation
+# only do this with our pipeline for the momemnt
+
+scored_reads = []
 for i, row in analysis_df.iterrows():
+
+	if row['tool'] != 'pipeline':
+		continue
+
 	exp = row['experiment']
-	outpath = row['output_directory']
+	outpath = row['outdir']
 	analysis_condition = row['analysis_condition']
 	
 	# get samples, hosts, viruses for this analysis condition
-	samples = set(toDo[toDo['config_dataset'] == analysis_condition]['sample'])
-	hosts = set(toDo[toDo['config_dataset'] == analysis_condition]['host'])
-	viruses = set(toDo[toDo['config_dataset'] == analysis_condition]['virus'])
-	#post = ['', '.post']
+	samples = set(toDo[toDo['dataset'] == analysis_condition]['sample'])
+	hosts = set(toDo[toDo['dataset'] == analysis_condition]['host'])
+	viruses = set(toDo[toDo['dataset'] == analysis_condition]['virus'])
 	post = ['.post', '']
 	
-	both_targets += [f"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv" for samp, post, host, virus 
-										in itertools.product(samples, post, hosts, viruses)
-									]
-									
+	scored_reads += [
+	f"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv" 
+		for samp, post, host, virus 
+		in itertools.product(samples, post, hosts, viruses)
+	]
+
+						
 # summary files
 scored_summaries = expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv', 
 			zip,
@@ -253,15 +326,21 @@ scored_summaries = expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv',
 # polyidus outputs
 polyidus_targets = []
 for i, row in analysis_df.iterrows():
-	if row['polyidus'] == 1:
-		outpath = row['output_directory']
-		exp = row['experiment']
-		analysis_condition = row['analysis_condition']
-		samples = toDo[toDo['config_dataset'] == analysis_condition]['sample']
-		hosts = toDo[toDo['config_dataset'] == analysis_condition]['host']
-		viruses = toDo[toDo['config_dataset'] == analysis_condition]['virus']
-		for samp, host, virus in itertools.product(samples, hosts, viruses):
-			polyidus_targets.append(f"{outpath}/{exp}/polyidus/{samp}_{host}_{virus}/results/HpvIntegrationInfo.tsv")
+	if row['tool'] != 'polyidus':
+		continue
+		
+	outpath = row['outdir']
+	exp = row['experiment']
+	analysis_condition = row['analysis_condition']
+		
+	samples = sim_df[sim_df['experiment'] == exp]['sample']
+	host = row['host']
+	virus = row['virus']
+		
+	for samp  in samples:
+		polyidus_targets.append(
+			f"{outpath}/{analysis_condition}/ints/{samp}.{host}.{virus}.integrations.txt"
+		)
 
 rule all:
 	input: 
@@ -269,7 +348,7 @@ rule all:
 		set(sim_summaries),
 		set(analysis_summaries),
 		#set(post_targets),
-		set(both_targets),
+		set(scored_reads),
 		set(scored_summaries),
 		set(polyidus_targets)
 		
@@ -297,7 +376,21 @@ include: "snakemake_rules/postprocessing.smk"
 #####################################################
 ##################### polyidus ######################
 #####################################################
+def analysis_df_value(wildcards, column_name):
+	
+	# get a value from the row of the df corresponding to this analysis condition
+	
+	unique = f"{wildcards.dset}"
 
+	return analysis_df.loc[(analysis_df['analysis_condition'] == unique).idxmax(), column_name] 
+	
+def sim_df_value(wildcards, column_name):
+	
+	
+	# get a value from the row of the df corresponding to this analysis condition
+	unique = f"{wildcards.exp}__{wildcards.samp}"
+	return sim_df.loc[(sim_df['unique'] == unique).idxmax(), column_name] 
+	
 
 rule bwt2_index:
 	input:
@@ -311,21 +404,23 @@ rule bwt2_index:
 	shell:
 		"bowtie2-build {input} {params.prefix}"
 
-
 rule polyidus:
 	input:
-		fastq1 = rules.art.output.r1,
-		fastq2 = rules.art.output.r2,
+		fastq1 = lambda wildcards: f"{outpath}/{analysis_df_value(wildcards, 'exp')}/sim_reads/{samp}{analysis_df_value(wildcards, 'R1_suffix')}",
+		fastq2 = lambda wildcards: f"{outpath}/{analysis_df_value(wildcards, 'exp')}/sim_reads/{samp}{analysis_df_value(wildcards, 'R2_suffix')}",
 		host_idx =  "{outpath}/references/{host}/{host}.1.bt2",
 		virus_idx = "{outpath}/references/{virus}/{virus}.1.bt2"
 	output:
-		ints = "{outpath}/{exp}/polyidus/{samp}_{host}_{virus}/results/HpvIntegrationInfo.tsv"
+		temp_ints = temp("{outpath}/{dset}/polyidus_{host}_{virus}_{samp}/results/HpvIntegrationInfo.tsv"),
+		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	params:
-		output = lambda wildcards, output: path.dirname(path.dirname(output.ints)),
+		output = lambda wildcards, output: path.dirname(path.dirname(output.temp_ints)),
 		host_idx = lambda wildcards, input: path.splitext(path.splitext(input.host_idx)[0])[0],
 		virus_idx = lambda wildcards, input: path.splitext(path.splitext(input.virus_idx)[0])[0],
 	container:
 		"docker://szsctt/polyidus:1"
+	wildcard_constraints:
+		dset = "polyidus"
 	shell:
 		"""
 		python3 /usr/src/app/src/polyidus.py \
@@ -333,9 +428,27 @@ rule polyidus:
 		{params.virus_idx} \
 		--fastq {input.fastq1} {input.fastq2} \
 		--outdir {params.output}
+		
+		cp {output.temp_ints} {output.ints}
 		"""
 
+#####################################################
+####################### vifi ########################
+#####################################################
 
+rule make_data_repo:
+	input:
+		lambda wildcards: ref_names[wildcards.genome]
+	output:
+		"{outpath}/vifi_refs/data_repo/{host}/{host}.1.bt2"
+	container:
+		"docker://szsctt/polyidus:1"
+	params:
+		prefix = lambda wildcards, output: path.splitext(path.splitext(output[0])[0])[0]
+	shell:
+		"bowtie2-build {input} {params.prefix}"
+		
+		
 
 #####################################################
 ############ compare sim with analysis ##############
@@ -344,34 +457,26 @@ rule polyidus:
 
 rule write_analysis_summary:
 	output:
-		tsv_conditions = "{outdir}/{experiment}/analysis_conditions.tsv",
+		pipeline_conditions = "{outdir}/{experiment}/pipeline_analysis_conditions.tsv",
+		analysis_conditions = "{outdir}/{experiment}/analysis_conditions.tsv"
 	run:
-		toDo.to_csv(output.tsv_conditions, sep='\t', index=False)
+		toDo.to_csv(output.pipeline_conditions, sep='\t', index=False)
+		analysis_df.to_csv(output.pipeline_conditions, sep='\t', index=False)
 
 		
 rule score_reads:
 	input:
 		sim_info = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
 		sim_sam = "{outpath}/{exp}/sim_reads/{samp}.sam",
-		analysis_info = "{outpath}/{analysis_condition}_{host}_{virus}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
+		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
 	output:
-		scored_reads = "{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv",
-		summary = "{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv"
-	wildcard_constraints:
-		post = "|\.post",
-		exp = "|".join(set(df['experiment'])),
-		samp = "|".join(set(toDo['sample'])),
-		analysis_condition = "|".join(analysis_df['analysis_condition']),
-		outpath = "|".join(set(toDo['outdir'])),
-		host = "|".join(set(toDo['host'])),
-		virus = "|".join(set(toDo['virus']))
+		scored_reads = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}.tsv",
+		summary = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 50000,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	threads: 10
-	benchmark:
-		"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}_benchmark.tsv"
 	container:
 		"docker://szsctt/simvi:2"
 	conda:
@@ -411,7 +516,7 @@ def scores_to_combine(wildcards):
 	return set(targets)
 
 
-rule combine_scores:
+rule combine_read_scores:
 	input:
 		scores_to_combine
 	output:
@@ -426,8 +531,35 @@ rule combine_scores:
 		"""
 		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
 		"""
-		
-	
+
+rule score_integrations:
+	input:
+		sim_info = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
+		analysis_info = "{outpath}/{analysis_condition}_{host}_{virus}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
+	output:
+		scored_ints = "{outpath}/{exp}/scored_ints/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv",
+		summary = "{outpath}/{exp}/scored_ints/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv"
+	resources:
+		mem_mb= lambda wildcards, attempt: attempt * 50000,
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	threads: 10
+	benchmark:
+		"{outpath}/{exp}/scored_ints/{analysis_condition}.{samp}.{host}.{virus}{post}_benchmark.tsv"
+	container:
+		"docker://szsctt/simvi:2"
+	conda:
+		"envs/simvi.yml"
+	shell:
+		"""
+		python3 scripts/score_integrations.py \
+		--sim-info {input.sim_info} \
+		--analysis-info {input.analysis_info} \
+		--output {output.scored_ints} \
+		--output-summary {output.summary} \
+		--threads {threads}
+		"""
+
 		
 		
 		

@@ -40,7 +40,7 @@ singularity exec \
 -B $REFERENCE_REPO:/home/repo/data \
 -B $INPUT_DIR:/usr/share/ \
 -B $AA_DATA_REPO:/home/data_repo/ \
--B $OUTPUT_DIR:/home/output/ \
+-B $OUTPUT_DIR:/home/opt/ \
 $IMAGE \
 /bin/bash
 
@@ -49,7 +49,7 @@ $IMAGE \
 #CPUS="1"
 #READ1="cond0.rep01.fq"
 #READ2="cond0.rep02.fq"
-#python $VIFI_DIR/scripts/run_vifi.py -c ${CPUS} -f /usr/share/${READ1} -r /usr/share/${READ2} -v otc -o /home/output/ -d True
+#python $VIFI_DIR/scripts/run_vifi.py -c ${CPUS} -f /usr/share/${READ1} -r /usr/share/${READ2} -v otc -o /home/opt/ -d True
 
 
 

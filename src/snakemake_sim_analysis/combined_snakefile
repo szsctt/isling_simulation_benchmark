@@ -7,6 +7,7 @@ import pdb
 import copy
 import itertools
 import pandas as pd
+import re
 
 from python_scripts.parse_config import parse_config
 from python_scripts.make_df import make_df, make_post_args, make_reference_dict
@@ -20,7 +21,6 @@ HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
 				
 
 adapter_seqs = {'HS25':HS25, 'MSv3':HS25}
-
 
 #####################################################
 ############# simulation parameters #################
@@ -47,7 +47,7 @@ column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host
 								'virus', 'virus_fasta', 'bam_suffix',
 								'read_folder', 'R1_suffix', 'R2_suffix', 'outdir', 
 								'merge', 'dedup', 'postargs', 'seq_sys', 'adapter_1', 'adapter_2', 
-								'bwa_mem_params', 'score_ints', 'score_ints_window')
+								'bwa_mem_params', 'score_ints', 'score_ints_window', 'score_ints_tool')
 
 for dataset in datasets:
 	
@@ -118,7 +118,8 @@ for dataset in datasets:
 			'bwa_mem_params': bwa_mem_params,
 			'tool'			 : 'pipeline',
 			'score_ints' : score_ints,
-			'score_ints_window' : score_ints_window			
+			'score_ints_window' : score_ints_window,
+			'score_ints_tool' : "pipeline"	
 		})
 		i += 1
 	
@@ -150,7 +151,8 @@ for dataset in datasets:
 					'aligner'		 : aligner,
 					'tool'			 : 'polyidus',
 					'score_ints' : score_ints,
-					'score_ints_window' : score_ints_window			
+					'score_ints_window' : score_ints_window,
+					'score_ints_tool' : "polyidus"	
 					})	
 				i += 1
 	
@@ -172,7 +174,8 @@ for dataset in datasets:
 					'analysis_condition': condition,
 					'tool'			 : 'vifi',			
 					'score_ints' : score_ints,
-					'score_ints_window' : score_ints_window
+					'score_ints_window' : score_ints_window,
+					'score_ints_tool' : "vifi"	
 				})
 				i += 1
 
@@ -252,15 +255,26 @@ wildcard_constraints:
 	cond = "|".join(set(sim_df.loc[:, 'condition'])),
 	exp = "|".join(set(sim_df.loc[:, 'experiment'])),
 	rep = "|".join(set([str(i) for i in sim_df.loc[:, 'replicate']])),
-	dset = "|".join(set(toDo.loc[:, 'dataset'])),
+	dset = "|".join(set(analysis_df.loc[:, 'analysis_condition'])),
 	samp = "|".join(set(toDo.loc[:, 'sample'])),
-	host = "|".join(set(toDo.loc[:, 'host'])),
-	virus = "|".join(set(toDo.loc[:, 'virus'])),
+	host = "|".join(set(analysis_df.loc[:, 'host'])),
+	virus = "|".join(set(analysis_df.loc[:, 'virus'])),
 	post = "|\.post",
-	analysis_condition = "|".join(analysis_df['analysis_condition']) + "|polyidus",
-	outpath = "|".join(set(toDo['outdir'])),
+	analysis_condition = "|".join(analysis_df['analysis_condition']),
+	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
 	
-localrules: write_summary, write_analysis_summary, combine_scores
+localrules: write_summary, write_analysis_summary, combine_read_scores, combine_int_scores
+
+
+#####################################################
+################## ruleorder ########################
+#####################################################
+
+# to resolve conflicts between polyidus and combine_ints (our analysis pipeline)
+# rule polyidus has a wildcard contstraint so it can't be used for our pipeline
+# so make it higher in the priority
+
+ruleorder: polyidus > combine_ints
 
 #####################################################
 ################### target files ####################
@@ -288,41 +302,6 @@ analysis_summaries = [f"{outdir}/{experiment}/analysis_conditions.tsv" for outdi
 											]
 								
 
-
-
-# target files for per-read comparison of analysis with simulation
-# only do this with our pipeline for the momemnt
-
-scored_reads = []
-for i, row in analysis_df.iterrows():
-
-	if row['tool'] != 'pipeline':
-		continue
-
-	exp = row['experiment']
-	outpath = row['outdir']
-	analysis_condition = row['analysis_condition']
-	
-	# get samples, hosts, viruses for this analysis condition
-	samples = set(toDo[toDo['dataset'] == analysis_condition]['sample'])
-	hosts = set(toDo[toDo['dataset'] == analysis_condition]['host'])
-	viruses = set(toDo[toDo['dataset'] == analysis_condition]['virus'])
-	post = ['.post', '']
-	
-	scored_reads += [
-	f"{outpath}/{exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv" 
-		for samp, post, host, virus 
-		in itertools.product(samples, post, hosts, viruses)
-	]
-
-						
-# summary files
-scored_summaries = expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv', 
-			zip,
-			exp = experiments, 
-			outpath = [exp_targets[exp] for exp in experiments]
-			)
-			
 # polyidus outputs
 polyidus_targets = []
 for i, row in analysis_df.iterrows():
@@ -331,16 +310,35 @@ for i, row in analysis_df.iterrows():
 		
 	outpath = row['outdir']
 	exp = row['experiment']
-	analysis_condition = row['analysis_condition']
+	dset = row['analysis_condition']
 		
 	samples = sim_df[sim_df['experiment'] == exp]['sample']
 	host = row['host']
 	virus = row['virus']
 		
-	for samp  in samples:
+	for samp in samples:
 		polyidus_targets.append(
-			f"{outpath}/{analysis_condition}/ints/{samp}.{host}.{virus}.integrations.txt"
+			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 		)
+		polyidus_targets.append(
+			f"{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.tsv"
+		)
+
+	
+# summary files
+scored_summaries = expand(
+			'{outpath}/{exp}/{exp}.scored_reads_summary.tsv', 
+				zip,
+				exp = experiments, 
+				outpath = [exp_targets[exp] for exp in experiments]
+			) + expand(
+			"{outpath}/{exp}/{exp}.scored_ints_summary.tsv",
+				zip,
+				exp = experiments, 
+				outpath = [exp_targets[exp] for exp in experiments]
+			)
+			
+
 
 rule all:
 	input: 
@@ -348,7 +346,6 @@ rule all:
 		set(sim_summaries),
 		set(analysis_summaries),
 		#set(post_targets),
-		set(scored_reads),
 		set(scored_summaries),
 		set(polyidus_targets)
 		
@@ -379,7 +376,6 @@ include: "snakemake_rules/postprocessing.smk"
 def analysis_df_value(wildcards, column_name):
 	
 	# get a value from the row of the df corresponding to this analysis condition
-	
 	unique = f"{wildcards.dset}"
 
 	return analysis_df.loc[(analysis_df['analysis_condition'] == unique).idxmax(), column_name] 
@@ -398,7 +394,7 @@ rule bwt2_index:
 	output:
 		"{outpath}/references/{genome}/{genome}.1.bt2"
 	container:
-		"docker://szsctt/polyidus:1"
+		"docker://szsctt/polyidus:2"
 	params:
 		prefix = lambda wildcards, output: path.splitext(path.splitext(output[0])[0])[0]
 	shell:
@@ -411,16 +407,16 @@ rule polyidus:
 		host_idx =  "{outpath}/references/{host}/{host}.1.bt2",
 		virus_idx = "{outpath}/references/{virus}/{virus}.1.bt2"
 	output:
-		temp_ints = temp("{outpath}/{dset}/polyidus_{host}_{virus}_{samp}/results/HpvIntegrationInfo.tsv"),
+		temp_ints = temp("{outpath}/{dset}/polyidus_{host}_{virus}_{samp}/results/exactHpvIntegrations.tsv"),
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	params:
 		output = lambda wildcards, output: path.dirname(path.dirname(output.temp_ints)),
 		host_idx = lambda wildcards, input: path.splitext(path.splitext(input.host_idx)[0])[0],
 		virus_idx = lambda wildcards, input: path.splitext(path.splitext(input.virus_idx)[0])[0],
 	container:
-		"docker://szsctt/polyidus:1"
+		"docker://szsctt/polyidus:2"
 	wildcard_constraints:
-		dset = "polyidus"
+		dset = ".+_polyidus\d+"
 	shell:
 		"""
 		python3 /usr/src/app/src/polyidus.py \
@@ -461,12 +457,12 @@ rule write_analysis_summary:
 		analysis_conditions = "{outdir}/{experiment}/analysis_conditions.tsv"
 	run:
 		toDo.to_csv(output.pipeline_conditions, sep='\t', index=False)
-		analysis_df.to_csv(output.pipeline_conditions, sep='\t', index=False)
+		analysis_df.to_csv(output.analysis_conditions, sep='\t', index=False)
 
 		
 rule score_reads:
 	input:
-		sim_info = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
+		sim_info = rules.annotate_reads.output.annotated_info,
 		sim_sam = "{outpath}/{exp}/sim_reads/{samp}.sam",
 		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
 	output:
@@ -492,39 +488,16 @@ rule score_reads:
 		--threads {threads}
 		"""
 
-def scores_to_combine(wildcards):
-	targets = []
-
-	for i, row in analysis_df.iterrows():
-		
-		if row['experiment'] != wildcards.exp:
-			continue
-		analysis_condition = row['analysis_condition']
-	
-	
-		# get samples, hosts, viruses for this analysis condition
-		samples = set(toDo[toDo['config_dataset'] == analysis_condition]['sample'])
-		hosts = set(toDo[toDo['config_dataset'] == analysis_condition]['host'])
-		viruses = set(toDo[toDo['config_dataset'] == analysis_condition]['virus'])
-		post = ['', '.post']
-	
-		targets += [f"{outpath}/{wildcards.exp}/scored_reads/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv"
-		 						for samp, host, post, virus 
-								in itertools.product(samples, hosts, post, viruses)
-									]
-							
-	return set(targets)
-
 
 rule combine_read_scores:
 	input:
-		scores_to_combine
+		lambda wildcards: scores_to_combine(wildcards, "reads")
 	output:
 		"{outpath}/{exp}/{exp}.scored_reads_summary.tsv"
 	container:
 		"docker://ubuntu:18.04"	
 	resources:
-		mem_mb= lambda wildcards, attempt: attempt * 50000,
+		mem_mb= lambda wildcards, attempt: attempt * 5000,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	shell:
@@ -532,20 +505,23 @@ rule combine_read_scores:
 		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
 		"""
 
+
+
 rule score_integrations:
 	input:
-		sim_info = "{outpath}/{exp}/sim_ints/{samp}.int-info.annotated.tsv",
-		analysis_info = "{outpath}/{analysis_condition}_{host}_{virus}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
+		sim_info = rules.annotate_reads.output.annotated_info,
+		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
 	output:
-		scored_ints = "{outpath}/{exp}/scored_ints/{analysis_condition}.{samp}.{host}.{virus}{post}.tsv",
-		summary = "{outpath}/{exp}/scored_ints/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv"
+		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.tsv",
+		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
 	resources:
-		mem_mb= lambda wildcards, attempt: attempt * 50000,
+		mem_mb= lambda wildcards, attempt: attempt * 5000,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
-	threads: 10
-	benchmark:
-		"{outpath}/{exp}/scored_ints/{analysis_condition}.{samp}.{host}.{virus}{post}_benchmark.tsv"
+	params:
+		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'score_ints_tool')}",
+		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}"
+	threads: 1
 	container:
 		"docker://szsctt/simvi:2"
 	conda:
@@ -554,14 +530,74 @@ rule score_integrations:
 		"""
 		python3 scripts/score_integrations.py \
 		--sim-info {input.sim_info} \
-		--analysis-info {input.analysis_info} \
+		--found-info {input.analysis_info} \
 		--output {output.scored_ints} \
-		--output-summary {output.summary} \
-		--threads {threads}
+		--summary {output.summary} \
+		{params}
 		"""
+		
+rule combine_int_scores:
+	input:
+		lambda wildcards: scores_to_combine(wildcards, "ints")
+	output:
+		"{outpath}/{exp}/{exp}.scored_ints_summary.tsv"
+	container:
+		"docker://ubuntu:18.04"	
+	resources:
+		mem_mb= lambda wildcards, attempt: attempt * 5000,
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	shell:
+		"""
+		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
+		"""
+		
+# target files for per-read or per-integration comparison of analysis with simulation
+def scores_to_combine(wildcards, score_type):
 
+	assert score_type in ("ints", "reads")
+	
+	if score_type == "ints":
+		folder = "scored_ints"
+	else:
+		folder = "scored_reads"
+	
+	scored_files = []
+	for i, row in analysis_df.iterrows():
+		
+		# get information for this row
+		exp = row['experiment']
+		
+		if exp !=  wildcards.exp:
+			continue
+		outpath = row['outdir']
+		analysis_condition = row['analysis_condition']
+		host = row['host']
+		virus = row['virus']
 		
 		
-		
-		
+	
+		# get samples for this experiment
+		samples = set(sim_df[sim_df['experiment'] == exp]['sample'])
+	
+		# we only have postprocessed data for our pipeline
+		if re.search("analysis", analysis_condition):
+			
+			post = ['.post', '']
+
+		else:
+			post = ['']
+			
+			# currently we're only scoring reads for our pipeline
+			#if score_type == "reads":
+			#	continue
+			continue
+	
+		scored_files += [
+		f"{outpath}/{exp}/{folder}/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv" 
+			for samp, post,
+			in itertools.product(samples, post)
+		]
+	
+	return scored_files
 

@@ -63,7 +63,9 @@ test-easier:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    
    #run polyidus?
-   polyidus : True
+   polyidus_params:
+     aligner:
+      - "bowtie2"
        
 test-harder:
    out_directory: "../../out/test"
@@ -131,10 +133,10 @@ test-harder:
    #run polyidus?
    polyidus_params:
      aligner:
-      - "bwa"
+#      - "bwa"
       - "bowtie2"
       
-   vifi: True
+#   vifi: True
         
    # scoring
    score_ints: True

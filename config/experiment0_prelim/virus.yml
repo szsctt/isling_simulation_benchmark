@@ -33,6 +33,8 @@ rep68-easier:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -68,6 +70,10 @@ rep68-easier:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   
+   polyidus_params:
+     aligner:
+      - "bowtie2"
   
 
 OTC-vect-easier:
@@ -105,6 +111,8 @@ OTC-vect-easier:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -140,6 +148,11 @@ OTC-vect-easier:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       
+       
+   polyidus_params:
+     aligner:
+      - "bowtie2"
   
   
 AAV2-easier:
@@ -177,6 +190,8 @@ AAV2-easier:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -213,6 +228,11 @@ AAV2-easier:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200" 
        
+       
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+       
 OTC-vect-harder:
    out_directory: "../../out/experiment0_prelim"
    
@@ -247,6 +267,8 @@ OTC-vect-harder:
    p_host_deletion:
        - 0.5
    lambda_host_deletion:
+       - 500
+   min_sep:
        - 500
    # read simulation
    read_len: 
@@ -283,6 +305,11 @@ OTC-vect-harder:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       
+       
+   polyidus_params:
+     aligner:
+      - "bowtie2"
 
 
 AAV2-harder:
@@ -320,6 +347,8 @@ AAV2-harder:
        - 0.5
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -354,6 +383,11 @@ AAV2-harder:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200" 
+       
+       
+   polyidus_params:
+     aligner:
+      - "bowtie2"
        
 
 rep68-harder:
@@ -391,6 +425,8 @@ rep68-harder:
        - 0.5
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -425,3 +461,7 @@ rep68-harder:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200" 
+       
+   polyidus_params:
+     aligner:
+      - "bowtie2"

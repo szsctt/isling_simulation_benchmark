@@ -38,7 +38,7 @@ READ1="cond0.rep01.fq"
 READ2="cond0.rep02.fq"
 
 
-srun --time 2:00:00 --mem 30gb \
+#srun --time 2:00:00 --mem 30gb \
 singularity exec \
 -B $REFERENCE_REPO:/home/repo/data \
 -B $INPUT_DIR:/usr/share/ \

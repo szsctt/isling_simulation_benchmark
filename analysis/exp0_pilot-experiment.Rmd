@@ -100,8 +100,8 @@ There are a few different ways of scoring the results from these experiments.  O
 ### Are all the reads that cross integrations found?
 
 ```{r include=FALSE}
-easier <- importData(easier_sim, easier_analy, easier_results)
-harder <- importData(harder_sim, harder_analy, harder_results)
+easier <- importReadData(easier_sim, easier_analy, easier_results)
+harder <- importReadData(harder_sim, harder_analy, harder_results)
 results <- bind_rows(easier, harder)
 
 rm(easier, harder, easier_sim, easier_analy, easier_results, harder_sim, harder_analy, harder_results)
@@ -171,9 +171,9 @@ LIST=$(awk 'match($3, /fn/) && match($9, /chimeric/)' "../out/test/test-harder/s
 
 for l in $LIST; do
   echo "viral alignment:"
-  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0_human_AAV/virus_aligned/cond0.rep0.AAV.sam  $l
+  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0/virus_aligned/cond0.rep0.AAV.sam  $l
   echo "host_alignment:"
-  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0_human_AAV/host_aligned/cond0.rep0.human.readsFromAAV.sam $l  
+  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0/host_aligned/cond0.rep0.human.readsFromAAV.sam $l  
   echo 
   
 done
@@ -190,9 +190,9 @@ LIST=$(awk 'match($3, /fn/) && match($9, /discord/)' "../out/test/test-harder/sc
 
 for l in $LIST; do
   echo "viral alignment:"
-  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0_human_AAV/virus_aligned/cond0.rep0.AAV.sam  $l
+  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0/virus_aligned/cond0.rep0.AAV.sam  $l
   echo "host_alignment:"
-  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0_human_AAV/host_aligned/cond0.rep0.human.readsFromAAV.sam $l  
+  python3 python_scripts/print_cigars_from_sam.py ../out/test/test-harder_analysis0/host_aligned/cond0.rep0.human.readsFromAAV.sam $l  
   echo 
   
 done
@@ -336,9 +336,9 @@ scored <- c("../out/experiment0_prelim/AAV2-easier/AAV2-easier.scored_reads_summ
 ```
 
 ```{r include=FALSE}
-results <- importData(sim[1],  analysis[1], scored[1])
+results <- importReadData(sim[1],  analysis[1], scored[1])
 for (i in seq(2, length(sim))){
-  tmp <- importData(sim[i],  analysis[i], scored[i])
+  tmp <- importReadData(sim[i],  analysis[i], scored[i])
   results <- bind_rows(results, tmp)
 }
 rm(tmp, analysis, scored, sim)
@@ -389,6 +389,38 @@ There's a lot going on here.  Some observations:
   - We also tend to do better in the easier condition than the harder condition
   - We tend to do better with chimeric reads than discordant pairs.  The difference is worse with hg38 as a host reference and with the OTC vector as a viral reference.
   - It's curious that we do a bit better with AAV2 compared to rep68 - I would have expected this to be the other way around
+
+Also check out the host score - are the integrations in the correct place in the host?
+
+```{r}
+results %>% 
+  filter(score_type == 'host_score') %>% 
+  mutate(epi_num = as.factor(epi_num)) %>% 
+  filter(!post) %>% 
+  ggplot(aes(x = TNR, y = TPR, color = junc_type, shape = experiment)) +
+  geom_point(alpha = 0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate') +
+  facet_grid(rows = vars(analysis_host), cols = vars(analysis_virus))
+```
+
+Finally, check out the 'virus_score' - are the reads in the correct place in the virus?
+
+```{r}
+results %>% 
+  filter(score_type == 'virus_score') %>% 
+  mutate(epi_num = as.factor(epi_num)) %>% 
+  filter(!post) %>% 
+  ggplot(aes(x = TNR, y = TPR, color = junc_type, shape = experiment)) +
+  geom_point(alpha = 0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate') +
+  facet_grid(rows = vars(analysis_host), cols = vars(analysis_virus))
+```
 
 #### With postprocessing
 
@@ -483,41 +515,40 @@ awk 'match($3, /fn/)' ../out/experiment0_prelim/rep68-easier/scored_reads/rep68-
 ```
 
 
-Now looking at the three replicates of rep68 inserted into chr1 (and analysed against chr1) together.  If we plot a histogram the number of reads missing from each integration, it looks like this:
+Now looking at the three replicates of the different viruses inserted into chr1 (and analysed against chr1 or hg38) together.  If we plot a frequency polynomial of the number of reads missing from each integration, it looks like this:
 
 
 
 ```{r include=FALSE}
-scored_files <- Sys.glob("../out/experiment0_prelim/rep68-easier/scored_reads/rep68-easier_analysis0.cond0.rep*.chr1.rep68.tsv")
-int_files <- Sys.glob("../out/experiment0_prelim/rep68-easier/sim_ints/cond0.rep*.int-info.annotated.tsv")
 
-i <- 1
-cond <- str_extract(basename(int_files[i]), "cond\\d\\.rep\\d")
-fn_ints <-  annotate_ints_matching_condition("3", "fn", scored_files[i], int_files[i]) %>% 
-  mutate(condition = cond)
-  
-for (i in seq(2, length(scored_files))) {
-  cond <- str_extract(basename(int_files[i]), "cond\\d\\.rep\\d")
-  tmp <- annotate_ints_matching_condition("3", "fn", scored_files[i], int_files[i]) %>% 
-    mutate(condition = cond)
-  fn_ints <- bind_rows(fn_ints, tmp)
-}
+results <- missing_read_info("../out/experiment0_prelim/*/scored_reads/*.tsv",
+                         "../out/experiment0_prelim/{experiment}/sim_ints/{condition}.rep{replicate}.int-info.annotated.tsv")
 
-rm(tmp)
-#fn_ints
+results <- results %>% 
+  mutate(fn_ints = map2(scored_reads, int_file, ~annotate_ints_matching_condition("3", "fn", .x, .y)))
+
+results <- results %>% 
+  unnest(cols = c(fn_ints))
+
+results <- results %>% 
+  mutate(analysis_condition_number = str_extract(analysis_condition, "\\d+$")) %>% 
+  filter(analysis_condition_number == "0")
 
 
 ```
 
 
 ```{r}
-fn_ints %>% 
+results %>% 
+  filter(!post) %>% 
+  filter(analysis_host == "chr1") %>% 
   pivot_longer(n_fn_discord:n_fn_chimeric, names_to = "type", values_to = 'n_missing') %>% 
-  filter(n_missing >= 1) %>% 
-  ggplot(aes(x = n_missing, fill = condition)) +
-  geom_bar() +
+  filter(n_missing > 0) %>% 
+  ggplot(aes(x = n_missing, color = experiment)) + 
+  geom_freqpoly(binwidth = 1) + 
   facet_wrap(vars(type))
 ```
+
 
 
 It looks like for the integrations that have missing reads, it's usually only one read missing.  Of course, this could be the only read crossing either junction for that integration.
@@ -525,26 +556,34 @@ It looks like for the integrations that have missing reads, it's usually only on
 It would be good to examine the properties of the integrations missing reads, to see if there's anything consistent about the them.  Since these are clean, whole integrations with no deletions or rearrangements, the only thing to examine is the position in the host.  So it would be good to plot the density of missing integrations within the host chromosome. Make bins of width 1000 that span the length of the chromosome and count the fraction of missing integrations in each.
 
 ```{r}
-
 # bin width
 width <- 10000
 
 # length of chromosome 1
 chr_len <- 248956422
 
-#
-fn_ints <- add_bins_to_annotated_ints(fn_ints, width, chr_len)
 
-fn_ints %>% 
-  group_by(bin) %>% 
-  summarise(chimeric = sum(n_fn_chimeric),
+results <- results %>% 
+  group_by(scored_reads)
+
+results <- add_bins_to_annotated_ints(results, 1000, 248956422)
+
+```
+
+
+```{r}
+results %>% 
+  filter(!post) %>% 
+  filter(analysis_host == "chr1") %>% 
+  ungroup() %>% 
+  group_by(bin, experiment) %>% 
+    summarise(chimeric = sum(n_fn_chimeric),
             discordant = sum(n_fn_discord)) %>% 
-  mutate(start = as.numeric(as.character(bin))*width) %>% 
-  pivot_longer(chimeric:discordant, names_to = "type", values_to = "count") %>% 
-  ggplot(aes(x = start, y = count, color = type)) +
+    mutate(start = as.numeric(as.character(bin))*width) %>% 
+    pivot_longer(chimeric:discordant, names_to = "type", values_to = "count") %>% 
+    ggplot(aes(x = start, y = count, color = experiment)) +
   geom_line() + 
-  facet_grid(vars(type))
-
+  facet_grid(cols = vars(type), rows = vars(experiment))
 ```
 
 It looks like a lot of the missing reads are just sprinkled thoroughout the chromosome.  
@@ -553,16 +592,25 @@ The reason there are no missing reads is beacuse there aren't any reads crossing
 
 Also plot the fraction of missing reads in each bin, so we can get an idea of if there are any particular 'blind spots':
 ```{r}
-fn_ints %>% 
-  group_by(bin) %>% 
+results %>% 
+  filter(!post) %>% 
+  filter(analysis_host == "chr1") %>% 
+  group_by(bin, experiment) %>% 
   summarise(pos = bin*width + width/2,
             frac_missing_chimeric = n_fn_chimeric/annotated_chimeric,
             frac_missing_discord = n_fn_discord/annotated_discord) %>% 
   pivot_longer(frac_missing_chimeric:frac_missing_discord, names_to = "type", values_to = "frac", names_prefix = "frac_") %>% 
-  ggplot(aes(x = pos, y = frac, color = type)) +
+  ggplot(aes(x = pos, y = frac, color = experiment)) +
   geom_line() +
-  facet_grid(rows = vars(type))
+  facet_grid(cols = vars(type), rows = vars(experiment))
 ```
+
+Are there any common propreties of the integrations that tend to have missing reads?
+
+```{r}
+results
+```
+
 
 Look at the regions missing the highest proportion of reads:
 ```{r}
@@ -585,15 +633,15 @@ LIST=$(awk 'match($3, /fn/) && match($9, /discord/)' "../out/experiment0_prelim/
 
 for l in $LIST; do
   echo "viral alignment:"
-  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0_chr1_rep68/virus_aligned/cond0.rep2.rep68.sam  $l
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0/virus_aligned/cond0.rep2.rep68.sam  $l
   echo "host_alignment:"
-  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0_chr1_rep68/host_aligned/cond0.rep2.chr1.readsFromrep68.sam $l  
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0/host_aligned/cond0.rep2.chr1.readsFromrep68.sam $l  
   echo 
   
 done
 ```
 
-<!-- and chimeric reads: -->
+ and chimeric reads: 
 ```{bash, engine.opts='-l', class.output="scroll-100"}
 conda activate simvi
 
@@ -601,9 +649,9 @@ LIST=$(awk 'match($3, /fn/) && match($9, /chimeric/)' "../out/experiment0_prelim
 
 for l in $LIST; do
   echo "viral alignment:"
-  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0_chr1_rep68/virus_aligned/cond0.rep2.rep68.sam  $l
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0/virus_aligned/cond0.rep2.rep68.sam  $l
   echo "host_alignment:"
-  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0_chr1_rep68/host_aligned/cond0.rep2.chr1.readsFromrep68.sam $l  
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_prelim/rep68-easier_analysis0/host_aligned/cond0.rep2.chr1.readsFromrep68.sam $l  
   echo 
   
 done
@@ -652,9 +700,9 @@ scored <- c("../out/experiment0_prelim/rep68-whole/rep68-whole.scored_reads_summ
 ```
 
 ```{r include=FALSE}
-results <- importData(sim[1],  analysis[1], scored[1])
+results <- importReadData(sim[1],  analysis[1], scored[1])
 for (i in seq(2, length(sim))){
-  tmp <- importData(sim[i],  analysis[i], scored[i])
+  tmp <- importReadData(sim[i],  analysis[i], scored[i])
   results <- bind_rows(results, tmp)
 }
 

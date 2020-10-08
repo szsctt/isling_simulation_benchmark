@@ -1,8 +1,8 @@
-importData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
+importReadData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
   # function to import summaries from an experiment
   
   sim_cols <- c('experiment', 'condition', 'replicate', 'sim_host', 'sim_virus',
-                'int_num', 'epi_num', 'p_whole', 'p_rearrange', 
+                'int_num', 'epi_num', 'min_sep', 'p_whole', 'p_rearrange', 
                 'p_delete', 'lambda_split', 'p_overlap', 'p_gap',
                 'lambda_junction', 'p_host_deletion', 'lambda_host_deletion',
                 'read_len', 'fcov', 'frag_len', 'frag_std',
@@ -14,20 +14,17 @@ importData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
   
   sim <- read_tsv(sim_sum_path, col_names = sim_cols, skip=1)
   
-  analy_cols <- c('dataset', 'config_dataset', 'sample', 'analysis_host', 
-                  'host_fasta_analysis', 'analysis_virus', 'virus_fasta_analysis', 
-                  'merge', 'dedup', 'unique_analysis', 'outdir', 'bwa_mem_params',
-                  'R1_file', 'R2_file', 'bam_file', 'adapter_1',
-                  'adapter_2', 'postargs')
+  analy_cols <- c('experiment', 'experimet_dup', 'analysis_condition', 'tool', 'analysis_host',
+                  'host_fasta', 'analysis_virus', 'virus_fasta', 'bam_suffix', 'read_folder',
+                  'R1_suffix', 'R2_suffix', 'outdir', 'merge', 'dedup', 'postargs',
+                  'seq_sys', 'adapter_1', 'adapter_2', 'bwa_mem_params', 'score_ints',
+                   'score_ints_window', 'score_ints_tool')
   
   # import analysis table and add experiment and analysis_condition columns
-  analysis <- read_tsv(analy_sum_path, col_names = analy_cols, skip=1) %>% 
-    mutate(experiment = str_split(dataset, "_", simplify=TRUE)[,1]) %>% 
-    mutate(analysis_condition = str_split(dataset, "_", simplify=TRUE)[,2])
-  
+  analysis <- read_tsv(analy_sum_path, col_names = analy_cols, skip=1)
     
   # join simulation and analysis tables
-  joined <- left_join(analysis, sim, by=c('sample', 'experiment'))
+  joined <- left_join(analysis, sim, by=c('experiment'))
   
   # import scored reads summary
   scored_cols <- c('sim_info_file', 'sim_bam_file', 'analysis_info',
@@ -65,10 +62,11 @@ importData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
     mutate(balanced_accuracy = (TPR + TNR)/2)
     
     #https://en.wikipedia.org/wiki/Precision_and_recall
+  
   # join scored with simulation and analysis tables
   return(left_join(scored, joined, 
                    by = c('sample', 'analysis_host', 'analysis_virus', 
-                          'config_dataset', 'analysis_condition', 'experiment')))
+                          'config_dataset'='analysis_condition', 'experiment')))
   
 }
 
@@ -168,3 +166,40 @@ add_bins_to_annotated_ints <- function(ints, width, chr_len) {
 #int_file <- "../out/experiment0_prelim/rep68-easier/sim_ints/cond0.rep0.int-info.annotated.tsv"
 #test <- annotate_ints_matching_condition("3", "fn", scored_file, int_file)
 #add_bins_to_annotated_ints(test, 10000, 248956422)
+
+missing_read_info <- function(scored_reads_glob, int_file_string) {
+  scored_files <- Sys.glob(scored_reads_glob)
+  scored_files <- scored_files[str_detect(scored_files, "summary", negate=TRUE)]
+  
+  return(scored_files)
+  
+  cat('processing', length(scored_files), "files\n")
+  
+  df <- tibble(
+    scored_reads = scored_files,
+    scored_reads_basename = basename(scored_files),
+    experiment = basename(dirname(dirname(scored_reads))),
+    analysis_condition = str_split(basename(scored_reads_basename), "\\.", simplify=TRUE)[,1],
+    condition = str_split(basename(scored_reads_basename), "\\.", simplify=TRUE)[,2],
+    replicate = str_split(basename(scored_reads_basename), "\\.", simplify=TRUE)[,3],
+    analysis_host =  str_split(basename(scored_reads_basename), "\\.", simplify=TRUE)[,4],
+    analysis_virus =  str_split(basename(scored_reads_basename), "\\.", simplify=TRUE)[,5],
+    post = str_detect(scored_reads_basename, "post"),
+    sample=paste0(condition, replicate),
+    analysis_condition_number = str_extract(analysis_condition, "\\d+")
+  )
+  df <- df %>% 
+    mutate(replicate = as.integer(str_extract(replicate, "\\d+"))) %>% 
+    mutate(int_file = str_replace(int_file_string, "\\{experiment\\}", experiment)) %>% 
+    mutate(int_file = str_replace(int_file, "\\{condition\\}", condition)) %>% 
+    mutate(int_file = str_replace(int_file, "\\{replicate\\}", as.character(replicate)))
+  
+  return(df)
+}
+
+
+
+#test <-missing_read_info("../out/experiment0_prelim/*/scored_reads/*.tsv",
+#                         "../out/experiment0_prelim/{experiment}/sim_ints/{condition}.rep{replicate}.int-info.annotated.tsv")
+#test
+

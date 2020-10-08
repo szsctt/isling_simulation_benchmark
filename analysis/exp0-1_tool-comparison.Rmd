@@ -5,7 +5,14 @@ output: html_notebook
 
 Comparisons with other tools.
 
+```{r setup, include=FALSE}
+library(tidyverse)
+library(kableExtra)
+source("sim_functions.R")
 
+
+
+```
 
 # Experiment 1 - toy example
 
@@ -81,3 +88,133 @@ read_tsv("../polyidus/test/easier/results/exactHpvIntegrations.tsv")
 cat /scratch1/sco305/intvi_simulation-experiments/vifi-test/test_output_2/output.clusters.txt
 ```
 
+# Experiment 2 - chromosome 1
+
+
+Again, I simulated two different situations using this data: one  'easier' for the pipeline to handle, and one 'harder'.  
+
+'easier' condition:  
+
+- integrations: python script
+  - 1000 integrations into random location (minimum separation 500 bp)
+  - whole reference only 
+  - no rearrangements of viral reference
+  - no deletions from viral reference
+  - no overlaps or gaps at junction (except coincidental ones)
+  - no deletions from host at integration site
+- reads: art_illumina
+  - 2x150 bp reads
+  - 5-fold coverage
+  - 500bp fragment length, 30bp standard deviation
+  - illumina error profile ("HS25")
+- analysis options:
+  - seqPrep trims adapters and merges overlapping R1 and R2
+  - use either only chr1 or all of hg38 for host reference
+  - three options for post-processing:
+    - 'filter' - remove suspicious integrations
+    - 'mask-exclude' - remove integrations in regions of hg38 that have homology with vector
+    - both of the above
+
+'harder' condition:  
+
+- integrations: python script
+  - 1000 integrations into random location (minimum separation 500 bp)
+  - 1000 'episomes' included (with possible rearrangments and deletions)
+  - 30% chance of whole reference, 70% chance of random subsequence 
+  - 10% chance of rearrangement of inserted (sub-)sequence (Poisson number of fragments, mean 1)
+  - 10% chance of deletion of inserted (sub-)sequence (Poisson number of fragments, mean 1)
+  - at junctions, 30% chance of overlaps, 30% chance of gaps, 40% chance of neither (Poisson number of bases involved, mean 1)
+  - 50% chance of deletion from host at integration site (Poisson number of bases, mean 500bp)
+- reads: same as 'easier' condition
+- analysis options: same as 'easier' condition
+
+For the host, I used chromsome 1 from hg38.   
+
+For the virus I used rep68 from AAV2 (NC_001401.2_cds_YP_680422.1_1, protein_id=YP_680422.1, db_xref=GeneID:4192013), or the whole AAV sequence (NC_001401.2), or the OTC vector rAAV genome (including OTC enhancer, hAAT promoter, codon optimised OTC genome, bovine b-actin poly A, both ITRs).
+
+Performed analysis either with Polyidus or our pipeline.  Vifi is not yet working because it's a bit complicated to get it to use any refrence other than hg19.
+
+```{r}
+analysis_conditions <- read_tsv("../out/experiment0_prelim/AAV2-easier/analysis_conditions.tsv")
+```
+
+
+```{r inlcude=FALSE}
+
+int_summaries <- Sys.glob("../out/experiment0_prelim/*/*.scored_ints_summary.tsv")
+
+results <- tibble(
+  summary_file = int_summaries,
+  experiment = basename(dirname(summary_file)),
+  data = map(summary_file, ~read_tsv(.))
+) %>% 
+  unnest(data)
+
+results <- results %>% 
+  mutate(analysis_condition = basename(dirname(dirname(found_info)))) %>% 
+  mutate(post = str_detect(basename(found_info), "post")) %>% 
+  mutate(condition = str_split(basename(sim_info), "\\.", simplify=TRUE)[,1]) %>% 
+  mutate(replicate = str_split(basename(sim_info), "\\.", simplify=TRUE)[,2]) %>%  
+  mutate(analysis_host = str_split(basename(found_info), "\\.", simplify = TRUE)[,3]) %>% 
+  mutate(analysis_virus = str_split(basename(found_info), "\\.", simplify = TRUE)[,4]) 
+
+results <- results %>% 
+  left_join(analysis_conditions, by = c("analysis_condition", "experiment"))
+
+```
+
+
+```{r}
+results <- results %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "polyidus") ~ TRUE,
+    str_detect(postargs, "filter") ~ TRUE,
+    TRUE ~ FALSE
+  ))
+```
+
+```{r}
+results %>% 
+  mutate(tpr = tp/(tp+fn)) %>% 
+  ggplot(aes(x = experiment, y = tpr, fill = analysis_tool)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(rows = vars(analysis_host), cols = vars(post)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab('true positive rate') 
+```
+
+
+
+```{r}
+results %>% 
+  ggplot(aes(x = experiment, y = fp, fill = analysis_tool)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(rows = vars(analysis_host), cols = vars(post)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab('number of false positives')
+```
+
+
+
+What about if we apply some filtering to the data (post-processing)
+```{r}
+results %>% 
+  mutate(tpr = tp/(tp+fn)) %>% 
+  filter(replicate == "rep2") %>% 
+  filter(post) %>% 
+  ggplot(aes(x = experiment, y = tpr, fill = analysis_tool)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(rows = vars(analysis_host)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab('true positive rate') 
+```
+
+```{r}
+results %>% 
+  filter(replicate == "rep2") %>% 
+  ggplot(aes(x = experiment, y = fp, fill = analysis_tool)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(rows = vars(analysis_host), cols = vars(post)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab('number of false positives')
+```

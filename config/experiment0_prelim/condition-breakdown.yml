@@ -1,5 +1,5 @@
 rep68-easier:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment0-1_cond-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -33,6 +33,8 @@ rep68-easier:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -62,9 +64,16 @@ rep68-easier:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
 
 rep68-whole:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment0-1_cond-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -98,6 +107,8 @@ rep68-whole:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -126,9 +137,17 @@ rep68-whole:
          - filter
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
  
 rep68-epi:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment0-1_cond-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -162,6 +181,8 @@ rep68-epi:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -190,10 +211,17 @@ rep68-epi:
          - filter
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
-       
+
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations     
  
 rep68-rearrange:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment0-1_cond-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -227,6 +255,8 @@ rep68-rearrange:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -255,9 +285,17 @@ rep68-rearrange:
          - filter
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
        
 rep68-deletion:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment0-1_cond-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -291,6 +329,8 @@ rep68-deletion:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -319,9 +359,17 @@ rep68-deletion:
          - filter
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
        
 rep68-overlap:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment0-1_cond-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -355,6 +403,8 @@ rep68-overlap:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -383,9 +433,17 @@ rep68-overlap:
          - filter
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
        
 rep68-gap:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment0-1_cond-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -419,6 +477,8 @@ rep68-gap:
        - 0
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500    
    # read simulation
    read_len: 
        - 150
@@ -448,8 +508,16 @@ rep68-gap:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
        
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
+       
 rep68-host-deletion:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment0-1_cond-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -483,6 +551,8 @@ rep68-host-deletion:
        - 0.5
    lambda_host_deletion:
        - 500
+   min_sep:
+       - 500       
    # read simulation
    read_len: 
        - 150
@@ -511,3 +581,11 @@ rep68-host-deletion:
          - filter
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations

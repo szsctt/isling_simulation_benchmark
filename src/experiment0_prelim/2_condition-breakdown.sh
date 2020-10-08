@@ -22,6 +22,6 @@ snakemake \
  --jobs 1 \
  --use-singularity \
  --profile slurm \
- --cluster-config ${CLUSTER}
+ --cluster-config ${CLUSTER}  
  
 

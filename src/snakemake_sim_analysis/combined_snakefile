@@ -263,7 +263,7 @@ wildcard_constraints:
 	analysis_condition = "|".join(analysis_df['analysis_condition']),
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
 	
-localrules: write_summary, write_analysis_summary, combine_read_scores, combine_int_scores
+localrules: write_summary, write_analysis_summary#, combine_int_scores, combine_read_scores
 
 
 #####################################################
@@ -300,7 +300,6 @@ analysis_summaries = [f"{outdir}/{experiment}/analysis_conditions.tsv" for outdi
 														sim_df.loc[:,'experiment']
 														)
 											]
-								
 
 # polyidus outputs
 polyidus_targets = []
@@ -327,16 +326,16 @@ for i, row in analysis_df.iterrows():
 	
 # summary files
 scored_summaries = expand(
-			'{outpath}/{exp}/{exp}.scored_reads_summary.tsv', 
-				zip,
-				exp = experiments, 
-				outpath = [exp_targets[exp] for exp in experiments]
-			) + expand(
 			"{outpath}/{exp}/{exp}.scored_ints_summary.tsv",
 				zip,
 				exp = experiments, 
 				outpath = [exp_targets[exp] for exp in experiments]
 			)
+#						+ expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv', 
+#				zip,
+#				exp = experiments, 
+#				outpath = [exp_targets[exp] for exp in experiments]
+#			) 
 			
 
 
@@ -390,20 +389,31 @@ def sim_df_value(wildcards, column_name):
 
 rule bwt2_index:
 	input:
-		lambda wildcards: ref_names[wildcards.genome]
+		fasta = lambda wildcards: ref_names[wildcards.genome]
 	output:
 		"{outpath}/references/{genome}/{genome}.1.bt2"
 	container:
 		"docker://szsctt/polyidus:2"
 	params:
 		prefix = lambda wildcards, output: path.splitext(path.splitext(output[0])[0])[0]
+	resources:
+		mem_mb= lambda wildcards, attempt, input: int(attempt * 5 * (os.stat(input.fasta).st_size/1e6)),
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
 	shell:
 		"bowtie2-build {input} {params.prefix}"
 
+def get_polyidus_reads(wildcards, read_num):
+	assert read_num in (1, 2)
+	if read_num == 1:
+		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'exp')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R1_suffix')}"
+	if read_num == 2:
+		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'exp')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R2_suffix')}"	
+
 rule polyidus:
 	input:
-		fastq1 = lambda wildcards: f"{outpath}/{analysis_df_value(wildcards, 'exp')}/sim_reads/{samp}{analysis_df_value(wildcards, 'R1_suffix')}",
-		fastq2 = lambda wildcards: f"{outpath}/{analysis_df_value(wildcards, 'exp')}/sim_reads/{samp}{analysis_df_value(wildcards, 'R2_suffix')}",
+		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
+		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
 		host_idx =  "{outpath}/references/{host}/{host}.1.bt2",
 		virus_idx = "{outpath}/references/{virus}/{virus}.1.bt2"
 	output:
@@ -413,12 +423,17 @@ rule polyidus:
 		output = lambda wildcards, output: path.dirname(path.dirname(output.temp_ints)),
 		host_idx = lambda wildcards, input: path.splitext(path.splitext(input.host_idx)[0])[0],
 		virus_idx = lambda wildcards, input: path.splitext(path.splitext(input.virus_idx)[0])[0],
+	resources:
+		mem_mb= lambda wildcards, attempt: int(attempt * 10000),
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1]
 	container:
 		"docker://szsctt/polyidus:2"
 	wildcard_constraints:
 		dset = ".+_polyidus\d+"
 	shell:
 		"""
+		rm -r {params.output}/*
+		
 		python3 /usr/src/app/src/polyidus.py \
 		{params.host_idx} \
 		{params.virus_idx} \
@@ -567,15 +582,14 @@ def scores_to_combine(wildcards, score_type):
 		
 		# get information for this row
 		exp = row['experiment']
-		
+
 		if exp !=  wildcards.exp:
 			continue
 		outpath = row['outdir']
 		analysis_condition = row['analysis_condition']
 		host = row['host']
 		virus = row['virus']
-		
-		
+	
 	
 		# get samples for this experiment
 		samples = set(sim_df[sim_df['experiment'] == exp]['sample'])
@@ -589,9 +603,8 @@ def scores_to_combine(wildcards, score_type):
 			post = ['']
 			
 			# currently we're only scoring reads for our pipeline
-			#if score_type == "reads":
-			#	continue
-			continue
+			if score_type == "reads":
+				continue
 	
 		scored_files += [
 		f"{outpath}/{exp}/{folder}/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv" 

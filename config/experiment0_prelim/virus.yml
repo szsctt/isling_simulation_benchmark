@@ -74,6 +74,11 @@ rep68-easier:
    polyidus_params:
      aligner:
       - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
+
   
 
 OTC-vect-easier:
@@ -153,6 +158,11 @@ OTC-vect-easier:
    polyidus_params:
      aligner:
       - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
+
   
   
 AAV2-easier:
@@ -232,6 +242,11 @@ AAV2-easier:
    polyidus_params:
      aligner:
       - "bowtie2"
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
+
        
 OTC-vect-harder:
    out_directory: "../../out/experiment0_prelim"
@@ -310,6 +325,12 @@ OTC-vect-harder:
    polyidus_params:
      aligner:
       - "bowtie2"
+      
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
+
 
 
 AAV2-harder:
@@ -388,6 +409,12 @@ AAV2-harder:
    polyidus_params:
      aligner:
       - "bowtie2"
+      
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
+
        
 
 rep68-harder:
@@ -465,3 +492,9 @@ rep68-harder:
    polyidus_params:
      aligner:
       - "bowtie2"
+      
+      
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
+

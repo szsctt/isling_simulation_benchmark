@@ -60,12 +60,6 @@ rep68-easier:
        - False
    post:
        -
-         - filter
-       -
-         - mask-exclude:
-           - "../../data/references/hg38_homologoustoOTCvec.bed"
-       -
-         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -143,12 +137,6 @@ OTC-vect-easier:
        - False
    post:
        -
-         - filter
-       -
-         - mask-exclude:
-           - "../../data/references/hg38_homologoustoOTCvec.bed"
-       -
-         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -227,12 +215,6 @@ AAV2-easier:
        - False
    post:
        -
-         - filter
-       -
-         - mask-exclude:
-           - "../../data/references/hg38_homologoustoOTCvec.bed"
-       -
-         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -310,12 +292,6 @@ OTC-vect-harder:
        - False
    post:
        -
-         - filter
-       -
-         - mask-exclude:
-           - "../../data/references/hg38_homologoustoOTCvec.bed"
-       -
-         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -394,12 +370,6 @@ AAV2-harder:
        - False
    post:
        -
-         - filter
-       -
-         - mask-exclude:
-           - "../../data/references/hg38_homologoustoOTCvec.bed"
-       -
-         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -478,12 +448,6 @@ rep68-harder:
        - False
    post:
        -
-         - filter
-       -
-         - mask-exclude:
-           - "../../data/references/hg38_homologoustoOTCvec.bed"
-       -
-         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:

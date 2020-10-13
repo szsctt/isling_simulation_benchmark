@@ -325,17 +325,21 @@ for i, row in analysis_df.iterrows():
 
 	
 # summary files
-scored_summaries = expand(
+
+# get experiments for which we want to score integrations
+exps_int_score = [exp for exp in config if 'score_ints' in config[exp]]
+exps_int_score = [exp for exp in exps_int_score if config[exp]['score_ints']]
+
+scored_summaries = expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv', 
+				zip,
+				exp = config.keys(), 
+				outpath = [exp_targets[exp] for exp in config]
+			) + expand(
 			"{outpath}/{exp}/{exp}.scored_ints_summary.tsv",
 				zip,
-				exp = experiments, 
-				outpath = [exp_targets[exp] for exp in experiments]
-			)
-#						+ expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv', 
-#				zip,
-#				exp = experiments, 
-#				outpath = [exp_targets[exp] for exp in experiments]
-#			) 
+				exp = exps_int_score, 
+				outpath = [exp_targets[exp] for exp in exps_int_score]
+			) 
 			
 
 

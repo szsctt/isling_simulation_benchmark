@@ -477,13 +477,25 @@ rule write_analysis_summary:
 	run:
 		toDo.to_csv(output.pipeline_conditions, sep='\t', index=False)
 		analysis_df.to_csv(output.analysis_conditions, sep='\t', index=False)
+		
+rule merged_list:
+	input:
+		merged = lambda wildcards: get_for_align(wildcards, "merged")
+	output:
+		merged_reads = "{outpath}/{dset}/merged_reads/{samp}.merged_reads.txt"
+	run:
+		if os.path.basename(os.path.dirname(input.merged)) == "combined_reads":
+			shell("touch {output.merged_reads}")
+		else:
+			shell("zcat {input.merged} | awk '{{if (NR%4==1) print substr($0, 2)}}' > {output.merged_reads}")
 
 		
 rule score_reads:
 	input:
 		sim_info = rules.annotate_reads.output.annotated_info,
 		sim_sam = "{outpath}/{exp}/sim_reads/{samp}.sam",
-		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
+		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt",
+		merged_reads = rules.merged_list.output.merged_reads
 	output:
 		scored_reads = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}.tsv",
 		summary = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
@@ -502,9 +514,10 @@ rule score_reads:
 		--sim-info {input.sim_info} \
 		--sim-sam {input.sim_sam} \
 		--analysis-info {input.analysis_info} \
+		--merged-reads {input.merged_reads} \
 		--output {output.scored_reads} \
 		--output-summary {output.summary} \
-		--threads {threads}
+		--threads {threads} 
 		"""
 
 

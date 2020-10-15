@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-CONFIG="../../config/experiment0_short-refs/virus.yml"
+CONFIG="../../config/experiment0_short-refs/conditions.yml"
 CLUSTER="../../config/experiment0_short-refs/cluster.json"
 OUTPATH="../../out/experiment0_short-refs/"
 NAME="conditions"
@@ -23,6 +23,7 @@ snakemake \
  --use-singularity \
  --profile slurm \
  --cluster-config ${CLUSTER}
+ --rerun-incomplete
  
 
 

@@ -47,7 +47,11 @@ column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host
 								'virus', 'virus_fasta', 'bam_suffix',
 								'read_folder', 'R1_suffix', 'R2_suffix', 'outdir', 
 								'merge', 'dedup', 'postargs', 'seq_sys', 'adapter_1', 'adapter_2', 
-								'bwa_mem_params', 'score_ints', 'score_ints_window', 'score_ints_tool')
+								'bwa_mem_params', 'score_ints', 'score_ints_window', 'score_ints_tool',
+								'host_mappability', 'host_mappability_exclude', 'host_genes', 'host_exons',
+								'host_oncogenes', 'host_centromeres', 'host_conserved_regions',
+								'host_segdup')																
+
 
 for dataset in datasets:
 	
@@ -159,25 +163,46 @@ for dataset in datasets:
 	#### parameters for vifi ####
 	# if we're also doing vifi
 	i = 0
-	if 'vifi' in config[dataset]:
-		if config[dataset]['vifi'] is True or config[dataset]['vifi'] == 'true' or config[dataset]['vifi'] == 'True':
-			for host, virus in itertools.product(
-																config[dataset]['analysis_hosts'].keys(),
-																config[dataset]['analysis_viruses'].keys()):
-				condition = f"{dataset}_vifi{i}"
-				analysis_conditions.append({
-					'experiment' : dataset,
-					'host' 			 : host,
-					'host_fasta' : config[dataset]['analysis_hosts'][host],
-					'virus'      : virus,		
-					'virus_fasta': config[dataset]['analysis_viruses'][virus],	
-					'analysis_condition': condition,
-					'tool'			 : 'vifi',			
-					'score_ints' : score_ints,
-					'score_ints_window' : score_ints_window,
-					'score_ints_tool' : "vifi"	
+	if 'vifi_params' in config[dataset]:
+		# make sure the required information about the host genome has been provided
+		host_file_keys = ('mappability', 'mappability_exclude', 'genes', 'exons', 'oncogenes', 'centromeres',
+												'conserved_regions', 'segdup')
+		hosts_to_use = []
+		for host in config[dataset]['analysis_hosts'].keys():
+			# check that this host is in host_info
+			if host not in config[dataset]['vifi_params']['host_info']:
+				print(f"host_info not provided: skipping ViFi for {host}")
+				continue
+			# check that all necessary files have been specified
+			if not all([key in config[dataset]['vifi_params']['host_info'][host] for key in host_file_keys]):
+				print(f"one or more of the required files ({host_file_keys}) for host {host} is not specfied: skipping ViFi for host {host}")
+				continue
+			hosts_to_use.append(host)
+									
+
+		for host, virus in itertools.product(hosts_to_use, config[dataset]['analysis_viruses'].keys()):
+			condition = f"{dataset}_vifi{i}"
+			analysis_conditions.append({
+				'experiment' : dataset,
+				'host' 			 : host,
+				'host_fasta' : config[dataset]['analysis_hosts'][host],
+				'host_mappability' : config[dataset]['vifi_params']['host_info'][host]['mappability'],
+				'host_mappability_exclude' : config[dataset]['vifi_params']['host_info'][host]['mappability_exclude'],				
+				'host_genes' : config[dataset]['vifi_params']['host_info'][host]['genes'],				
+				'host_exons' : config[dataset]['vifi_params']['host_info'][host]['exons'],				
+				'host_oncogenes' : config[dataset]['vifi_params']['host_info'][host]['oncogenes'],	
+				'host_centromeres' : config[dataset]['vifi_params']['host_info'][host]['centromeres'],	
+				'host_conserved_regions' : config[dataset]['vifi_params']['host_info'][host]['conserved_regions'],		
+				'host_segdup' : config[dataset]['vifi_params']['host_info'][host]['segdup'],																
+				'virus'      : virus,		
+				'virus_fasta': config[dataset]['analysis_viruses'][virus],	
+				'analysis_condition': condition,
+				'tool'			 : 'vifi',			
+				'score_ints' : score_ints,
+				'score_ints_window' : score_ints_window,
+				'score_ints_tool' : "vifi"	
 				})
-				i += 1
+			i += 1
 
 ##### parameters that are common to each experiment ####
 for cond_dict in analysis_conditions:
@@ -341,6 +366,11 @@ scored_summaries = expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv',
 				outpath = [exp_targets[exp] for exp in exps_int_score]
 			) 
 			
+# vifi outputs
+"{outpath}/vifi_refs/data_repo/reference.txt"
+vifi_targets = [f"{outpath}/vifi_refs/data_repo/reference.txt" for outpath in 
+											set(analysis_df.loc[(analysis_df['tool'] == 'vifi'), 'outdir'])]
+
 
 
 rule all:
@@ -350,7 +380,8 @@ rule all:
 		set(analysis_summaries),
 		#set(post_targets),
 		set(scored_summaries),
-		set(polyidus_targets)
+		set(polyidus_targets),
+		set(vifi_targets)
 		
 		
 
@@ -451,20 +482,106 @@ rule polyidus:
 ####################### vifi ########################
 #####################################################
 
-rule make_data_repo:
+rule host_virus_index:
 	input:
-		lambda wildcards: ref_names[wildcards.genome]
+		virus = lambda wildcards: ref_names[wildcards.virus],
+		host = lambda wildcards: ref_names[wildcards.host]
 	output:
-		"{outpath}/vifi_refs/data_repo/{host}/{host}.1.bt2"
+		fa = "{outpath}/vifi_refs/data/{virus}/{host}_{virus}.fas",
+		idx = multiext("{outpath}/vifi_refs/data/{virus}/{host}_{virus}", ".amb", ".ann", ".bwt", ".pac", ".sa")
 	container:
-		"docker://szsctt/polyidus:1"
+		"docker://szsctt/vifi:1"
 	params:
-		prefix = lambda wildcards, output: path.splitext(path.splitext(output[0])[0])[0]
+		prefix = lambda wildcards, output: path.splitext(output.fa)[0]
 	shell:
-		"bowtie2-build {input} {params.prefix}"
+		"""
+		cat {virus} {host} > {fa}
+		bwa index -p {params.prefix} {fa}
+		"""
+		 
+def get_vifi_resource(wildcards, resource_name):
+	"""Get resources required for vifi"""
+	host_idx = analysis_df[(analysis_df['host'] == wildcards.host) & (analysis_df['tool'] == 'vifi')].index[0]
+	return analysis_df.loc[host_idx, resource_name]
+		
+rule vifi_data_repo:
+	input:
+		fa = lambda wildcards: ref_names[wildcards.host],
+		mappability = lambda wildcards: get_vifi_resource(wildcards, 'host_mappability'),
+		mappability_exclude = lambda wildcards: get_vifi_resource(wildcards, 'host_mappability_exclude'),
+		genes = lambda wildcards: get_vifi_resource(wildcards, 'host_genes'),
+		exons = lambda wildcards: get_vifi_resource(wildcards, 'host_exons'),
+		oncogenes = lambda wildcards: get_vifi_resource(wildcards, 'host_oncogenes'),
+		centromeres = lambda wildcards: get_vifi_resource(wildcards, 'host_centromeres'),
+		conserved = lambda wildcards: get_vifi_resource(wildcards, 'host_conserved_regions'),
+		segdup = lambda wildcards: get_vifi_resource(wildcards, 'host_segdup')	
+	output:
+		chromosomes = "{outpath}/vifi_refs/data_repo/{host}/{host}_chromosome-list.txt",
+		file_list = "{outpath}/vifi_refs/data_repo/{host}/file_list.txt",
+		fa = "{outpath}/vifi_refs/data_repo/{host}/{host}.fa",
+		mappability = "{outpath}/vifi_refs/data_repo/{host}/{host}.mappability.bed",
+		mappability_exclude = "{outpath}/vifi_refs/data_repo/{host}/{host}.mappability-exclude.bed",
+		genes = "{outpath}/vifi_refs/data_repo/{host}/{host}.genes.gff",
+		exons = "{outpath}/vifi_refs/data_repo/{host}/{host}.exons.gff"	,
+		oncogenes = "{outpath}/vifi_refs/data_repo/{host}/{host}.oncogenes.gff",
+		centromeres = "{outpath}/vifi_refs/data_repo/{host}/{host}.centromeres.bed",
+		conserved = "{outpath}/vifi_refs/data_repo/{host}/{host}.conserved.bed",
+		segdup = "{outpath}/vifi_refs/data_repo/{host}/{host}.segdup.bed"
+	params:
+		fai = lambda wildcards, output: output.fa + ".fai"
+	container:
+		"docker://szsctt/bwa:1"
+	shell:
+		"""
+		cp {input.fa} {output.fa}
+		cp {input.mappability} {output.mappability}
+		cp {input.mappability_exclude} {output.mappability_exclude}
+		cp {input.genes} {output.genes}
+		cp {input.exons} {output.exons}
+		cp {input.oncogenes} {output.oncogenes}
+		cp {input.centromeres} {output.centromeres}
+		cp {input.conserved} {output.conserved}
+		cp {input.segdup} {output.segdup}
+		
+		samtools faidx {output.fa}
+		
+		awk 'BEGIN {{ ORS = " " }} {{a[$1]}} END {{for (i in a) print i}}' \
+				{params.fai} > {output.chromosomes}
+				
+		echo "fa_file 		                  $(basename {output.fa})" > {output.file_list}
+		echo "chrLen_file 		              $(basename {params.fai})" >> {output.file_list}
+  	echo "duke35_filename 		          $(basename {output.mappability})" >> {output.file_list}
+  	echo "mapability_exclude_filename   $(basename {output.mappability_exclude})" >> {output.file_list}
+  	echo "gene_filename 		            $(basename {output.genes})" >> {output.file_list}
+  	echo "exon_file 		                $(basename {output.exons})" >> {output.file_list}
+  	echo "oncogene_filenamee 		        $(basename {output.oncogenes})" >> {output.file_list}
+  	echo "centromere_filename 		      $(basename {output.centromeres})" >> {output.file_list}
+  	echo "conserved_regions_filename 		$(basename {output.conserved})" >> {output.file_list}
+  	echo "segdup_filename 		          $(basename {output.segdup})" >> {output.file_list}		
+		"""
+	
+def vifi_hosts(wildcards):
+	"""get all the names of the hosts used for vifi"""
+	subset = analysis_df[(analysis_df['tool'] == 'vifi') & (analysis_df['outdir'] == wildcards.outpath)]
+	return set(subset['host'])
+	
+rule data_repo_host_list:
+	input: 
+		lambda wildcards: [f"{wildcards.outpath}/vifi_refs/data_repo/{host}/file_list.txt" for host in vifi_hosts(wildcards)]
+	output: "{outpath}/vifi_refs/data_repo/reference.txt"
+	run:
+		shell("rm -f {output}")
+		shell("touch {output}")	
+		hosts = vifi_hosts(wildcards)	
+		for host in hosts:
+			shell("echo {host} >> {output}")
 		
 		
-
+	
+			
+# make host list after making repo for all hosts - otherwise race condition
+# host_list = "{outpath}/vifi_refs/data_repo/reference.txt",		
+				
 #####################################################
 ############ compare sim with analysis ##############
 #####################################################
@@ -472,8 +589,8 @@ rule make_data_repo:
 
 rule write_analysis_summary:
 	output:
-		pipeline_conditions = "{outdir}/{experiment}/pipeline_analysis_conditions.tsv",
-		analysis_conditions = "{outdir}/{experiment}/analysis_conditions.tsv"
+		pipeline_conditions = "{outpath}/{experiment}/pipeline_analysis_conditions.tsv",
+		analysis_conditions = "{outpath}/{experiment}/analysis_conditions.tsv"
 	run:
 		toDo.to_csv(output.pipeline_conditions, sep='\t', index=False)
 		analysis_df.to_csv(output.analysis_conditions, sep='\t', index=False)

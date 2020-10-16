@@ -1,5 +1,5 @@
 rep68-easier:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 
@@ -60,6 +60,7 @@ rep68-easier:
        - False
    post:
        -
+         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -76,7 +77,7 @@ rep68-easier:
   
 
 OTC-vect-easier:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 
@@ -137,6 +138,7 @@ OTC-vect-easier:
        - False
    post:
        -
+         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -154,7 +156,7 @@ OTC-vect-easier:
   
   
 AAV2-easier:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 
@@ -215,6 +217,7 @@ AAV2-easier:
        - False
    post:
        -
+         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -231,7 +234,7 @@ AAV2-easier:
 
        
 OTC-vect-harder:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 
@@ -292,6 +295,7 @@ OTC-vect-harder:
        - False
    post:
        -
+         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -310,7 +314,7 @@ OTC-vect-harder:
 
 
 AAV2-harder:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 
@@ -370,6 +374,7 @@ AAV2-harder:
        - False
    post:
        -
+         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
@@ -388,7 +393,7 @@ AAV2-harder:
        
 
 rep68-harder:
-   out_directory: "../../out/experiment0_prelim"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 
@@ -448,6 +453,7 @@ rep68-harder:
        - False
    post:
        -
+         - filter
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:

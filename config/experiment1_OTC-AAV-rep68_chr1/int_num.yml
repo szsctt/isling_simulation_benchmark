@@ -1,5 +1,5 @@
 int_num:
-   out_directory: "../../out/experiment2_AAV-OTC"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 

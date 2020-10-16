@@ -1,15 +1,10 @@
 chromosomes:
-   out_directory: "../../out/experiment2_AAV-OTC"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 
    hosts: 
       chr1 : "../../data/references/chrs/chr1.fa"
-      chr2 : "../../data/references/chrs/chr2.fa"
-      chr14 : "../../data/references/chrs/chr14.fa"
-      chr20 : "../../data/references/chrs/chr20.fa"
-      chrX : "../../data/references/chrs/chrX.fa"
-      chrY : "../../data/references/chrs/chrY.fa"
        
    viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
@@ -43,7 +38,8 @@ chromosomes:
        - 150
    fcov: 
        - 5 
-   frag_len: 
+   frag_len:
+       - 250
        - 500 
    frag_std: 
        - 30
@@ -54,11 +50,6 @@ chromosomes:
    # analysis
    analysis_hosts: 
       chr1 : "../../data/references/chrs/chr1.fa"
-      chr2 : "../../data/references/chrs/chr2.fa"
-      chr14 : "../../data/references/chrs/chr14.fa"
-      chr20 : "../../data/references/chrs/chr20.fa"
-      chrX : "../../data/references/chrs/chrX.fa"
-      chrY : "../../data/references/chrs/chrY.fa"
       hg38: "../../data/references/GRCh38.fa"
        
    analysis_viruses:

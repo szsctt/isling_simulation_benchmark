@@ -1,5 +1,5 @@
 episomes:
-   out_directory: "../../out/experiment2_AAV-OTC"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 
@@ -44,6 +44,7 @@ episomes:
    fcov: 
        - 5 
    frag_len: 
+       - 250
        - 500 
    frag_std: 
        - 30

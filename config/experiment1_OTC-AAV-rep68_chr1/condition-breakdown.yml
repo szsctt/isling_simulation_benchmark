@@ -1,5 +1,5 @@
 rep68-easier:
-   out_directory: "../../out/experiment0-1_cond-breakdown"
+   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1"
    
    # integration simulation
    replicates: 3 

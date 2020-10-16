@@ -2,7 +2,6 @@
 	"__default__":
 	{
 		"nodes" : "1",
-		"mail-user" : "suzanne.scott@csiro.au",
 		"time" : "2:00:00",
 		"output" : "../../logs/{rule}.%j.log"
 	},
@@ -34,7 +33,7 @@
 	},
 	"extract_to_fastq_paired":
 	{
-		"time" : ":00:00",
+		"time" : "2:00:00",
 		"mem" : "20GB",
 		"job-name" : "viInt-extract"
 	},

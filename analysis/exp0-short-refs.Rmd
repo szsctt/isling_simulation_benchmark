@@ -1,0 +1,138 @@
+---
+title: "Viral integration simulations - short references"
+output:
+  html_notebook:
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: false
+---
+```{r setup, include=FALSE}
+library(tidyverse)
+library(kableExtra)
+source("sim_functions.R")
+
+exp_dir <- "../out/experiment0_short-refs"
+```
+
+```{css, include=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+## Overview
+The first experiment I did was to test out the simulation pipeline, and try to analyse the data, and compare the results from analysis with what would be expected from the pipeline.  
+
+## Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chr2:100000:102999 and chr3:100000:102999 from hg38.   
+
+For the virus I used rep68 from AAV2 (NC_001401.2_cds_YP_680422.1_1, protein_id=YP_680422.1, db_xref=GeneID:4192013)
+
+## Simulation parameters
+
+I simulated two different situations using this data: one that I thought would be 'easier' for the pipeline to handle, and one that is 'harder'.
+
+These conditions are summarised in the config file:
+
+```{bash class.output="scroll-100"}
+cat ../config/experiment0_short-refs/conditions.yml
+```
+
+
+In the 'easier' condition, there are five integrations of the whole virus, with clean junctions and no rearrangements, deletions of the virus, and no host deletions either.  In the 'harder' condition the host and virus reference are the same, but there's a high probability of rearrangements, deletions, gaps and overlaps at the junctions, and host deletions.  There are also some 'episomal' sequences included in the output fasta.
+
+The DAG from snakemake looks like this:
+![DAG for this experiment](../out/experiment0_short-refs/conditions.dag.svg)
+
+
+
+## Results
+
+There are a few different ways of scoring the results from these experiments.  One thing to look at is just simply if all the reads that cross integrations in the simulated fasta are found in the output.  Within those reads that are found, we can also look at if the locations of the integration in the host and vector genomes are correct.
+
+### Are all the reads that cross integrations found?
+
+```{r include=FALSE}
+read_scores <- importReadScoreExperiment(exp_dir)
+```
+
+
+```{r}
+read_scores %>% 
+  filter(score_type == "found_score")
+```
+
+
+We can calculate the true positive rate (sensitivity, recall) as
+$$TPR = \frac{TP}{P} = \frac{TP}{TP+FN}$$
+
+
+and the true negative rate (specificity, selectivity)
+$$TNR = \frac{TN}{N} = \frac{TN}{TN+FP}$$
+
+In each experiment (easier and harder), there were two conditions, with different simulated fragment lengths.  The reads were 2x150 bp in each case, so different fragment lengths results in 
+
+
+```{r}
+for (type in c('chimeric', 'discord')) {
+  p <- read_scores %>% 
+  filter(score_type == "found_score") %>% 
+  filter(junc_type == type) %>% 
+  filter(!post) %>% 
+    mutate(merge = ifelse(merge == 0, 'unmerged', "merged")) %>% 
+  mutate(replicate = as.factor(replicate)) %>% 
+  mutate(frag_len = as.factor(frag_len)) %>% 
+  ggplot(aes(x = TNR, y = TPR, shape = replicate, color = frag_len)) +
+  geom_point(alpha = 0.5)  +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate') +
+  facet_grid(rows = vars(experiment), cols = vars(merge)) +
+    ggtitle(type)
+  print(p)
+  
+}
+```
+
+During analysis, reads were simulated using different fragment lengths (250bp, 500bp), which changes the probability that R1 and R2 have some overlap (indicated by colors of points).  During analysis, reads were either merged if they overlapped (left), or kept unmerged (right).
+
+So we have mostly missing reads (false negatives) - not really any reads that are false positives.  That's not too bad, but why are we missing reads?
+
+#### Why are there false negatives?
+
+For the chimeric reads, the missing reads seem to be only for the shorter fragment length, in which most reads were merged.  It doesn't seem to matter to much if the the simulated integrations were easier or harder for the pipeline to handle.
+
+There seem to be the most missing reads in replicate 2 - this is especially noticable for the unmerged condition, where the two other replicates are pretty good.  First look at those missing reads for the unmerged condition.
+
+```{r}
+read_scores %>% 
+  select(experiment, analysis_condition, merge, condition, frag_len) %>% 
+  distinct()
+```
+
+
+```{bash}
+awk '$4 ~ /fn/ || NR==1' ../out/experiment0_short-refs/test-easier/scored_reads/test-easier_analysis1.cond0.rep2.human.AAV.tsv
+```
+
+
+```{bash}
+grep chr2-1070 ../out/experiment0_short-refs/test-easier/sim_ints/cond0.rep2.int-info.annotated.tsv
+```
+
+
+
+For the discordant pairs (in which merging would not be expected to make a difference), the pipeline performace is pretty good in the easier condition, with some false negatives in the 
+
+
+```{r}
+sessionInfo()
+```
+

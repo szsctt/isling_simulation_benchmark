@@ -1,5 +1,66 @@
+
+importReadScoreExperiment <- function(experiment_path) {
+  
+  # expected filenames of anaysis, simulated and read score files
+  analysis_filename <- "^analysis_conditions\\.tsv$"
+  sim_filename <- "^simulation_summary\\.tsv$"
+  results_filename <- "scored_reads_summary\\.tsv$"
+  
+  # get directories in the specified directories to look for
+  search_dirs <- list.dirs(experiment_path, recursive = FALSE)
+  
+  # check that we found at least one directory
+  if (length(search_dirs) == 0) {
+    stop("no files found in specified directory")
+  }
+  
+  # to keep track of which directories we imported data from
+  imported_dirs <- c()
+  
+  read_scores <- tibble()
+  
+  for (dir in search_dirs) {
+    
+    # look for a file with simulation info
+    sim_file <- list.files(dir, pattern = sim_filename)
+    
+    # look for a file with analysis pipeline paramters
+    analysis_file <- list.files(dir, pattern = analysis_filename)
+    
+    # look for a summary of read scores
+    results_file <- list.files(dir, pattern = results_filename)
+    
+    # check we found exactly one file for each
+    if (length(sim_file) != 1) {
+      next
+    }
+    else if (length(analysis_file) != 1) {
+      next
+    }
+    else if (length(results_file) != 1) {
+      next
+    }
+    
+    # import data
+    tmp <- importReadData(
+      paste0(dir, "/", sim_file), 
+      paste0(dir, "/", analysis_file), 
+      paste0(dir, "/", results_file)
+      )
+    
+    read_scores <- bind_rows(read_scores, tmp)
+    
+  }
+  
+  return(read_scores)
+  
+}
+
+
+#importReadScoreExperiment("../out/experiment0_short-refs")
+
 importReadData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
-  # function to import summaries from an experiment
+  # function to import read score summaries from an experiment
   
   sim_cols <- c('experiment', 'condition', 'replicate', 'sim_host', 'sim_virus',
                 'int_num', 'epi_num', 'min_sep', 'p_whole', 'p_rearrange', 

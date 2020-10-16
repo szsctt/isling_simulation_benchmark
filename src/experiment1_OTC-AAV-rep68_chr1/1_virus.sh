@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-CONFIG="../../config/experiment0_prelim/virus.yml"
-CLUSTER="../../config/experiment0_prelim/cluster.json"
-OUTPATH="../../out/experiment0_prelim/"
+CONFIG="../../config/experiment1_OTC-AAV-rep68_chr1/virus.yml"
+CLUSTER="../../config/experiment1_OTC-AAV-rep68_chr1/cluster.json"
+OUTPATH="../../out/experiment1_OTC-AAV-rep68_chr1/"
 NAME="viruses"
 
 eval "$(conda shell.bash hook)"
@@ -22,7 +22,8 @@ snakemake \
  --jobs 100 \
  --use-singularity \
  --profile slurm \
- --cluster-config ${CLUSTER}
+ --cluster-config ${CLUSTER} \
+ --rerun-incomplete
  
 
 

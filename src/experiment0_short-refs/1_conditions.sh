@@ -22,7 +22,7 @@ snakemake \
  --jobs 100 \
  --use-singularity \
  --profile slurm \
- --cluster-config ${CLUSTER}
+ --cluster-config ${CLUSTER} \
  --rerun-incomplete
  
 

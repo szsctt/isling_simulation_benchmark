@@ -2,7 +2,7 @@ test-easier:
    out_directory: "../../out/experiment0_short-refs"
    
    # integration simulation
-   replicates: 3
+   replicates: 5
    hosts: 
        "human" : "../../data/references/test_human.fa"
    viruses:
@@ -10,11 +10,11 @@ test-easier:
    initial_seed: 12345
    seed_increment: 123 
    int_num: 
-       - 5
+       - 3
    epi_num:
        - 0
    min_sep: 
-       - 20
+       - 500
    p_whole:
        - 1
    p_rearrange:
@@ -76,7 +76,7 @@ test-harder:
    out_directory: "../../out/experiment0_short-refs"
    
    # integration simulation
-   replicates: 1 
+   replicates: 5
    hosts: 
        "human" : "../../data/references/test_human.fa"
    viruses:
@@ -84,11 +84,11 @@ test-harder:
    initial_seed: 12345
    seed_increment: 123 
    int_num: 
-       - 5
+       - 3
    epi_num:
        - 10
    min_sep: 
-       - 20
+       - 500
    p_whole:
        - 0.5
    p_rearrange:

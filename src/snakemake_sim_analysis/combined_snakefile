@@ -50,7 +50,7 @@ column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host
 								'bwa_mem_params', 'score_ints', 'score_ints_window', 'score_ints_tool',
 								'host_mappability', 'host_mappability_exclude', 'host_genes', 'host_exons',
 								'host_oncogenes', 'host_centromeres', 'host_conserved_regions',
-								'host_segdup')																
+								'host_segdup', 'vifi_dir')																
 
 
 for dataset in datasets:
@@ -200,7 +200,8 @@ for dataset in datasets:
 				'tool'			 : 'vifi',			
 				'score_ints' : score_ints,
 				'score_ints_window' : score_ints_window,
-				'score_ints_tool' : "vifi"	
+				'score_ints_tool' : "vifi",
+				'vifi_dir' : config[dataset]['vifi_params']['vifi_dir']
 				})
 			i += 1
 
@@ -299,7 +300,7 @@ localrules: write_summary, write_analysis_summary#, combine_int_scores, combine_
 # rule polyidus has a wildcard contstraint so it can't be used for our pipeline
 # so make it higher in the priority
 
-ruleorder: polyidus > combine_ints
+ruleorder: vifi> polyidus > combine_ints
 
 #####################################################
 ################### target files ####################
@@ -488,15 +489,13 @@ rule host_virus_index:
 		host = lambda wildcards: ref_names[wildcards.host]
 	output:
 		fa = "{outpath}/vifi_refs/data/{virus}/{host}_{virus}.fas",
-		idx = multiext("{outpath}/vifi_refs/data/{virus}/{host}_{virus}", ".amb", ".ann", ".bwt", ".pac", ".sa")
+		idx = multiext("{outpath}/vifi_refs/data/{virus}/{host}_{virus}.fas", ".amb", ".ann", ".bwt", ".pac", ".sa")
 	container:
-		"docker://szsctt/vifi:1"
-	params:
-		prefix = lambda wildcards, output: path.splitext(output.fa)[0]
+		"docker://namphuon/vifi"
 	shell:
 		"""
-		cat {virus} {host} > {fa}
-		bwa index -p {params.prefix} {fa}
+		cat {input.virus} {input.host} > {output.fa}
+		bwa index {output.fa}
 		"""
 		
 rule vifi_faidx:
@@ -504,10 +503,15 @@ rule vifi_faidx:
 		fa = lambda wildcards: ref_names[wildcards.host]
 	output:
 		fai = "{outpath}/vifi_refs/data_repo/{host}/{host}.fa.fai"
+	params:
+		fai = lambda wildcards: ref_names[wildcards.host] + ".fai"
 	container:
 		"docker://szsctt/bwa:1"
 	shell:
-		"samtools faidx -o {output.fai} {input.fa}"
+		"""
+		samtools faidx {input.fa}
+		mv {params.fai} {output.fai}
+		"""
 		
 		
 		 
@@ -553,15 +557,15 @@ rule vifi_data_repo:
 		cp {input.segdup} {output.segdup}
 		
 		awk 'BEGIN {{ ORS = " " }} {{a[$1]}} END {{for (i in a) print i}}' \
-				{output.fai} > {output.chromosomes}
+				{input.fai} > {output.chromosomes}
 				
 		echo "fa_file 		                  $(basename {output.fa})" > {output.file_list}
-		echo "chrLen_file 		              $(basename {output.fai})" >> {output.file_list}
+		echo "chrLen_file 		              $(basename {input.fai})" >> {output.file_list}
   	echo "duke35_filename 		          $(basename {output.mappability})" >> {output.file_list}
   	echo "mapability_exclude_filename   $(basename {output.mappability_exclude})" >> {output.file_list}
   	echo "gene_filename 		            $(basename {output.genes})" >> {output.file_list}
   	echo "exon_file 		                $(basename {output.exons})" >> {output.file_list}
-  	echo "oncogene_filenamee 		        $(basename {output.oncogenes})" >> {output.file_list}
+  	echo "oncogene_filename 		        $(basename {output.oncogenes})" >> {output.file_list}
   	echo "centromere_filename 		      $(basename {output.centromeres})" >> {output.file_list}
   	echo "conserved_regions_filename 		$(basename {output.conserved})" >> {output.file_list}
   	echo "segdup_filename 		          $(basename {output.segdup})" >> {output.file_list}		
@@ -584,6 +588,46 @@ rule data_repo_host_list:
 			shell("echo {host} >> {output}")
 		
 		
+rule vifi:
+	input:
+		idx = rules.host_virus_index.output.idx,
+		fa = rules.host_virus_index.output.fa,
+		host_list = rules.data_repo_host_list.output[0],
+		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
+		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
+		chrom_list = rules.vifi_data_repo.output.chromosomes,
+		script = "../../ViFi/scripts/run_vifi.py"
+	output:
+		clusters = "{outpath}/{dset}/{samp}.{host}.{virus}/output.clusters.txt",
+		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"	
+	params:
+		vifi_dir = lambda wildcards: analysis_df_value(wildcards, 'vifi_dir'),
+		reference_repo = lambda wildcards, input: os.path.dirname(input.idx[0]),
+		aa_data_repo = lambda wildcards, input: os.path.dirname(input.host_list),
+		outdir = lambda wildcards, output: os.path.dirname(output.clusters),
+		reference = lambda wildcards, input: os.path.splitext(input.idx[0])[0]
+	wildcard_constraints:
+		dset = ".+_vifi\d+"
+	container:
+		"docker://namphuon/vifi"
+	threads: 5
+	shell:
+		"""
+		export VIFI_DIR=$(realpath {params.vifi_dir})
+		export AA_DATA_REPO=$(realpath {params.aa_data_repo})
+		export REFERENCE_REPO=$(realpath {params.reference_repo})
+		
+		python {params.vifi_dir}/scripts/run_vifi.py \
+		-c {threads} \
+		-f {input.fastq1} -r {input.fastq2} \
+		--reference {input.fa} \
+		-v {wildcards.virus} \
+		-o {params.outdir} \
+		-d True \
+		-C {input.chrom_list}
+		
+		cp {output.clusters} {output.ints}
+		"""
 	
 				
 				

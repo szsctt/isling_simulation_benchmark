@@ -264,3 +264,41 @@ missing_read_info <- function(scored_reads_glob, int_file_string) {
 #                         "../out/experiment0_prelim/{experiment}/sim_ints/{condition}.rep{replicate}.int-info.annotated.tsv")
 #test
 
+fn_chimeric_reads_explained_by_short_integrations <- function(read_scores) {
+  # import the read scores and look for false negatives (found_score) that can be explained 
+  # by short (undetectable) integrations
+  
+  # these integrations are indicated by reads that cross both the left and right junctions of the integration
+  # or reads that cross more than one integration
+  
+  if (!file.exists(read_scores)) {
+    stop(paste0("file ", read_scores, " does not exist"))
+  }
+  
+  read_scores <- readr::read_tsv(read_scores) 
+  
+  fn_reads <- read_scores %>% 
+    dplyr::filter(found_score == "fn") %>% 
+    dplyr::filter(type == "chimeric") 
+  
+  if (nrow(fn_reads) == 0) {
+    return(NA)
+  }
+  
+  fn_reads <- fn_reads %>% 
+    distinct() %>% 
+    group_by(readID) %>% 
+    summarise(number_sides = n_distinct(side),
+              number_ints = n_distinct(intID)) %>% 
+    rowwise() %>% 
+    mutate(multiple_sides_or_ints = number_sides > 1 | number_ints > 1) %>% 
+    ungroup() %>% 
+    summarise(n_explained = sum(multiple_sides_or_ints),
+              total_fn = n())
+  
+  return(fn_reads$n_explained / fn_reads$total_fn)
+  
+  
+}
+
+test <- fn_chimeric_reads_explained_by_short_integrations("../out/experiment0_short-refs/test-harder/scored_reads/test-harder_analysis0.cond1.rep3.human.AAV.tsv")

@@ -498,6 +498,18 @@ rule host_virus_index:
 		cat {virus} {host} > {fa}
 		bwa index -p {params.prefix} {fa}
 		"""
+		
+rule vifi_faidx:
+	input:
+		fa = lambda wildcards: ref_names[wildcards.host]
+	output:
+		fai = "{outpath}/vifi_refs/data_repo/{host}/{host}.fa.fai"
+	container:
+		"docker://szsctt/bwa:1"
+	shell:
+		"samtools faidx -o {output.fai} {input.fa}"
+		
+		
 		 
 def get_vifi_resource(wildcards, resource_name):
 	"""Get resources required for vifi"""
@@ -507,6 +519,7 @@ def get_vifi_resource(wildcards, resource_name):
 rule vifi_data_repo:
 	input:
 		fa = lambda wildcards: ref_names[wildcards.host],
+		fai = rules.vifi_faidx.output.fai,
 		mappability = lambda wildcards: get_vifi_resource(wildcards, 'host_mappability'),
 		mappability_exclude = lambda wildcards: get_vifi_resource(wildcards, 'host_mappability_exclude'),
 		genes = lambda wildcards: get_vifi_resource(wildcards, 'host_genes'),
@@ -527,10 +540,6 @@ rule vifi_data_repo:
 		centromeres = "{outpath}/vifi_refs/data_repo/{host}/{host}.centromeres.bed",
 		conserved = "{outpath}/vifi_refs/data_repo/{host}/{host}.conserved.bed",
 		segdup = "{outpath}/vifi_refs/data_repo/{host}/{host}.segdup.bed"
-	params:
-		fai = lambda wildcards, output: output.fa + ".fai"
-	container:
-		"docker://szsctt/bwa:1"
 	shell:
 		"""
 		cp {input.fa} {output.fa}
@@ -543,13 +552,11 @@ rule vifi_data_repo:
 		cp {input.conserved} {output.conserved}
 		cp {input.segdup} {output.segdup}
 		
-		samtools faidx {output.fa}
-		
 		awk 'BEGIN {{ ORS = " " }} {{a[$1]}} END {{for (i in a) print i}}' \
-				{params.fai} > {output.chromosomes}
+				{output.fai} > {output.chromosomes}
 				
 		echo "fa_file 		                  $(basename {output.fa})" > {output.file_list}
-		echo "chrLen_file 		              $(basename {params.fai})" >> {output.file_list}
+		echo "chrLen_file 		              $(basename {output.fai})" >> {output.file_list}
   	echo "duke35_filename 		          $(basename {output.mappability})" >> {output.file_list}
   	echo "mapability_exclude_filename   $(basename {output.mappability_exclude})" >> {output.file_list}
   	echo "gene_filename 		            $(basename {output.genes})" >> {output.file_list}
@@ -578,9 +585,7 @@ rule data_repo_host_list:
 		
 		
 	
-			
-# make host list after making repo for all hosts - otherwise race condition
-# host_list = "{outpath}/vifi_refs/data_repo/reference.txt",		
+				
 				
 #####################################################
 ############ compare sim with analysis ##############

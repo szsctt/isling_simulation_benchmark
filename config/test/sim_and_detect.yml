@@ -78,6 +78,7 @@ test-easier:
          centromeres: "../../data/references/GRCh38/centromeres.bed"
          conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
          segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
+     vifi_dir: "../../ViFi"
               
    # scoring
    score_ints: True

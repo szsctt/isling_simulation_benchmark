@@ -82,7 +82,7 @@ if [ ! -e $REFERENCE_REPO/${VIRUSNAME}/${HOSTNAME}_${VIRUSNAME}.fas ]; then
   echo "mapability_exclude_filename     $(basename $BLACKLIST)" >> ${AA_DATA_REPO}/${HOSTNAME}/file_list.txt
   echo "gene_filename 		            $(basename $GENES)" >> ${AA_DATA_REPO}/${HOSTNAME}/file_list.txt
   echo "exon_file 		                $(basename $EXONS)" >> ${AA_DATA_REPO}/${HOSTNAME}/file_list.txt
-  echo "oncogene_filenamee 		        $(basename $GENES)" >> ${AA_DATA_REPO}/${HOSTNAME}/file_list.txt
+  echo "oncogene_filename 		        $(basename $GENES)" >> ${AA_DATA_REPO}/${HOSTNAME}/file_list.txt
   echo "centromere_filename 		      $(basename $CENTROMERE)" >> ${AA_DATA_REPO}/${HOSTNAME}/file_list.txt
   echo "conserved_regions_filename 		$(basename $CONS)" >> ${AA_DATA_REPO}/${HOSTNAME}/file_list.txt
   echo "segdup_filename 		        $(basename $DUPS)" >> ${AA_DATA_REPO}/${HOSTNAME}/file_list.txt

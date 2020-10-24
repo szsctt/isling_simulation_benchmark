@@ -709,6 +709,10 @@ rule read_score_summary:
 		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt",
 	output:
 		summary = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
+	resources:
+		mem_mb= lambda wildcards, attempt: attempt * 5000,
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
 	shell:
 		"""	
 		echo -e "sim_info_file\tsim_sam_file\tanalysis_info_file\tresults_file\tjunc_type\tscore_type\ttrue_positives\ttrue_negatives\tfalse_positives\tfalse_negatives" > {output.summary}

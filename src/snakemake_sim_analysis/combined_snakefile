@@ -249,7 +249,6 @@ for i, row in analysis_df.iterrows():
 		todo_row['dataset'] = dataset
 		todo_row['config_dataset'] = experiment
 		
-		
 		# add sample name
 		todo_row['sample'] = sample
 		todo_row['unique'] = f"{dataset}+++{sample}"
@@ -300,7 +299,7 @@ localrules: write_summary, write_analysis_summary#, combine_int_scores, combine_
 # rule polyidus has a wildcard contstraint so it can't be used for our pipeline
 # so make it higher in the priority
 
-ruleorder: vifi> polyidus > combine_ints
+ruleorder: vifi > polyidus > combine_ints
 
 #####################################################
 ################### target files ####################
@@ -349,6 +348,27 @@ for i, row in analysis_df.iterrows():
 			f"{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.tsv"
 		)
 
+
+# vifi outputs
+vifi_targets = []
+for i, row in analysis_df.iterrows():
+	if row['tool'] != 'vifi':
+		continue
+	outpath = row['outdir']
+	exp = row['experiment']
+	dset = row['analysis_condition']
+		
+	samples = sim_df[sim_df['experiment'] == exp]['sample']
+	host = row['host']
+	virus = row['virus']
+		
+	for samp in samples:
+		vifi_targets.append(
+			f"{outpath}/{dset}/vifi.{samp}.{host}.{virus}/output.clusters.txt"
+		)
+		vifi_targets.append(
+			f"{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.tsv"
+		)
 	
 # summary files
 
@@ -366,13 +386,6 @@ scored_summaries = expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv',
 				exp = exps_int_score, 
 				outpath = [exp_targets[exp] for exp in exps_int_score]
 			) 
-			
-# vifi outputs
-"{outpath}/vifi_refs/data_repo/reference.txt"
-vifi_targets = [f"{outpath}/vifi_refs/data_repo/reference.txt" for outpath in 
-											set(analysis_df.loc[(analysis_df['tool'] == 'vifi'), 'outdir'])]
-
-
 
 rule all:
 	input: 
@@ -385,7 +398,6 @@ rule all:
 		set(vifi_targets)
 		
 		
-
 #####################################################
 ############### simulate integrations ###############
 #####################################################
@@ -453,7 +465,7 @@ rule polyidus:
 		host_idx =  "{outpath}/references/{host}/{host}.1.bt2",
 		virus_idx = "{outpath}/references/{virus}/{virus}.1.bt2"
 	output:
-		temp_ints = temp("{outpath}/{dset}/polyidus_{host}_{virus}_{samp}/results/exactHpvIntegrations.tsv"),
+		temp_ints = temp("{outpath}/{dset}/polyidus.{host}.{virus}.{samp}/results/exactHpvIntegrations.tsv"),
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	params:
 		output = lambda wildcards, output: path.dirname(path.dirname(output.temp_ints)),
@@ -492,6 +504,10 @@ rule host_virus_index:
 		idx = multiext("{outpath}/vifi_refs/data/{virus}/{host}_{virus}.fas", ".amb", ".ann", ".bwt", ".pac", ".sa")
 	container:
 		"docker://namphuon/vifi"
+	resources:
+		mem_mb= lambda wildcards, attempt, input: int(attempt * 5 * (os.stat(input.host).st_size/1e6 + os.stat(input.virus).st_size/1e6)),
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
 	shell:
 		"""
 		cat {input.virus} {input.host} > {output.fa}
@@ -512,9 +528,7 @@ rule vifi_faidx:
 		samtools faidx {input.fa}
 		mv {params.fai} {output.fai}
 		"""
-		
-		
-		 
+
 def get_vifi_resource(wildcards, resource_name):
 	"""Get resources required for vifi"""
 	host_idx = analysis_df[(analysis_df['host'] == wildcards.host) & (analysis_df['tool'] == 'vifi')].index[0]
@@ -587,7 +601,6 @@ rule data_repo_host_list:
 		for host in hosts:
 			shell("echo {host} >> {output}")
 		
-		
 rule vifi:
 	input:
 		idx = rules.host_virus_index.output.idx,
@@ -596,13 +609,13 @@ rule vifi:
 		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
 		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
 		chrom_list = rules.vifi_data_repo.output.chromosomes,
-		script = "../../ViFi/scripts/run_vifi.py"
+		script = lambda wildcards: analysis_df_value(wildcards, 'vifi_dir') + "/scripts/run_vifi.py"
 	output:
-		clusters = "{outpath}/{dset}/{samp}.{host}.{virus}/output.clusters.txt",
-		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"	
+		clusters = "{outpath}/{dset}/vifi.{samp}.{host}.{virus}/output.clusters.txt",
+		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	params:
-		vifi_dir = lambda wildcards: analysis_df_value(wildcards, 'vifi_dir'),
-		reference_repo = lambda wildcards, input: os.path.dirname(input.idx[0]),
+		vifi_dir = lambda wildcards, input: os.path.dirname(os.path.dirname(input.script)),
+		reference_repo = lambda wildcards, input: os.path.dirname(input.fa),
 		aa_data_repo = lambda wildcards, input: os.path.dirname(input.host_list),
 		outdir = lambda wildcards, output: os.path.dirname(output.clusters),
 		reference = lambda wildcards, input: os.path.splitext(input.idx[0])[0]
@@ -610,6 +623,9 @@ rule vifi:
 		dset = ".+_vifi\d+"
 	container:
 		"docker://namphuon/vifi"
+	resources:
+		mem_mb= lambda wildcards, attempt: int(attempt * 10000),
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1]
 	threads: 5
 	shell:
 		"""
@@ -627,9 +643,7 @@ rule vifi:
 		-C {input.chrom_list}
 		
 		cp {output.clusters} {output.ints}
-		"""
-	
-				
+		"""			
 				
 #####################################################
 ############ compare sim with analysis ##############
@@ -663,8 +677,8 @@ rule score_reads:
 		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt",
 		merged_reads = rules.merged_list.output.merged_reads
 	output:
-		scored_reads = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}.tsv",
-		summary = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
+		scored_reads = temp("{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}.tsv"),
+		scored_reads_uniq = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}.uniq.tsv",
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 50000,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
@@ -682,8 +696,65 @@ rule score_reads:
 		--analysis-info {input.analysis_info} \
 		--merged-reads {input.merged_reads} \
 		--output {output.scored_reads} \
-		--output-summary {output.summary} \
 		--threads {threads} 
+		
+		(head -n 1 {output.scored_reads} && tail -n +2 {output.scored_reads} | sort | uniq) > {output.scored_reads_uniq}
+		"""
+		
+rule read_score_summary:
+	input:
+		scores = rules.score_reads.output.scored_reads_uniq,
+		sim_info = rules.annotate_reads.output.annotated_info,
+		sim_sam = "{outpath}/{exp}/sim_reads/{samp}.sam",
+		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt",
+	output:
+		summary = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
+	shell:
+		"""	
+		echo -e "sim_info_file\tsim_sam_file\tanalysis_info_file\tresults_file\tjunc_type\tscore_type\ttrue_positives\ttrue_negatives\tfalse_positives\tfalse_negatives" > {output.summary}
+		
+		TP=$(awk -F "\t" '$4 ~ /tp/ && /discord/' {input.scores} | wc -l)
+		TN=$(awk -F "\t" '$4 ~ /tn/ && /discord/' {input.scores} | wc -l)
+		FP=$(awk -F "\t" '$4 ~ /fp/ && /discord/' {input.scores} | wc -l)
+		FN=$(awk -F "\t" '$4 ~ /fn/ && /discord/' {input.scores} | wc -l)
+		
+		echo -e "{input.sim_info}\t{input.sim_sam}\t{input.analysis_info}\t{input.scores}\tdiscord\tfound_score\t${{TP}}\t${{TN}}\t${{FP}}\t${{FN}}" >> {output.summary}
+
+		TP=$(awk -F "\t" '$4 ~ /tp/ && /chimeric/' {input.scores} | wc -l)
+		TN=$(awk -F "\t" '$4 ~ /tn/ && /chimeric/' {input.scores} | wc -l)
+		FP=$(awk -F "\t" '$4 ~ /fp/ && /chimeric/' {input.scores} | wc -l)
+		FN=$(awk -F "\t" '$4 ~ /fn/ && /chimeric/' {input.scores} | wc -l)
+
+		echo -e "{input.sim_info}\t{input.sim_sam}\t{input.analysis_info}\t{input.scores}\tchimeric\tfound_score\t${{TP}}\t${{TN}}\t${{FP}}\t${{FN}}" >> {output.summary}
+		
+		TP=$(awk -F "\t" '$5 ~ /tp/ && /discord/' {input.scores} | wc -l)
+		TN=$(awk -F "\t" '$5 ~ /tn/ && /discord/' {input.scores} | wc -l)
+		FP=$(awk -F "\t" '$5 ~ /fp/ && /discord/' {input.scores} | wc -l)
+		FN=$(awk -F "\t" '$5 ~ /fn/ && /discord/' {input.scores} | wc -l)
+		
+		echo -e "{input.sim_info}\t{input.sim_sam}\t{input.analysis_info}\t{input.scores}\tdiscord\thost_score\t${{TP}}\t${{TN}}\t${{FP}}\t${{FN}}" >> {output.summary}	
+
+		TP=$(awk -F "\t" '$5 ~ /tp/ && /chimeric/' {input.scores} | wc -l)
+		TN=$(awk -F "\t" '$5 ~ /tn/ && /chimeric/' {input.scores} | wc -l)
+		FP=$(awk -F "\t" '$5 ~ /fp/ && /chimeric/' {input.scores} | wc -l)
+		FN=$(awk -F "\t" '$5 ~ /fn/ && /chimeric/' {input.scores} | wc -l)
+		
+		echo -e "{input.sim_info}\t{input.sim_sam}\t{input.analysis_info}\t{input.scores}\tchimeric\thost_score\t${{TP}}\t${{TN}}\t${{FP}}\t${{FN}}" >> {output.summary}
+
+		TP=$(awk -F "\t" '$6 ~ /tp/ && /discord/' {input.scores} | wc -l)
+		TN=$(awk -F "\t" '$6 ~ /tn/ && /discord/' {input.scores} | wc -l)
+		FP=$(awk -F "\t"  '$6 ~ /fp/ && /discord/' {input.scores} | wc -l)
+		FN=$(awk -F "\t" '$6 ~ /fn/ && /discord/' {input.scores} | wc -l)
+		
+		echo -e "{input.sim_info}\t{input.sim_sam}\t{input.analysis_info}\t{input.scores}\tdiscord\tvirus_score\t${{TP}}\t${{TN}}\t${{FP}}\t${{FN}}" >> {output.summary}
+
+		TP=$(awk -F "\t" '$6 ~ /tp/ && /chimeric/' {input.scores} | wc -l)
+		TN=$(awk -F "\t" '$6 ~ /tn/ && /chimeric/' {input.scores} | wc -l)
+		FP=$(awk -F "\t" '$6 ~ /fp/ && /chimeric/' {input.scores} | wc -l)
+		FN=$(awk -F "\t" '$6 ~ /fn/ && /chimeric/' {input.scores} | wc -l)
+		
+		echo -e "{input.sim_info}\t{input.sim_sam}\t{input.analysis_info}\t{input.scores}\tchimeric\tvirus_score\t${{TP}}\t${{TN}}\t${{FP}}\t${{FN}}" >> {output.summary}
+
 		"""
 
 

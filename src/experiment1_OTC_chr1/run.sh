@@ -1,10 +1,12 @@
 #!/bin/bash
 set -e
 
-CONFIG="../../config/experiment1_OTC_chr1/easier-harder.yml"
-CLUSTER="../../config/experiment1_OTC_chr1/cluster.json"
-OUTPATH="../../out/experiment1_OTC_chr1/"
-NAME="easier-harder"
+# ./run.sh <config yml> <cluster json> <dag outpath> <dag name>
+
+CONFIG=$1
+CLUSTER=$2
+OUTPATH=$3
+NAME=$4
 
 eval "$(conda shell.bash hook)"
 conda activate snakemake
@@ -24,3 +26,5 @@ snakemake \
  --profile slurm \
  --cluster-config ${CLUSTER} \
  --rerun-incomplete -n
+
+

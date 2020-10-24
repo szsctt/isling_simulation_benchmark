@@ -5,32 +5,11 @@
 		"mail-user" : "suzanne.scott@csiro.au",
 		"output" : "../../logs/{rule}.%j.log"
 	},
-	"simulate_integrations":
-	{	
-		"mem" : "100GB",
-		"time" : "24:00:00",
-		"job-name" : "simvi-sim"
-
-	},
 	"convert":
 	{	
 		"mem" : "20GB",
 		"time" : "24:00:00",
 		"job-name" : "simvi-convert"
-
-	},
-	"art":
-	{	
-		"mem" : "50GB",
-		"time" : "24:00:00",
-		"job-name" : "simvi-art"
-
-	},
-	"annotate_reads":
-	{	
-		"mem" : "10GB",
-		"time" : "24:00:00",
-		"job-name" : "simvi-annotated"
 
 	},
 	"bamtobed":
@@ -154,8 +133,6 @@
 	"score_reads":
 	{
 		"time" : "24:00:00",
-		"cpus-per-task" : "1",
-		"mem" : "20GB",
-		"job-name" : "summarise"
+		"job-name" : "score_reads"
 	}
 }

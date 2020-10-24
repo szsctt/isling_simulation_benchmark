@@ -1,9 +1,24 @@
 #!/bin/bash
 set -e
 
-bash 1_easier-harder.sh
+CONFIG="../../config/experiment1_OTC_chr1/easier-harder.yml"
+CLUSTER="../../config/experiment1_OTC_chr1/cluster.json"
+OUTPATH="../../out/experiment1_OTC_chr1/"
+NAME="easier-harder"
 
-bash 2_read-props.sh
+bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
 
-bash 3_condition-breakdown.sh
+CONFIG="../../config/experiment1_OTC_chr1/read-properties.yml"
+CLUSTER="../../config/experiment1_OTC_chr1/cluster.json"
+OUTPATH="../../out/experiment1_OTC_chr1/"
+NAME="read-properties"
+
+bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
+
+CONFIG="../../config/experiment1_OTC_chr1/condition-breakdown.yml"
+CLUSTER="../../config/experiment1_OTC_chr1/cluster.json"
+OUTPATH="../../out/experiment1_OTC_chr1/"
+NAME="condition-breakdown"
+
+bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
 

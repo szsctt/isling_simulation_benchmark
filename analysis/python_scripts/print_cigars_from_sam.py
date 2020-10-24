@@ -16,7 +16,7 @@ def main(argv):
 		return()
 	
 	# build dict of reads we're looking for
-	reads = {"1": [], "2":[]}
+	reads = {"1": [], "2":[], "neither": []}
 	for read in argv[2:]:
 		if read[-2:] == "/1":
 			reads["1"].append(read[:-2])
@@ -25,6 +25,7 @@ def main(argv):
 		else:
 			reads["1"].append(read)
 			reads["2"].append(read)
+			reads['neither'].append(read)
 	
 	# loop through samfile and print cigars for matches
 	found = []
@@ -48,12 +49,24 @@ def main(argv):
 				else:
 					print(f"{read.qname}/2 ({ori}): {read.cigarstring}")
 					found.append(f"{read.qname}/2")
+		else:
+			if read.qname in reads["neither"]:
+				if read.is_secondary or read.is_supplementary:
+					continue
+				else:
+					print(f"{read.qname} ({ori}): {read.cigarstring}")
+					found.append(f"{read.qname}")
 	
 	# check if there are any reads we didn't find
 	for read_num in reads:
 		for readid in reads[read_num]:
-			if f"{readid}/{read_num}" not in found:
-				print(f"didn't find read {readid}/{read_num} in sam file {argv[1]}")
+			# if we were looking for either both R1 and R2, or neither R1 or R2
+			if read_num == 'neither':
+				if readid not in found:
+					print(f" didn't find read {readid} in sam file {argv[1]}")
+			else:
+				if f"{readid}/{read_num}" not in found and readid not in reads['neither']:
+					print(f"didn't find read {readid}/{read_num} in sam file {argv[1]}")
 
 	
 	

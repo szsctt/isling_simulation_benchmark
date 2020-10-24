@@ -1,3 +1,6 @@
+library(glue)
+library(tidyverse)
+
 
 importReadScoreExperiment <- function(experiment_path) {
   
@@ -301,4 +304,51 @@ fn_chimeric_reads_explained_by_short_integrations <- function(read_scores) {
   
 }
 
-test <- fn_chimeric_reads_explained_by_short_integrations("../out/experiment0_short-refs/test-harder/scored_reads/test-harder_analysis0.cond1.rep3.human.AAV.tsv")
+#test <- fn_chimeric_reads_explained_by_short_integrations("../out/experiment0_short-refs/test-harder/scored_reads/test-harder_analysis0.cond1.rep3.human.AAV.tsv")
+
+import_fp_reads <- function(read_scores_path, score_type = 'host_score', junction_type = 'chimeric') {
+  # given a path to a scored reads file, import the false positives 
+  # of a specified score type and junction type
+  
+  if (!file.exists(read_scores_path)) {
+    stop(glue("file {read_scores} does not exist"))
+  }
+  
+  read_scores <- readr::read_tsv(read_scores_path) 
+  
+  if (!(score_type %in% colnames(read_scores))) {
+    stop(glue("coudln't find column {score_type}"))
+  }
+  if (!(junction_type %in% c('chimeric', 'discord'))) {
+    stop(glue("junction type {junction_type} is invalid (must be either 'chimeric' or 'discord')"))
+  }
+  
+  fp_reads <- read_scores %>% 
+    filter(across(matches(score_type), ~ . == "fp")) %>% 
+    dplyr::filter(type == junction_type) %>% 
+    distinct() 
+  
+  return(fp_reads)
+  
+}
+
+fp_reads_explained_by_wrong_location <- function(read_scores_path, score_type = 'host_score', junction_type = 'chimeric') {
+  # import the read scores and look for false negatives (found_score) that can be explained 
+  # by short (undetectable) integrations
+  
+  # these integrations are indicated by reads that cross both the left and right junctions of the integration
+  # or reads that cross more than one integration
+
+  fp_reads <- import_fp_reads(read_scores_path, score_type, junction_type)
+  
+  if (nrow(fp_reads) == 0) {
+    return(NA)
+  }
+  
+  return(sum(fp_reads$found) / nrow(fp_reads))
+  
+}
+#test_file <- "../out/experiment0_short-refs/test-easier/scored_reads/test-easier_analysis0.cond1.rep1.human.AAV.uniq.tsv"
+#fp_reads_explained_by_wrong_location(test_file, 'virus_score', 'discord')
+
+#import_fp_reads(test_file, 'virus_score', 'discord')

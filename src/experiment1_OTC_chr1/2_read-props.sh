@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-CONFIG="../../config/experiment0_prelim/condition-breakdown.yml"
-CLUSTER="../../config/experiment0_prelim/cluster.json"
-OUTPATH="../../out/experiment0_prelim/"
-NAME="condition-breakdown"
+CONFIG="../../config/experiment1_OTC_chr1/read-properties.yml"
+CLUSTER="../../config/experiment1_OTC_chr1/cluster.json"
+OUTPATH="../../out/experiment1_OTC_chr1/"
+NAME="read-properties"
 
 eval "$(conda shell.bash hook)"
 conda activate snakemake
@@ -22,6 +22,7 @@ snakemake \
  --jobs 1 \
  --use-singularity \
  --profile slurm \
- --cluster-config ${CLUSTER}  
+ --cluster-config ${CLUSTER} \
+ --rerun-incomplete -n
  
 

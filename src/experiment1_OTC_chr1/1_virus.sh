@@ -1,11 +1,10 @@
 #!/bin/bash
 set -e
 
-CONFIG="../../config/experiment2_AAV-OTC/chromosomes.yml"
-CLUSTER="../../config/experiment2_AAV-OTC/cluster.json"
-OUTPATH="../../out/experiment2_AAV-OTC/"
-NAME="chomosomes"
-ANALYSIS="../../intvi_pipeline"
+CONFIG="../../config/experiment1_OTC_chr1/easier-harder.yml"
+CLUSTER="../../config/experiment1_OTC_chr1/cluster.json"
+OUTPATH="../../out/experiment1_OTC_chr1/"
+NAME="easier-harder"
 
 eval "$(conda shell.bash hook)"
 conda activate snakemake
@@ -17,14 +16,11 @@ cd ../snakemake_sim_analysis
 mkdir -p ${OUTPATH}
 snakemake --configfile ${CONFIG} --snakefile combined_snakefile --dag | dot -Tsvg > ${OUTPATH}/${NAME}.dag.svg
 
-# simulate and analyse data with individual chromosomes
 snakemake \
  --snakefile combined_snakefile \
  --configfile ${CONFIG}\
  --jobs 100 \
  --use-singularity \
  --profile slurm \
- --cluster-config ${CLUSTER}
- 
- 
-
+ --cluster-config ${CLUSTER} \
+ --rerun-incomplete -n

@@ -1,10 +1,11 @@
 #!/bin/bash
 set -e
 
-CONFIG="../../config/experiment2_AAV-OTC/int_num.yml"
-CLUSTER="../../config/experiment2_AAV-OTC/cluster.json"
-OUTPATH="../../out/experiment2_AAV-OTC/"
-NAME="chomosomes"
+
+CONFIG="../../config/experiment1_OTC_chr1/condition-breakdown.yml"
+CLUSTER="../../config/experiment1_OTC_chr1/cluster.json"
+OUTPATH="../../out/experiment1_OTC_chr1/"
+NAME="condition-breakdown"
 
 eval "$(conda shell.bash hook)"
 conda activate snakemake
@@ -22,6 +23,6 @@ snakemake \
  --jobs 100 \
  --use-singularity \
  --profile slurm \
- --cluster-config ${CLUSTER}
+ --cluster-config ${CLUSTER} \
+ --rerun-incomplete -n
  
-

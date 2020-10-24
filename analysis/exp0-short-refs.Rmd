@@ -10,6 +10,7 @@ output:
 ---
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(gganimate)
 library(kableExtra)
 source("sim_functions.R")
 
@@ -59,13 +60,19 @@ There are a few different ways of scoring the results from these experiments.  O
 ### Are all the reads that cross integrations found?
 
 ```{r include=FALSE}
-read_scores <- importReadScoreExperiment(exp_dir)
+read_scores <- importReadScoreExperiment(exp_dir) 
+
+read_scores <- read_scores %>% 
+  filter(str_detect(read_scores$config_dataset, "test"))
+
 ```
 
 
 ```{r}
 read_scores %>% 
-  filter(score_type == "found_score")
+    filter(!post) %>% 
+  filter(score_type == "found_score") %>%
+  select(experiment, analysis_condition, merge, condition, replicate, frag_len, junc_type, TPR, TNR, true_positive, true_negative, false_positive, false_negative) 
 ```
 
 
@@ -89,7 +96,7 @@ for (type in c('chimeric', 'discord')) {
   mutate(replicate = as.factor(replicate)) %>% 
   mutate(frag_len = as.factor(frag_len)) %>% 
   ggplot(aes(x = TNR, y = TPR, shape = replicate, color = frag_len)) +
-  geom_point(alpha = 0.5)  +
+  geom_point(alpha = 0.8)  +
   xlim(0, 1) +
   ylim(0, 1) +
   xlab('true negative rate') +
@@ -105,32 +112,359 @@ During analysis, reads were simulated using different fragment lengths (250bp, 5
 
 So we have mostly missing reads (false negatives) - not really any reads that are false positives.  That's not too bad, but why are we missing reads?
 
-#### Why are there false negatives?
+#### False negatives - chimeric reads
 
-For the chimeric reads, the missing reads seem to be only for the shorter fragment length, in which most reads were merged.  It doesn't seem to matter to much if the the simulated integrations were easier or harder for the pipeline to handle.
+For the chimieric reads, there only appear to be a significant number of missing reads in the 'harder' condition, and this occurs reagardless of fragment length or whether the reads were merged or not.
 
-There seem to be the most missing reads in replicate 2 - this is especially noticable for the unmerged condition, where the two other replicates are pretty good.  First look at those missing reads for the unmerged condition.
+We can check out one replicate from each with the most missing reads (replicate 3 for fragment length 500, and replicate 1 for fragment length 250) to see why the reads are missing.
 
 ```{r}
 read_scores %>% 
-  select(experiment, analysis_condition, merge, condition, frag_len) %>% 
+    filter(!post) %>% 
+  filter(score_type == "found_score") %>%
+  filter(junc_type == "chimeric") %>% 
+  select(experiment, analysis_condition, merge, condition, replicate, frag_len, junc_type, TPR, TNR) %>% 
+  arrange(TPR) %>% 
+  head()
+
+```
+
+Let's start with the `test-harder` datset, analysis condition 0 (with merging), condition 1 (fragment length 500), replicate 3.
+
+Checking which reads appear to be missing:
+
+```{r include=FALSE}
+missing_reads <- read_tsv("../out/experiment0_short-refs/test-harder/scored_reads/test-harder_analysis0.cond1.rep3.human.AAV.uniq.tsv")
+```
+```{r}
+missing_reads %>% 
+  filter(found_score == "fn") %>% 
+  head(10)
+```
+
+The first few reads that are missing seem to cross both left and right junctions of integration 2.  Any chimeric read crossing more than one junction can't be detected.  How many of the reads missing are like this?  To answer this question, we can count the number of reads that cross integrations with two different sides of the same integration:
+
+```{r}
+missing_reads %>% 
+  filter(found_score == "fn") %>% 
+  filter(type == "chimeric") %>% 
+  distinct() %>% 
+  group_by(readID) %>% 
+  summarise(number_sides = n_distinct(side)) %>% 
+  group_by(number_sides) %>% 
+  summarise(number_reads_with_n_sides = n())
+```
+
+
+So, in this case the missing reads all can be explained in this way - they all cross multiple junctions, and therefore wouldn't be detected.  We can also see this by checking out the properties of the integrations to which the missing reads belong - particularly the parts of the virus that are integrated (vBreakpoints)
+
+```{r}
+ missing_int_ids <- missing_reads %>% 
+  filter(found_score == "fn") %>% 
+  pull(intID) %>% 
+  unique()
+
+int_info <- read_tsv("../out/experiment0_short-refs/test-harder/sim_ints/cond1.rep3.int-info.annotated.tsv")
+
+int_info %>% 
+  filter(id %in% missing_int_ids) %>% 
+  select(id, chr, hPos, vBreakpoints)
+
+```
+
+These integrations all have very short sections of virus integrated, making them undetectable by the pipeline.
+
+We can check how many of the chimeric missing reads can be explained in this way:
+
+```{r include=FALSE}
+explained_missing_reads <- read_scores %>% 
+    filter(!post) %>% 
+  filter(score_type == "found_score") %>%
+  filter(junc_type == "chimeric") %>% 
+  mutate(results_file = map(results_file, ~substring(., 4))) %>% 
+  mutate(frac_fn_cross_multiple_juncs = map_dbl(results_file, ~fn_chimeric_reads_explained_by_short_integrations(.))) %>% 
+  select(experiment, analysis_condition, merge, condition, replicate, frag_len, false_negative, frac_fn_cross_multiple_juncs) %>% 
+  arrange(desc(false_negative)) %>% 
+  rowwise() %>% 
+  mutate()
+
+```
+```{r}
+explained_missing_reads
+```
+
+There are still some integrations missed that can't be explained this way.  For example, look at condition 0, replicate 4 (merged reads) in the test-harder condition:
+
+```{r include=FALSE}
+missing_reads <- read_tsv("../out/experiment0_short-refs/test-harder/scored_reads/test-harder_analysis0.cond0.rep4.human.AAV.uniq.tsv")
+```
+
+Check out which reads are missed:
+
+```{r}
+missing_reads %>% 
+  filter(found_score == "fn") %>% 
+  filter(type == "chimeric") %>% 
   distinct()
 ```
 
+These are all merged reads - perhaps they are missed because they strech across a relativley short viral segment.  Check the properties of the viral fragments integrated (and note that these fragments are all on the left side of the integrated sequences).
 
-```{bash}
-awk '$4 ~ /fn/ || NR==1' ../out/experiment0_short-refs/test-easier/scored_reads/test-easier_analysis1.cond0.rep2.human.AAV.tsv
+```{r include=FALSE}
+missing_ints <- read_tsv("../out/experiment0_short-refs/test-harder/sim_ints/cond0.rep4.int-info.annotated.tsv")
+```
+
+```{r}
+missing_ints %>% 
+  select(id, chr, leftStart, vBreakpoints)
+```
+
+So the reads missing from integrations 0 and 2 could be explained this way, and the one from integration 1 might just be close to the soft-clipping threshold.
+
+We can check the CIGAR strings of these reads in the host and virus alignment:
+```{bash, engine.opts='-l', class.output="scroll-100"}
+conda activate simvi
+
+LIST=$(awk '$4 ~ /fn/' "../out/experiment0_short-refs/test-harder/scored_reads/test-harder_analysis0.cond0.rep4.human.AAV.uniq.tsv" | sort | uniq | cut -f1)
+
+for l in $LIST; do
+  echo "host alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_short-refs/test-harder_analysis0/host_aligned/cond0.rep4.human.readsFromAAV.sam $l
+  echo "viral_alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_short-refs/test-harder_analysis0/virus_aligned/cond0.rep4.AAV.sam $l  
+  echo 
+  
+done
+
+```
+
+These reads either don't meet the clipping threshold (in the first case) or aren't the kind of reads that the pipeline is looking for.
+
+#### False negatives - discordant pairs
+
+We also see some false negatives amongst the discordant pairs.  The easier dataset, unmerged reads, fragment length 250bp, replciate 4 seems to have a lot of false negatives (and stands apart from all the other cases in that dataset).  We also tend to see more false negatives in the harder dataset, particularly with the longer fragment length.
+
+But double-check if these are worth checking out, or if it's due to small numbers:
+```{r}
+read_scores %>% 
+  filter(junc_type == "discord") %>% 
+  filter(score_type == "found_score") %>% 
+  filter(!str_detect(results_file, "post")) %>% 
+  select(experiment, sample, frag_len, merge, true_positive:false_negative) %>% 
+  arrange(desc(false_negative))
+```
+
+Start with the sample with the most false negatives: cond1.rep0, fragment length 500, merged reads in the test-harder condition:
+```{r include=FALSE}
+missing_reads <- read_tsv("../out/experiment0_short-refs/test-harder/scored_reads/test-harder_analysis0.cond1.rep0.human.AAV.uniq.tsv")
+```
+
+Check out which reads are missed:
+
+```{r}
+missing_reads %>% 
+  filter(found_score == "fn") %>% 
+  filter(type == "discord") %>% 
+  distinct()
+```
+There seems to be a mix of integration IDs, so it's not just one integration.  Check out the properties of these integrations:
+```{r include=FALSE}
+missing_ints <- read_tsv("../out/experiment0_short-refs/test-harder/sim_ints/cond1.rep0.int-info.annotated.tsv")
+```
+
+```{r}
+missing_ints %>% 
+  select(id, chr, leftStart, vBreakpoints)
+```
+
+We see some shorter fragments here, but they're not as short as others that we've seen.  What do the CIGAR strings of these reads look like?
+
+```{bash, engine.opts='-l', class.output="scroll-100"}
+conda activate simvi
+
+LIST=$(awk '$4 ~ /fn/' "../out/experiment0_short-refs/test-harder/scored_reads/test-harder_analysis0.cond1.rep0.human.AAV.uniq.tsv" | grep discord | sort | uniq | cut -f1)
+
+for l in $LIST; do  
+  echo "viral_alignment:"
+  <!-- python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_short-refs/test-harder_analysis0/virus_aligned/cond1.rep0.AAV.sam $l   -->
+  echo "host alignment:"
+  python3 python_scripts/print_cigars_from_sam.py ../out/experiment0_short-refs/test-harder_analysis0/host_aligned/cond1.rep0.human.readsFromAAV.sam $l
+
+  echo 
+  
+done
+
+```
+
+In one alignment, one of the reads has too many soft-clipped bases to be considered. This seems to be  usually the viral alignment because one of the reads it crosses a rearrangment junction.  The exception is chr2-40, which is excluded because it's marked as a proper pair in the viral alignment.
+
+### Are reads in the correct place in the host and virus?
+
+Up until now, we've only been looking at if the correct place.  But we also need to consider if they are mapped to the correct place, since we also care about the location of the integration sites.  In the `host_score`, reads that are found, and should be found, but are in the wrong place, change from true positives to false positives. Same goes for the `virus_score`, but here we're checking for the correct location in the virus/vector sequence.
+
+For the chimeric reads:
+
+
+```{r message = FALSE, warning = FALSE, results = FALSE}
+p <- read_scores %>% 
+  filter(junc_type == "chimeric") %>% 
+  filter(!post) %>% 
+  mutate(merge = ifelse(merge == 0, 'unmerged', "merged")) %>% 
+  mutate(replicate = as.factor(replicate)) %>% 
+  mutate(frag_len = as.factor(frag_len)) %>% 
+  ggplot(aes(x = TNR, y = TPR, shape = replicate, color = frag_len)) +
+  geom_point(alpha = 0.8)  +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate') +
+  facet_grid(rows = vars(experiment), cols = vars(merge)) +
+  transition_states(score_type,
+                    transition_length = 2,
+                    state_length = 1) +
+  enter_fade() +
+  exit_shrink() +
+  ease_aes('sine-in-out')+
+  labs(title = "Chimeric reads",
+      subtitle = "Score type: {closest_state}") 
+
+
+
+anim_save("animations/expt0-test-chimeric.gif", p)
+
+```
+![](animations/expt0-test-chimeric.gif)
+
+
+```{r message = FALSE, warning = FALSE, results = FALSE}
+p <- read_scores %>% 
+  filter(junc_type == "discord") %>% 
+  filter(!post) %>% 
+  mutate(merge = ifelse(merge == 0, 'unmerged', "merged")) %>% 
+  mutate(replicate = as.factor(replicate)) %>% 
+  mutate(frag_len = as.factor(frag_len)) %>% 
+  ggplot(aes(x = TNR, y = TPR, shape = replicate, color = frag_len)) +
+  geom_point(alpha = 0.8)  +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('true negative rate') +
+  ylab('true positive rate') +
+  facet_grid(rows = vars(experiment), cols = vars(merge)) +
+  transition_states(score_type,
+                    transition_length = 2,
+                    state_length = 1) +
+  enter_fade() +
+  exit_shrink() +
+  ease_aes('sine-in-out')+
+  labs(title = "Discordant pairs",
+      subtitle = "Score type: {closest_state}") 
+
+
+
+anim_save("animations/expt0-test-discord.gif", p)
+
+```
+
+![](animations/expt0-test-discord.gif)
+
+In these graphs, `host_score` and `virus_score` look pretty similar to the `found_score`, indicating that most of the reads are in the right place.  Also check the table of results:
+```{r}
+read_scores %>% 
+  filter(!post) %>% 
+  filter(score_type == "found_score") %>% 
+  filter(false_positive > 0)
 ```
 
 
-```{bash}
-grep chr2-1070 ../out/experiment0_short-refs/test-easier/sim_ints/cond0.rep2.int-info.annotated.tsv
+```{r}
+read_scores %>% 
+    filter(!post) %>% 
+  filter(score_type == "host_score" | score_type == "virus_score") %>%
+  select(experiment, merge, replicate, frag_len, junc_type, score_type, true_positive, true_negative, false_positive, false_negative, PPV)  %>% 
+  mutate(merge = ifelse(merge == 0, 'unmerged', "merged")) %>%
+  arrange(desc(false_positive), desc(false_negative)) %>% 
+  rename(tp = true_positive, fp = false_positive, tn = true_negative, fn = false_negative)
+```
+
+False positives can either be reads that are associated with integrations, but in the wrong place, or reads that are not associated with integrations.  Check out the relative amounts of each type:
+
+```{r include=FALSE}
+fp <- read_scores %>% 
+    filter(!post) %>% 
+  filter(false_positive > 0) %>% 
+  mutate(results_file = map_chr(results_file, ~substring(., 4))) %>% 
+  mutate(frac_wrong_location = pmap_dbl(list(results_file, score_type, junc_type), 
+                                    ~fp_reads_explained_by_wrong_location(..1, ..2, ..3))) %>% 
+  mutate(fp_wrong_location = frac_wrong_location * false_positive) %>% 
+  mutate(fp_other_reason = (1- frac_wrong_location) * false_positive)
+```
+
+```{r}
+for (exp in unique(fp$experiment)) {
+p <- fp %>% 
+    filter(experiment == exp) %>% 
+  filter(score_type != "found_score") %>% 
+  mutate(fp_wrong_location = frac_wrong_location * false_positive) %>% 
+  mutate(fp_other_reason = (1- frac_wrong_location) * false_positive) %>% 
+  rename(total_false_positive = false_positive) %>% 
+  mutate(merge = ifelse(merge == 0, 'unmerged', "merged")) %>%
+  mutate(sample = glue("rep{replicate}, frag {frag_len}, {merge}")) %>% 
+  select(replicate, frag_len, merge, score_type, junc_type, sample,  total_false_positive, fp_wrong_location, fp_other_reason) %>% 
+  pivot_longer(cols =  total_false_positive:fp_other_reason, names_to="type", values_to="count") %>% 
+    arrange(replicate, frag_len, merge) %>% 
+      ggplot(aes(x = sample, y = count, fill = type)) +
+      geom_bar(stat = 'identity', position = 'dodge') +
+      facet_grid(rows = vars(score_type), cols = vars(junc_type)) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+    ggtitle(exp)
+print(p)
+}
+```
+
+
+So pretty much all the false positives arise from integrations that are in the wrong location. 
+
+In the 'easier' condition we seem to have only discordant false positives - this could be because the calculated fragment length is incorrect.  In the 'harder' condition we have both chimeric and discordant.  The chimeric reads in the wrong location can't be explained by a wrong fragment length - why are there so many?
+
+How far are these false positives from where they should be?
+
+```{r}
+scored_reads <- fp %>% 
+  filter(false_positive > 0) %>% 
+  filter(!post) %>% 
+  select(results_file, experiment, merge, frag_len, replicate) %>%   
+  mutate(merge = ifelse(merge == 0, 'unmerged', "merged")) %>%
+  mutate(sample = glue("rep{replicate}, frag {frag_len}, {merge}")) %>% 
+  distinct() %>% 
+  mutate(data = map(results_file, ~read_tsv(.))) %>% 
+  unnest(data) %>% 
+  filter(host_score == "fp" | virus_score == "fp")
+
+
+```
+```{r}
+scored_reads %>% 
+  filter(host_score == "fp") %>% 
+  rowwise() %>% 
+  mutate(host_dist = min(host_start_dist, host_stop_dist)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = host_dist, color = jun)) +
+  geom_freqpoly()
 ```
 
 
 
-For the discordant pairs (in which merging would not be expected to make a difference), the pipeline performace is pretty good in the easier condition, with some false negatives in the 
+## Summary
 
+### Correct reads are found
+
+Overall, the performance of the pipeline, in terms of the correct reads being found, isn't too bad.  We see mostly false negataives, with few false positives. In the 'easier' condition, the performance is nearly perfiect.  In the 'harder' condition, there are more false positves (missed reads). The false negatives originate mainly from:
+
+- reads where the number of bases from host or virus is close to the clipping threshold (20 bases)
+- reads that cross both junctions of an integration
+- reads that cross a short viral segment that is part of a complex integration (with rearrangement or deletion)
+
+It appears that merging overlappling reads isn't always helpful, because where there are complex integrations with short fragments or integrations that are close to each other, merging can result in a read crossing more than one junction (either host/virus or virus/virus), which exacerbates the second two issues above.
 
 ```{r}
 sessionInfo()

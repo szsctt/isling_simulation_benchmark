@@ -39,6 +39,8 @@ OTC-whole:
        - 500
    min_sep:
        - 500
+   min_len:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -68,6 +70,10 @@ OTC-whole:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
     # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -130,6 +136,8 @@ OTC-epi:
        - 500
    min_sep:
        - 500
+   min_len:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -159,6 +167,10 @@ OTC-epi:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"     
    merge-dist:
        - 100   
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
    # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -223,6 +235,8 @@ OTC-rearrange:
        - 500
    min_sep:
        - 500
+   min_len:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -252,6 +266,10 @@ OTC-rearrange:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
    # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -315,6 +333,8 @@ OTC-deletion:
        - 500
    min_sep:
        - 500
+   min_len:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -343,6 +363,10 @@ OTC-deletion:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
    # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -417,6 +441,10 @@ OTC-overlap:
        - 30
    seq_sys: 
        - "HS25"
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
 
    # analysis
    analysis_hosts: 
@@ -496,7 +524,9 @@ OTC-gap:
    lambda_host_deletion:
        - 500
    min_sep:
-       - 500    
+       - 500   
+   min_len:
+       - 500 
    # read simulation
    read_len: 
        - 150
@@ -525,6 +555,10 @@ OTC-gap:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
    # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -588,7 +622,9 @@ OTC-host_deletion:
        - 1000
        - 100000
    min_sep:
-       - 500       
+       - 500  
+   min_len:
+       - 500     
    # read simulation
    read_len: 
        - 150
@@ -617,6 +653,11 @@ OTC-host_deletion:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20       
+
    # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -675,6 +716,8 @@ OTC-frag_len:
        - 500
    min_sep:
        - 500
+   min_len:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -706,6 +749,10 @@ OTC-frag_len:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
    # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -764,6 +811,8 @@ OTC-frag_sd:
        - 500
    min_sep:
        - 500
+   min_len:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -794,6 +843,10 @@ OTC-frag_sd:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
    # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -857,6 +910,8 @@ OTC-min_sep:
        - 500
        - 800
        - 1000
+   min_len:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -885,6 +940,107 @@ OTC-min_sep:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
+   # scoring
+   score_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
+   
+   # other tools 
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+
+   vifi_params:
+     host_info:
+       hg38: 
+         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
+         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
+         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
+         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
+         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
+         centromeres: "../../data/references/GRCh38/centromeres.bed"
+         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
+         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
+     vifi_dir: "../../ViFi"      
+     
+OTC-min_len:
+   out_directory: "../../out/experiment1_OTC_chr1/condition-breakdown"
+   
+   # integration simulation
+   replicates: 3 
+   hosts: 
+      chr1 : "../../data/references/chrs/chr1.fa"
+       
+   viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   
+   initial_seed: 12345
+   seed_increment: 123 
+   int_num: 
+       - 1000
+   epi_num:
+       - 0
+   p_whole:
+       - 1
+   p_rearrange:
+       - 0
+   p_delete:
+       - 0
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0
+   p_gap:
+       - 0
+   lambda_junction:
+       - 5
+   p_host_deletion:
+       - 0
+   lambda_host_deletion:
+       - 500
+   min_sep:
+       - 500
+   min_len:
+       - 100
+       - 300
+       - 500
+       - 800
+       - 1000
+   # read simulation
+   read_len: 
+       - 150
+   fcov: 
+       - 5 
+   frag_len: 
+       - 500
+   frag_std: 
+       - 30
+   seq_sys: 
+       - "HS25"
+
+   # analysis
+   analysis_hosts: 
+      hg38: "../../data/references/GRCh38.fa"
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   merge: 
+       - True
+   dedup: 
+       - False
+   post:
+       -
+         - filter
+   bwa_mem:
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   merge-dist:
+       - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
    # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  

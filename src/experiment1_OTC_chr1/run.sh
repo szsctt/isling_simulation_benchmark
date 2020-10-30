@@ -25,6 +25,6 @@ snakemake \
  --use-singularity \
  --profile slurm \
  --cluster-config ${CLUSTER} \
- --rerun-incomplete -n
+ --rerun-incomplete
 
 

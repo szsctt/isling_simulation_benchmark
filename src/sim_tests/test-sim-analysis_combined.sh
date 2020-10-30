@@ -29,6 +29,7 @@ snakemake --configfile ../../config/test/sim_and_detect.yml --snakefile combined
 # --conda-frontend mamba \
 # --rerun-incomplete
 
+srun -c5 --time 2:00:00 --mem 50gb \
 snakemake \
  --snakefile combined_snakefile \
  --configfile ../../config/test/sim_and_detect.yml\

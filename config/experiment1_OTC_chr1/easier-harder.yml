@@ -35,6 +35,8 @@ OTC-vect-easier:
        - 500
    min_sep:
        - 500
+   min_len:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -67,7 +69,11 @@ OTC-vect-easier:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100   
+       - 100
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
            
    polyidus_params:
      aligner:
@@ -136,6 +142,8 @@ OTC-vect-harder:
        - 500
    min_sep:
        - 100
+   min_len:
+       - 100
    # read simulation
    read_len: 
        - 150
@@ -169,6 +177,10 @@ OTC-vect-harder:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100   
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
 
    polyidus_params:
      aligner:

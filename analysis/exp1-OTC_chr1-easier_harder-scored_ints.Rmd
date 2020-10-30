@@ -1,0 +1,401 @@
+---
+title: "OTC vector integrations into chromosome 1: easier and harder conditions, scored integrations"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(gganimate)
+library(kableExtra)
+source("sim_functions.R")
+
+exp_dir <- "../out/experiment1_OTC_chr1/easier_harder"
+```
+
+```{css, include=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+
+# Overview
+In this experiment I tried to mimic vector (rather than wild-type) integration.  I wanted to compare the perfomance of various integration detection tools in this situtaiton.
+
+# Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chromosome 1 from hg38.   
+
+For the virus I used the OTC vector genome (the subsequence of the plasmid from ITR to ITR)
+
+# Simulation parameters
+
+I simulated two different situations using this data: one that I thought would be 'easier' for the pipeline to handle, and one that is 'harder'.
+
+These conditions are summarised in the config file:
+
+```{bash class.output="scroll-100"}
+cat ../config/experiment1_OTC_chr1/easier-harder.yml
+```
+
+
+In the 'easier' condition, there are 1000 integrations of the whole virus, with clean junctions and no rearrangements, deletions of the virus, and no host deletions either.  In the 'harder' condition the host and virus reference are the same, but there's a high probability of rearrangements, deletions, gaps and overlaps at the junctions, and host deletions.  There are also some 'episomal' sequences included in the output fasta.
+
+The DAG from snakemake looks like this:
+![DAG for this experiment](../out/experiment1_OTC_chr1/easier-harder.dag.svg)
+
+
+# Results
+
+There are a few different ways of scoring the results from these experiments.  One thing to look at is just simply if all the integrations were found or not, and if there's any integrations we detected, but shouldn't have.
+
+
+```{r include=FALSE}
+scored_int_files <- list.files(exp_dir, pattern = "scored_ints_summary.tsv", recursive = TRUE)
+
+int_scores <- tibble(
+  file = list.files(exp_dir, pattern = "scored_ints_summary.tsv", recursive = TRUE)
+) %>% 
+  mutate(data = map(file, ~read_tsv(paste0(exp_dir, "/", .)))) %>% 
+  unnest(data)
+
+
+int_scores <- int_scores %>% 
+  mutate(results_file = basename(found_info)) %>% 
+  mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+  mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
+  mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
+  mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+  mutate(post = str_detect(results_file, "post")) %>% 
+  mutate(analysis_condition = basename(dirname(dirname(found_info)))) %>%
+  rowwise() %>% 
+  mutate(TPR = tp/(tp+fn)) %>% 
+  mutate(PPV = tp/(tp+fp)) %>% 
+  ungroup()
+
+
+analysis_conditions <- read_tsv("../out/experiment1_OTC_chr1/easier_harder/OTC-vect-easier/analysis_conditions.tsv")
+
+int_scores <- int_scores %>% left_join(analysis_conditions, by="analysis_condition") %>% 
+  mutate(merge = case_when(
+    merge == 1 ~ "merged",
+    merge == 0 ~ "unmerged",
+    TRUE ~ "unmerged"
+  ))
+```
+
+## Table of results
+
+```{r}
+int_scores %>% 
+  select(experiment, replicate, analysis_host, post, analysis_tool, merge, TPR, PPV, tp:fn) %>% 
+  arrange(analysis_tool, replicate, analysis_host)
+```
+
+For each replicate, we can calulate the positive predictive value (how many of the predicted positves are true positves - high means few false positves), and the true positve rate (how many of the real positves are detected - high means few false negatives).
+
+
+We can calculate the true positive rate (sensitivity, recall) as
+$$TPR = \frac{TP}{P} = \frac{TP}{TP+FN}$$
+
+And the positive predictive value as
+$$PPV = \frac{TP}{TP+FP}$$
+
+
+```{r include=FALSE}
+p <- int_scores %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_tool, shape=post)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_grid(vars(analysis_host), vars(merge)) +
+    transition_states(experiment,
+                    transition_length = 2,
+                    state_length = 1) +
+  enter_fade() +
+  exit_shrink() +
+  ease_aes('sine-in-out')+
+  labs(title = "Chimeric reads",
+      subtitle = "Simulation condition: {closest_state}") 
+
+anim_save("animations/expt1_easier-harder_int-scores.gif", p)
+```
+![](animations/expt1_easier-harder_int-scores.gif)
+
+So the three different pipelines seem to have quite different performances.  
+
+Of the three tools, Polyidus has the best positive predictive value for both conditions.  However, this comes at the cost of missing most of the integrations - the true positive rate for this tool is around 25%.  
+
+The performance of ViFi varies a lot between the two conditions.  In the easier condition, the true positive rate isn't too bad (around 75%), but the positive predictive value around 50%, so it doesn't miss too many integations, but there are quite a few false positives.  In the harder condition, the true positive rate goes way down (so a lot of integrations are missed), but the positive predictive value doesn't change too much.
+
+## False positives
+
+The main problem for our pipeline seems to be false positives, particularly in the harder condition. False positives could be junction fragments that are correctly identified but in the wrong place, or they could be incorrectly identified fragments.  
+
+### Wrong location or not junction fragments?
+
+First, check all the false positives that were identified, and see if the reads in those false positives are actually indicated to cross integrations.
+
+```{r include=FALSE}
+exps <- c("OTC-vect-harder", "OTC-vect-easier")
+folder <- "../out/experiment1_OTC_chr1/easier_harder"
+
+filenames <- c()
+
+for (exp in exps) {
+  scored_ints_folder <- file.path(folder, exp, "scored_ints")
+  files <- list.files(scored_ints_folder, pattern = "tsv")
+  
+  # exclude summary files
+  files <- files[!str_detect(files, "summary")]
+  
+  filenames <- append(filenames, file.path(scored_ints_folder, files))
+  
+}
+
+scored_ints <- tibble(
+  filename = filenames,
+  data = map(filename, ~read_tsv(.))
+) %>% 
+  unnest(data)
+
+```
+Each integration may consist of one or more reads, each of which may cross a junction fragment or not.
+```{r warning=FALSE}
+scored_ints <- scored_ints %>% 
+  filter(score == 'fp') %>%
+  mutate(junc = n_junc_reads > 0) %>% 
+  mutate(results_file = basename(filename)) %>% 
+  mutate(analysis_condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+  mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
+  mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
+  mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+  mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>%
+  mutate(post = str_detect(results_file, "post"))
+```
+
+
+```{r}
+scored_ints %>% 
+  filter(str_detect(analysis_condition, "analysis")) %>% 
+  group_by(condition, analysis_host, post, analysis_condition) %>% 
+  summarise(wrong_location = sum(junc),
+            not_junc = sum(!junc),
+            n_group = n()) %>% 
+  pivot_longer(wrong_location:not_junc, names_to = "type", values_to = "frac") %>% 
+  ggplot(aes(x = analysis_condition, y = frac, fill = type)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust=1))  +
+  facet_wrap(vars(post))
+
+```
+
+A reminder of how those analysis conditions are different:
+```{r}
+analysis_conditions %>% 
+  select(experiment:host, virus, merge) %>% 
+  filter(str_detect(analysis_condition, "analysis"))
+```
+
+So, in most conditions it looks like the majority of integrations are actually junction fragments, but they're just in the wrong place.  We have a significant number of integrations that are not actually junction fragments in the merged condition.  This is kind of weird - check out a few of these.
+
+Some examples of reads not indicated to be junction reads:
+```{r}
+scored_ints %>% 
+  filter(n_junc_reads == 0) %>% 
+  select(total_reads, analysis_condition, condition, replicate, analysis_host, analysis_virus, post)
+```
+
+
+### Distance to closest integration 
+
+We can look for the closest integration to the each false positive.  If they are further away, then they're probably incorrectly identified.
+
+```{r include=FALSE}
+exps <- c("OTC-vect-harder", "OTC-vect-easier")
+folder <- "../out/experiment1_OTC_chr1/easier_harder"
+
+for (exp in exps) {
+  this_folder <- file.path(folder, exp)
+scored_ints_folder <- file.path(this_folder, "scored_ints")
+int_info_folder <- file.path(this_folder, "sim_ints")
+files <- list.files(scored_ints_folder, pattern = "tsv")
+# exclude summary files
+files <- files[!str_detect(files, "summary")]
+
+awk1 <- "awk -F\"\t\" 'BEGIN {OFS=\"\t\"}{if ($2 ~ /fp/) { split($4,arr,\"/\" ); print $3,arr[1],arr[2] }}'"
+awk2 <- "awk 'BEGIN {OFS=\"\t\"}{if (NR!=1) {print $2, $3, $3}}'"
+
+for (file in files) {
+  cat("processing file", file, "\n")
+  
+  # construct filenames for fp scored ints bed file
+  split_filename <- str_split(file, "\\.", simplify=TRUE)
+  n_terms_keep <- dim(split_filename)[2] - 1
+  filename_base <- paste0(split_filename[1,1:n_terms_keep], collapse=".")
+  new_filename <- paste0(filename_base, ".sorted.bed")
+  infile <- file.path(scored_ints_folder, file)
+  result <- file.path(scored_ints_folder, new_filename)
+  
+  # generate bed file
+  command <- paste0(awk1, " ", infile, " | sort -k1,1 -k2,2n > ", result)
+  return_value <- system(command)
+  if (return_value != 0) {
+    cat("error with file", file, "\n")
+  }
+  
+  # construct filenames for fp sim ints bed file
+  sample <- paste0(split_filename[1,2:3], collapse=".")
+  infile <- file.path(int_info_folder, paste0(sample, ".int-info.annotated.tsv"))
+  expected <- file.path(int_info_folder, paste0(sample, ".int-info.bed"))
+  
+  # generate bed file
+  command <- paste0(awk2, " ", infile, " | sort -k1,1 -k2,2n > ", expected)
+  return_value <- system(command)
+  if (return_value != 0) {
+    cat("error with file", file, "\n")
+  }  
+  
+  # construct filename for closest
+  closest <- paste0(filename_base, ".closest.bed")
+  
+  # do closest
+  command <- paste0("module load bedtools/2.29.2; bedtools closest -d -a ", result, " -b ", expected, " > ", file.path(scored_ints_folder, closest))
+  return_value <- system(command)
+  if (return_value != 0) {
+    cat("error with file", file, "\n")
+  } 
+  
+}
+}
+
+column_names <- c("found_chr", "found_start", "found_stop", "int_chr", "int_start", "int_stop", "distance")
+fp_dists <- int_scores %>% 
+  rowwise() %>% 
+  mutate(fp_closest_file = paste0(
+    analysis_condition, ".",
+    condition,  ".",
+    replicate, ".",
+    analysis_host, ".",
+    analysis_virus, ".",
+    "closest.bed"
+  )) %>% 
+  mutate(data = map(fp_closest_file, ~read_tsv(file.path(folder, exp, "scored_ints", .),
+                                               col_names = column_names)) ) %>% 
+  unnest(data)
+
+```
+
+
+```{r}
+fp_dists %>% 
+  ggplot(aes(x=distance, color=experiment)) +
+  geom_freqpoly(binwidth = 100) +
+  facet_grid(cols = vars(analysis_tool), rows= vars(analysis_host), scales="free") +
+  theme(axis.text.x = element_text(angle = 45, hjust=1))
+```
+
+#### Why are reads in the wrong place?
+
+We seem to have two populations of wrong location reads: those that are close to the nearest integration (which is most of the intergrations) and those that are far.
+```{r}
+fp_dists %>% 
+  filter(distance > 0) %>% 
+  filter(distance < 1000) %>% 
+  ggplot(aes(x=distance, color=experiment)) +
+  geom_freqpoly(binwidth = 10) +
+  facet_grid(cols = vars(analysis_tool), rows= vars(analysis_host), scales="free") +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) + 
+  ggtitle("fp integrations within 1000 bp of the nearest integration")
+
+fp_dists %>% 
+  filter(distance > 0) %>% 
+  filter(distance > 1000) %>% 
+  ggplot(aes(x=distance, color=experiment)) +
+  geom_freqpoly(binwidth = 100) +
+  facet_grid(cols = vars(analysis_tool), rows= vars(analysis_host), scales="free") +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) + 
+  ggtitle("fp integrations further than 1000 bp of the nearest integration")
+```
+We can also count the number of integrations that are on the wrong chromosome, 'close' (ie within 1000 bp of the nearest integration), or 'far' (ie further than 1000bp from the nearest integration).
+```{r}
+fp_dists %>% 
+  mutate(class = case_when(
+    distance < 0 ~ "wrong_chr",
+    distance < 1000 ~ "close",
+    distance > 1000 ~ "far"
+  )) %>%
+  group_by(analysis_condition) %>% 
+  ggplot(aes(x = analysis_condition, fill = class)) +
+  geom_bar(stat = 'count') +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  facet_wrap(vars(post))
+```
+
+We seem to have mostly integrations that are close to their nearest integration, with some conditions having about half that are far or on the wrong chromosome.  Analysis conditions 0 and 2 use only chr1 for analysis, so that's why they don't have any integrations on the wrong chromosome.
+
+If we look at those integrations that are far from where they should be, does there look to be any particular pattern in their output position in the genome?
+
+```{r}
+fp_dists %>% 
+  mutate(class = case_when(
+    distance < 0 ~ "wrong_chr",
+    distance < 1000 ~ "close",
+    distance > 1000 ~ "far"
+  )) %>% 
+  filter(class != "wrong_chr") %>% 
+  ggplot(aes(x = found_start, color = class)) +
+  geom_density(bw = 1e4) +
+  facet_grid(rows = vars(class), scales = "free")
+
+```
+
+Taking those integrations that are either 'far' from the nearest integration, or on the wrong chromosome, how many fall within the ENCODE blacklisted regions?
+
+```{r include=FALSE}
+fp_bed <- tempfile(tmpdir = ".")
+fp_intersect_bed <- tempfile(tmpdir = ".")
+blacklist <- "../data/references/ENCFF356LFX.bed"
+
+fp_dists %>% 
+  mutate(class = case_when(
+    distance < 0 ~ "wrong_chr",
+    distance < 1000 ~ "close",
+    distance > 1000 ~ "far"
+  )) %>% 
+  filter(class == "wrong_chr" | class == "far") %>% 
+  select(found_chr, found_start, found_stop, class, found_info) %>% 
+  arrange(found_chr, found_start) %>% 
+  write_tsv(fp_bed, col_names = FALSE)
+
+ command <- paste0("module load bedtools/2.29.2; bedtools intersect -a ", substring(fp_bed, 3), " -b ", blacklist, " -loj > ", substring(fp_intersect_bed, 3))
+system(command)
+
+column_names <- c("chr", "start", "stop", "class", "int_file", "blacklist_chr", "blacklist_start", "blacklist_stop")
+fp_blacklist <- read_tsv(fp_intersect_bed, col_names = column_names)
+
+file.remove(fp_bed, fp_intersect_bed)
+
+```
+
+
+```{r}
+fp_blacklist %>% 
+  mutate(in_blacklist = ifelse(blacklist_chr == ".", FALSE, TRUE)) %>% 
+  mutate(analysis_condition = basename(dirname(dirname(int_file)))) %>% 
+  mutate(post = str_detect(int_file, "post")) %>% 
+  ggplot(aes(x = analysis_condition, fill = in_blacklist)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  facet_grid(vars(post), vars(class))
+```
+So this doesn't appear to explain most of the integrations mapped to the wrong place.
+
+
+```{r}
+sessionInfo()
+```
+

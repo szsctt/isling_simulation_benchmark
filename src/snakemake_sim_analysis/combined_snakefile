@@ -47,7 +47,8 @@ column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host
 								'virus', 'virus_fasta', 'bam_suffix',
 								'read_folder', 'R1_suffix', 'R2_suffix', 'outdir', 
 								'merge', 'dedup', 'postargs', 'seq_sys', 'adapter_1', 'adapter_2', 
-								'bwa_mem_params', 'score_ints', 'score_ints_window', 'score_ints_tool',
+								'bwa_mem_params', 'merge_dist', 'clip_cutoff', 'cigar_tol', 'score_ints', 
+								'score_ints_window', 'score_ints_tool',
 								'host_mappability', 'host_mappability_exclude', 'host_genes', 'host_exons',
 								'host_oncogenes', 'host_centromeres', 'host_conserved_regions',
 								'host_segdup', 'vifi_dir')																
@@ -75,17 +76,24 @@ for dataset in datasets:
 	assert hasattr(config[dataset]['post'], '__iter__')
 	assert hasattr(config[dataset]['bwa_mem'], '__iter__')	
 	assert hasattr(config[dataset]['seq_sys'], '__iter__')
-	
+	assert hasattr(config[dataset]['merge-dist'], '__iter__')
+	assert hasattr(config[dataset]['clip-cutoff'], '__iter__')
+	assert hasattr(config[dataset]['cigar-tol'], '__iter__')
+
 	# each combination of these are a unique 'analysis condition' for our pipeline
 	i = 0
-	for merge, dedup, post, bwa_mem_params, seq_sys, host, virus in itertools.product(
+	for merge, dedup, post, bwa_mem_params, seq_sys, host, virus, merge_dist, clip_cutoff, cigar_tol in itertools.product(
 																		config[dataset]['merge'], 
 																		config[dataset]['dedup'],
 																		config[dataset]['post'],
 																		config[dataset]['bwa_mem'],
 																		config[dataset]['seq_sys'],
 																		config[dataset]['analysis_hosts'].keys(),
-																		config[dataset]['analysis_viruses'].keys()):
+																		config[dataset]['analysis_viruses'].keys(),
+																		config[dataset]['merge-dist'],
+																		config[dataset]['clip-cutoff'],
+																		config[dataset]['cigar-tol'],
+																		):
 		
 		condition = f"{dataset}_analysis{i}"
 
@@ -120,7 +128,10 @@ for dataset in datasets:
 			'adapter_1'  : read1_adapt,
 			'adapter_2'  : read2_adapt,
 			'bwa_mem_params': bwa_mem_params,
+			'clip_cutoff': clip_cutoff,
+			'cigar_tol'  : cigar_tol,
 			'tool'			 : 'pipeline',
+			'merge_dist' : merge_dist,
 			'score_ints' : score_ints,
 			'score_ints_window' : score_ints_window,
 			'score_ints_tool' : "pipeline"	
@@ -153,6 +164,7 @@ for dataset in datasets:
 					'virus_fasta': config[dataset]['analysis_viruses'][virus],
 					'analysis_condition': condition,
 					'aligner'		 : aligner,
+					'merge'			 : 0,
 					'tool'			 : 'polyidus',
 					'score_ints' : score_ints,
 					'score_ints_window' : score_ints_window,
@@ -197,6 +209,7 @@ for dataset in datasets:
 				'virus'      : virus,		
 				'virus_fasta': config[dataset]['analysis_viruses'][virus],	
 				'analysis_condition': condition,
+				'merge'			 : 0,
 				'tool'			 : 'vifi',			
 				'score_ints' : score_ints,
 				'score_ints_window' : score_ints_window,
@@ -225,7 +238,7 @@ analysis_df = pd.DataFrame(analysis_conditions, columns = column_names)
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
 
-column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs']
+column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'clip_cutoff', 'cigar_tol']
 
 rows = []
 
@@ -326,6 +339,26 @@ analysis_summaries = [f"{outdir}/{experiment}/analysis_conditions.tsv" for outdi
 														)
 											]
 
+# outputs from our pipeline
+merged_targets = []
+for i, row in analysis_df.iterrows():
+	if row['tool'] != 'pipeline':
+		continue
+		
+	outpath = row['outdir']
+	exp = row['experiment']
+	dset = row['analysis_condition']
+		
+	samples = sim_df[sim_df['experiment'] == exp]['sample']
+	host = row['host']
+	virus = row['virus']
+		
+	for samp, post in itertools.product(samples, (".post", "")):
+		merged_targets.append(
+			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
+		)
+
+
 # polyidus outputs
 polyidus_targets = []
 for i, row in analysis_df.iterrows():
@@ -392,7 +425,7 @@ rule all:
 		set(sim_targets),
 		set(sim_summaries),
 		set(analysis_summaries),
-		#set(post_targets),
+		set(merged_targets),
 		set(scored_summaries),
 		set(polyidus_targets),
 		set(vifi_targets)
@@ -480,7 +513,7 @@ rule polyidus:
 		dset = ".+_polyidus\d+"
 	shell:
 		"""
-		rm -r {params.output}/*
+		rm -rf {params.output}/*
 		
 		python3 /usr/src/app/src/polyidus.py \
 		{params.host_idx} \
@@ -657,10 +690,18 @@ rule write_analysis_summary:
 	run:
 		toDo.to_csv(output.pipeline_conditions, sep='\t', index=False)
 		analysis_df.to_csv(output.analysis_conditions, sep='\t', index=False)
+
+def get_merged_reads(wildcards):
+	# for our pipeline, return result depending on if we merged or not
+	if re.search("analysis", wildcards.dset):
+		return get_for_align(wildcards, "merged")
+	# other pipelines - no merged reads
+	else:
+		return rules.touch_merged.output.merged
 		
 rule merged_list:
 	input:
-		merged = lambda wildcards: get_for_align(wildcards, "merged")
+		merged = lambda wildcards: get_merged_reads(wildcards)
 	output:
 		merged_reads = "{outpath}/{dset}/merged_reads/{samp}.merged_reads.txt"
 	run:
@@ -683,7 +724,7 @@ rule score_reads:
 		mem_mb= lambda wildcards, attempt: attempt * 50000,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
-	threads: 10
+	threads: lambda wildcards, attempt: (10, 15, 20, 20)[attempt - 1]
 	container:
 		"docker://szsctt/simvi:2"
 	conda:
@@ -710,8 +751,8 @@ rule read_score_summary:
 	output:
 		summary = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
 	resources:
-		mem_mb= lambda wildcards, attempt: attempt * 5000,
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb= lambda wildcards, attempt: attempt * 50000,
+		time = lambda wildcards, attempt: ('24:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	shell:
 		"""	
@@ -761,7 +802,6 @@ rule read_score_summary:
 
 		"""
 
-
 rule combine_read_scores:
 	input:
 		lambda wildcards: scores_to_combine(wildcards, "reads")
@@ -783,17 +823,19 @@ rule combine_read_scores:
 rule score_integrations:
 	input:
 		sim_info = rules.annotate_reads.output.annotated_info,
-		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
+		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt",
+		merged_reads = rules.merged_list.output.merged_reads
 	output:
-		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.tsv",
-		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
+		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}_summary.tsv",
+		temp = temp("{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.tmp.tsv"),
+		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.tsv"
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 5000,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	params:
 		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'score_ints_tool')}",
-		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}"
+		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}",
 	threads: 1
 	container:
 		"docker://szsctt/simvi:2"
@@ -804,10 +846,17 @@ rule score_integrations:
 		python3 scripts/score_integrations.py \
 		--sim-info {input.sim_info} \
 		--found-info {input.analysis_info} \
-		--output {output.scored_ints} \
+		--output {output.temp} \
 		--summary {output.summary} \
-		{params}
+		{params.tool} {params.window}
+		
+		python3 scripts/int_fp_type.py \
+		--sim-info {input.sim_info} \
+		--merged {input.merged_reads} \
+		--scored-ints {output.temp} \
+		--output {output.scored_ints}
 		"""
+		
 		
 rule combine_int_scores:
 	input:

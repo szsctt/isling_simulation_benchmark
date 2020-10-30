@@ -133,6 +133,8 @@
 	"score_reads":
 	{
 		"time" : "24:00:00",
+		"cpus-per-task" : "1",
+		"mem" : "20GB",
 		"job-name" : "score_reads"
 	}
 }

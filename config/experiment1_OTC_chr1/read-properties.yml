@@ -1,5 +1,5 @@
 read_len-frag_len-merge-easier:
-   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1/reads"
+   out_directory: "../../out/experiment1_OTC_chr1/reads"
    
    # integration simulation
    replicates: 3 
@@ -54,7 +54,6 @@ read_len-frag_len-merge-easier:
 
    # analysis
    analysis_hosts: 
-      chr1 : "../../data/references/chrs/chr1.fa"
       hg38: "../../data/references/GRCh38.fa"
        
    analysis_viruses:
@@ -78,6 +77,8 @@ read_len-frag_len-merge-easier:
            
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   merge-dist:
+       - 100  
        
    polyidus_params:
      aligner:
@@ -85,15 +86,6 @@ read_len-frag_len-merge-easier:
 
    vifi_params:
      host_info:
-       chr1: 
-         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
-         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
-         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         centromeres: "../../data/references/GRCh38/centromeres.bed"
-         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
        hg38: 
          mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
          mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
@@ -111,7 +103,7 @@ read_len-frag_len-merge-easier:
 
 
 read_len-frag_len-merge-harder:
-   out_directory: "../../out/experiment1_OTC-AAV-rep68_chr1/reads"
+   out_directory: "../../out/experiment1_OTC_chr1/reads"
    
    # integration simulation
    replicates: 3 
@@ -167,7 +159,6 @@ read_len-frag_len-merge-harder:
    # analysis
    analysis_hosts: 
       chr1 : "../../data/references/chrs/chr1.fa"
-      hg38: "../../data/references/GRCh38.fa"
        
    analysis_viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
@@ -190,21 +181,15 @@ read_len-frag_len-merge-harder:
            
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   merge-dist:
+       - 100  
+       
    polyidus_params:
      aligner:
       - "bowtie2"
 
    vifi_params:
      host_info:
-       chr1: 
-         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
-         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
-         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         centromeres: "../../data/references/GRCh38/centromeres.bed"
-         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
        hg38: 
          mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
          mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"

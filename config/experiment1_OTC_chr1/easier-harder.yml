@@ -66,6 +66,8 @@ OTC-vect-easier:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   merge-dist:
+       - 100   
            
    polyidus_params:
      aligner:
@@ -165,6 +167,8 @@ OTC-vect-harder:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   merge-dist:
+       - 100   
 
    polyidus_params:
      aligner:

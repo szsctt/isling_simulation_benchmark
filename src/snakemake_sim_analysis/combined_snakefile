@@ -20,7 +20,7 @@ HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
 				'read2-adapt' : "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"}
 				
 
-adapter_seqs = {'HS25':HS25, 'MSv3':HS25}
+adapter_seqs = {'HS25':HS25, 'MSv3':HS25, 'MS': HS25}
 
 #####################################################
 ############# simulation parameters #################
@@ -47,7 +47,7 @@ column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host
 								'virus', 'virus_fasta', 'bam_suffix',
 								'read_folder', 'R1_suffix', 'R2_suffix', 'outdir', 
 								'merge', 'dedup', 'postargs', 'seq_sys', 'adapter_1', 'adapter_2', 
-								'bwa_mem_params', 'merge_dist', 'clip_cutoff', 'cigar_tol', 'score_ints', 
+								'bwa_mem_params', 'merge_dist', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'score_ints', 
 								'score_ints_window', 'score_ints_tool',
 								'host_mappability', 'host_mappability_exclude', 'host_genes', 'host_exons',
 								'host_oncogenes', 'host_centromeres', 'host_conserved_regions',
@@ -79,10 +79,11 @@ for dataset in datasets:
 	assert hasattr(config[dataset]['merge-dist'], '__iter__')
 	assert hasattr(config[dataset]['clip-cutoff'], '__iter__')
 	assert hasattr(config[dataset]['cigar-tol'], '__iter__')
+	assert hasattr(config[dataset]['min-mapq'], '__iter__')
 
 	# each combination of these are a unique 'analysis condition' for our pipeline
 	i = 0
-	for merge, dedup, post, bwa_mem_params, seq_sys, host, virus, merge_dist, clip_cutoff, cigar_tol in itertools.product(
+	for merge, dedup, post, bwa_mem_params, seq_sys, host, virus, merge_dist, clip_cutoff, cigar_tol, min_mapq in itertools.product(
 																		config[dataset]['merge'], 
 																		config[dataset]['dedup'],
 																		config[dataset]['post'],
@@ -93,6 +94,7 @@ for dataset in datasets:
 																		config[dataset]['merge-dist'],
 																		config[dataset]['clip-cutoff'],
 																		config[dataset]['cigar-tol'],
+																		config[dataset]['min-mapq'],
 																		):
 		
 		condition = f"{dataset}_analysis{i}"
@@ -130,6 +132,7 @@ for dataset in datasets:
 			'bwa_mem_params': bwa_mem_params,
 			'clip_cutoff': clip_cutoff,
 			'cigar_tol'  : cigar_tol,
+			'min_mapq'  : min_mapq,
 			'tool'			 : 'pipeline',
 			'merge_dist' : merge_dist,
 			'score_ints' : score_ints,
@@ -238,7 +241,7 @@ analysis_df = pd.DataFrame(analysis_conditions, columns = column_names)
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
 
-column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'clip_cutoff', 'cigar_tol']
+column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'clip_cutoff', 'cigar_tol', 'min_mapq']
 
 rows = []
 

@@ -67,6 +67,8 @@ test-easier:
        - 3
    clip-cutoff:
        - 20
+   min-mapq:
+       - 5
    
    #run polyidus?
    polyidus_params:

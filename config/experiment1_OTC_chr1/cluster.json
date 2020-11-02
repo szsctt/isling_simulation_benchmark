@@ -5,6 +5,13 @@
 		"mail-user" : "suzanne.scott@csiro.au",
 		"output" : "../../logs/{rule}.%j.log"
 	},
+	"bam_to_fastq":
+	{	
+		"mem" : "20GB",
+		"time" : "24:00:00",
+		"job-name" : "simvi-convert"
+
+	},
 	"convert":
 	{	
 		"mem" : "20GB",

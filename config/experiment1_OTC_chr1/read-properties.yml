@@ -35,6 +35,8 @@ read_len-frag_len-merge-easier:
        - 500
    min_sep:
        - 500
+   min_len:
+       - 500
    # read simulation
    read_len: 
        - 150
@@ -47,9 +49,8 @@ read_len-frag_len-merge-easier:
        - 1000
    frag_std: 
        - 30
-       - 100
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
 
    # analysis
@@ -69,16 +70,21 @@ read_len-frag_len-merge-easier:
          - filter
        -
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
        -
          - filter
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
            
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
+       - 30
        
    polyidus_params:
      aligner:
@@ -139,6 +145,8 @@ read_len-frag_len-merge-harder:
        - 500
    min_sep:
        - 100
+   min_len:
+       - 20
    # read simulation
    read_len: 
        - 150
@@ -151,14 +159,13 @@ read_len-frag_len-merge-harder:
        - 1000
    frag_std: 
        - 30
-       - 100
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
 
    # analysis
    analysis_hosts: 
-      chr1 : "../../data/references/chrs/chr1.fa"
+      hg38: "../../data/references/GRCh38.fa"
        
    analysis_viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
@@ -173,16 +180,21 @@ read_len-frag_len-merge-harder:
          - filter
        -
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
        -
          - filter
          - mask-exclude:
-           - "../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
+           - "../../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
            
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100  
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
+       - 30
        
    polyidus_params:
      aligner:

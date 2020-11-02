@@ -47,7 +47,7 @@ OTC-vect-easier:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -143,7 +143,7 @@ OTC-vect-harder:
    min_sep:
        - 100
    min_len:
-       - 100
+       - 20
    # read simulation
    read_len: 
        - 150
@@ -154,7 +154,7 @@ OTC-vect-harder:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 

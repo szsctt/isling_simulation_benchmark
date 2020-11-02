@@ -28,7 +28,7 @@ OTC-vect-easier:
    p_gap:
        - 0
    lambda_junction:
-       - 5
+       - 1
    p_host_deletion:
        - 0
    lambda_host_deletion:

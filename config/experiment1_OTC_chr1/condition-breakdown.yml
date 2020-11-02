@@ -51,7 +51,7 @@ OTC-whole:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -66,6 +66,8 @@ OTC-whole:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
@@ -148,7 +150,7 @@ OTC-epi:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -163,6 +165,8 @@ OTC-epi:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"     
    merge-dist:
@@ -247,7 +251,7 @@ OTC-rearrange:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -262,6 +266,8 @@ OTC-rearrange:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
@@ -345,7 +351,7 @@ OTC-deletion:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -359,6 +365,8 @@ OTC-deletion:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
@@ -440,11 +448,8 @@ OTC-overlap:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
-   cigar-tol:
-       - 3
-   clip-cutoff:
-       - 20
+       - "MSv3"
+
 
    # analysis
    analysis_hosts: 
@@ -458,10 +463,16 @@ OTC-overlap:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100  
+       - 100
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20  
    # scoring
    score_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -537,7 +548,7 @@ OTC-gap:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -551,6 +562,8 @@ OTC-gap:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
@@ -635,7 +648,7 @@ OTC-host_deletion:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -649,6 +662,8 @@ OTC-host_deletion:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
@@ -731,7 +746,7 @@ OTC-frag_len:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -745,6 +760,8 @@ OTC-frag_len:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
@@ -825,7 +842,7 @@ OTC-frag_sd:
        - 30
        - 100
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -839,6 +856,8 @@ OTC-frag_sd:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
@@ -922,7 +941,8 @@ OTC-min_sep:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
+      
 
    # analysis
    analysis_hosts: 
@@ -936,6 +956,8 @@ OTC-min_sep:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
@@ -1004,10 +1026,11 @@ OTC-min_len:
    min_sep:
        - 500
    min_len:
+       - 20
+       - 50
        - 100
        - 300
        - 500
-       - 800
        - 1000
    # read simulation
    read_len: 
@@ -1019,7 +1042,7 @@ OTC-min_len:
    frag_std: 
        - 30
    seq_sys: 
-       - "HS25"
+       - "MSv3"
 
    # analysis
    analysis_hosts: 
@@ -1033,6 +1056,8 @@ OTC-min_len:
    post:
        -
          - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:

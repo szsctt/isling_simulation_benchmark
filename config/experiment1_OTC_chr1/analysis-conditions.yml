@@ -58,6 +58,8 @@ OTC-vect-easier:
    merge: 
        - True
        - False
+   trim:
+       - True
    dedup: 
        - False
    post:
@@ -150,6 +152,8 @@ OTC-vect-harder:
    merge: 
        - True
        - False
+   trim:
+       - True
    dedup: 
        - False
    post:

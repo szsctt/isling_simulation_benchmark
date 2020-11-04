@@ -8,17 +8,18 @@ ANALYSIS="../../intvi_pipeline"
 
 # simulation stuff
 mkdir -p snakemake_rules
+mkdir -p scripts
 find "$SIM/snakemake_rules" -name '*smk' -exec ln -sf  "$(realpath '{}')" "$(realpath snakemake_rules)" \;
 ln -sf "$SIM/snakemake_rules/make_df.py" "$(realpath snakemake_rules)"
-ln -sf "$SIM/scripts" .
+find "$SIM/scripts" -name '*' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
 
 # analysis stuff
 find "$ANALYSIS/snakemake_rules" -name '*smk' -exec ln -sf "$(realpath '{}')" "$(realpath snakemake_rules)" \;
-ln -sf $ANALYSIS/scripts/*.pl .
-ln -sf $ANALYSIS/scripts/*.pm .
-ln -sf $ANALYSIS/scripts/*.R .
-ln -sf $ANALYSIS/scripts/*.sh .
-ln -sf $ANALYSIS/scripts/post .
+find "$SIM/scripts" -name '*.pl' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
+find "$SIM/scripts" -name '*.pm' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
+find "$SIM/scripts" -name '*.R' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
+find "$SIM/scripts" -name '*.sh' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
+find "$SIM/scripts" -name 'post' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
 
 # python stuff
 mkdir -p python_scripts

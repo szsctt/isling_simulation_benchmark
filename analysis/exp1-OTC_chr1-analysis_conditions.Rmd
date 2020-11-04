@@ -1,0 +1,125 @@
+---
+title: "Optimising analysis conditions"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(gganimate)
+library(kableExtra)
+source("sim_functions.R")
+
+exp_dir <- "../out/experiment1_OTC_chr1/analysis_conditions"
+```
+
+```{css, include=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+# Overview
+In this experiment I optmised analysis condition options for our pipeline, using integrations of the OTC vector into chromosome 1.  The parameters of interest were `merge`, `clip-cutoff`, `min-mapq` and `cigar-tol`.
+
+# Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chromosome 1 from hg38.   
+
+For the virus I used the OTC vector genome (the subsequence of the plasmid from ITR to ITR)
+
+# Simulation parameters
+
+I simulated two different situations using this data: one that I thought would be 'easier' for the pipeline to handle, and one that is 'harder'.
+
+These conditions are summarised in the config file:
+
+```{bash class.output="scroll-100"}
+cat ../config/experiment1_OTC_chr1/analysis-conditions.yml
+```
+
+In the 'easier' condition, there are 1000 integrations of the whole virus, with clean junctions and no rearrangements, deletions of the virus, and no host deletions either.  In the 'harder' condition the host and virus reference are the same, but there's a high probability of rearrangements, deletions, gaps and overlaps at the junctions, and host deletions.  There are also some 'episomal' sequences included in the output fasta.
+
+
+
+```{r include=FALSE}
+int_scores <- importIntScoreExperiment(exp_dir)
+
+# average over replicates
+int_scores <- int_scores %>% 
+  group_by(experiment, condition, analysis_condition, post, merge, clip_cutoff, cigar_tol, min_mapq) %>% 
+  summarise(count = n(),
+            tp = sum(tp),
+            fp = sum(fp), 
+            fn = sum(fn)) %>% 
+  mutate(TPR = tp/(tp+fn)) %>% 
+  mutate(PPV = tp/(tp+fp))
+
+```
+
+First, a table of results.  Here I've added the tp, tn, fp, and fn scores for each replicate from the same condition. 
+```{r}
+int_scores %>% 
+  select(experiment, analysis_condition, TPR, PPV, merge, clip_cutoff, cigar_tol, min_mapq, post,  tp:fn) %>% 
+  arrange(desc(PPV))
+```
+
+```{r}
+int_scores %>% 
+  filter(experiment == "OTC-vect-harder") %>% 
+  select(experiment, analysis_condition, TPR, PPV, merge, clip_cutoff, cigar_tol, min_mapq, post, tp:fn) %>% 
+  arrange(desc(PPV))
+```
+
+```{r}
+p <- int_scores %>% 
+  mutate(analysis_condition = str_match(analysis_condition, "(analysis\\d+)")[,2]) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab("Positive predictive value") +
+  ylab("True positive rate") +
+  facet_grid(vars(experiment), vars(post)) 
+
+print(p)
+
+```
+
+```{r}
+int_scores %>% 
+  mutate(analysis_condition = str_match(analysis_condition, "(analysis\\d+)")[,2]) %>%
+  pivot_longer(TPR:PPV, names_to = "score_type", values_to = "score") %>%
+  ggplot(aes(x = min_mapq, y = score, color = analysis_condition, shape=post)) +
+  geom_point() +
+  facet_grid(vars(score_type), vars(experiment))
+```
+
+```{r}
+int_scores %>% 
+  mutate(analysis_condition = str_match(analysis_condition, "(analysis\\d+)")[,2]) %>%
+  pivot_longer(TPR:PPV, names_to = "score_type", values_to = "score") %>%
+  ggplot(aes(x = clip_cutoff, y = score, color = analysis_condition, shape=post)) +
+  geom_point() +
+  facet_grid(vars(score_type), vars(experiment))
+```
+
+```{r}
+int_scores %>% 
+  mutate(analysis_condition = str_match(analysis_condition, "(analysis\\d+)")[,2]) %>%
+  pivot_longer(TPR:PPV, names_to = "score_type", values_to = "score") %>%
+  ggplot(aes(x = merge, y = score, color = analysis_condition, shape=post)) +
+  geom_point() +
+  facet_grid(vars(score_type), vars(experiment))
+```
+
+```{r}
+int_scores %>% 
+  mutate(analysis_condition = str_match(analysis_condition, "(analysis\\d+)")[,2]) %>%
+  pivot_longer(TPR:PPV, names_to = "score_type", values_to = "score") %>%
+  ggplot(aes(x = cigar_tol, y = score, color = analysis_condition, shape=post)) +
+  geom_point() +
+  facet_grid(vars(score_type), vars(experiment))
+```

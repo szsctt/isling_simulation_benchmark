@@ -352,3 +352,55 @@ fp_reads_explained_by_wrong_location <- function(read_scores_path, score_type = 
 #fp_reads_explained_by_wrong_location(test_file, 'virus_score', 'discord')
 
 #import_fp_reads(test_file, 'virus_score', 'discord')
+
+
+importIntScoreExperiment <- function(exp_path) {
+  
+  scored_ints_file <- "scored_ints_summary.tsv"
+  analysis_condtions_file <- "analysis_conditions.tsv"
+  
+  # import scored integrations
+  int_scores <- tibble(
+    file = list.files(exp_dir, pattern = scored_ints_file, recursive = TRUE)
+  ) %>% 
+    mutate(data = map(file, ~read_tsv(paste0(exp_dir, "/", .)))) %>% 
+    unnest(data)
+  
+  # add extra info to scored integrations
+  int_scores <- int_scores %>% 
+    mutate(results_file = basename(found_info)) %>% 
+    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
+    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
+    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+    mutate(post = str_detect(results_file, "post")) %>% 
+    mutate(analysis_condition = basename(dirname(dirname(found_info)))) %>%
+    rowwise() %>% 
+    mutate(TPR = tp/(tp+fn)) %>% 
+    mutate(PPV = tp/(tp+fp)) %>% 
+    ungroup()
+  
+  # get files with analysis conditions
+  cond_files <- list.files(exp_dir, pattern = analysis_condtions_file, recursive = TRUE)
+  cond_files <- cond_files[!str_detect(cond_files, "pipeline")]
+  
+  # import analysis conditions
+  analysis_conditions <- tibble(
+    file = file.path(exp_dir, cond_files),
+    conds = map(file, ~read_tsv(.))
+  ) %>% 
+    unnest(conds) %>% 
+    select(-file) %>% 
+    distinct() 
+  
+  # add analysis condition info to int scores
+  int_scores <- int_scores %>% left_join(analysis_conditions, by="analysis_condition") %>% 
+    mutate(merge = case_when(
+      merge == 1 ~ "merged",
+      merge == 0 ~ "unmerged",
+      TRUE ~ "unmerged"
+    ))
+  
+  return(int_scores)
+  
+}

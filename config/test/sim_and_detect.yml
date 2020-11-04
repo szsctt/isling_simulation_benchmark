@@ -54,6 +54,8 @@ test-easier:
        "AAV" :  "../../data/references/test_AAV.fa"
    merge: 
        - True
+   trim: 
+       - True
    dedup: 
        - False
    post:
@@ -62,7 +64,9 @@ test-easier:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100  
+       - 100
+   merge-n-min:
+       - 2
    cigar-tol:
        - 3
    clip-cutoff:

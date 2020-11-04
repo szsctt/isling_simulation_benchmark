@@ -305,6 +305,7 @@ wildcard_constraints:
 	host = "|".join(set(analysis_df.loc[:, 'host'])),
 	virus = "|".join(set(analysis_df.loc[:, 'virus'])),
 	post = "|\.post",
+	merged = "|\.merged",
 	analysis_condition = "|".join(analysis_df['analysis_condition']),
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
 	
@@ -319,7 +320,7 @@ localrules: write_summary, write_analysis_summary#, combine_int_scores, combine_
 # rule polyidus has a wildcard contstraint so it can't be used for our pipeline
 # so make it higher in the priority
 
-ruleorder: vifi > polyidus > combine_ints
+ruleorder: vifi > polyidus > combine_ints > merged_bed
 
 #####################################################
 ################### target files ####################
@@ -506,7 +507,8 @@ rule polyidus:
 		virus_idx = "{outpath}/references/{virus}/{virus}.1.bt2"
 	output:
 		temp_ints = temp("{outpath}/{dset}/polyidus.{host}.{virus}.{samp}/results/exactHpvIntegrations.tsv"),
-		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		fake_merged = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed")
 	params:
 		output = lambda wildcards, output: path.dirname(path.dirname(output.temp_ints)),
 		host_idx = lambda wildcards, input: path.splitext(path.splitext(input.host_idx)[0])[0],
@@ -529,6 +531,7 @@ rule polyidus:
 		--outdir {params.output}
 		
 		cp {output.temp_ints} {output.ints}
+		cp {output.temp_ints} {output.fake_merged}
 		"""
 
 #####################################################
@@ -652,7 +655,8 @@ rule vifi:
 		script = lambda wildcards: analysis_df_value(wildcards, 'vifi_dir') + "/scripts/run_vifi.py"
 	output:
 		clusters = "{outpath}/{dset}/vifi.{samp}.{host}.{virus}/output.clusters.txt",
-		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		fake_merged = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed")
 	params:
 		vifi_dir = lambda wildcards, input: os.path.dirname(os.path.dirname(input.script)),
 		reference_repo = lambda wildcards, input: os.path.dirname(input.fa),
@@ -683,6 +687,7 @@ rule vifi:
 		-C {input.chrom_list}
 		
 		cp {output.clusters} {output.ints}
+		cp {output.clusters} {output.fake_merged}
 		"""			
 				
 #####################################################
@@ -863,7 +868,36 @@ rule score_integrations:
 		--scored-ints {output.temp} \
 		--output {output.scored_ints}
 		"""
-		
+	
+rule score_merged_integrations:
+	input:
+		sim_info = rules.annotate_reads.output.annotated_info,
+		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
+	output:
+		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.merged_summary.tsv",
+		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.merged.tsv"
+	resources:
+		mem_mb= lambda wildcards, attempt: attempt * 5000,
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	params:
+		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'score_ints_tool')}",
+		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}",
+		merged = "--merged"
+	threads: 1
+	container:
+		"docker://szsctt/simvi:2"
+	conda:
+		"envs/simvi.yml"
+	shell:
+		"""
+		python3 scripts/score_integrations.py \
+		--sim-info {input.sim_info} \
+		--found-info {input.analysis_info} \
+		--output {output.scored_ints} \
+		--summary {output.summary} \
+		{params}
+		"""
 		
 rule combine_int_scores:
 	input:
@@ -904,26 +938,32 @@ def scores_to_combine(wildcards, score_type):
 		host = row['host']
 		virus = row['virus']
 	
-	
 		# get samples for this experiment
 		samples = set(sim_df[sim_df['experiment'] == exp]['sample'])
-	
+		
+		# we only have merged integrations for integration scoring
+		if score_type == "reads":	
+			merged = ['']
+		else:
+			merged = ['.merged', '']
+		
 		# we only have postprocessed data for our pipeline
 		if re.search("analysis", analysis_condition):
-			
+	
 			post = ['.post', '']
+			
 
 		else:
 			post = ['']
 			
 			# currently we're only scoring reads for our pipeline
 			if score_type == "reads":
-				continue
+				continue		
 	
 		scored_files += [
-		f"{outpath}/{exp}/{folder}/{analysis_condition}.{samp}.{host}.{virus}{post}_summary.tsv" 
-			for samp, post,
-			in itertools.product(samples, post)
+		f"{outpath}/{exp}/{folder}/{analysis_condition}.{samp}.{host}.{virus}{post}{merged}_summary.tsv"
+			for samp, post, merged
+			in itertools.product(samples, post, merged)
 		]
 	
 	return scored_files

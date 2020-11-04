@@ -14,11 +14,11 @@ ln -sf "$SIM/scripts" .
 
 # analysis stuff
 find "$ANALYSIS/snakemake_rules" -name '*smk' -exec ln -sf "$(realpath '{}')" "$(realpath snakemake_rules)" \;
-ln -sf $ANALYSIS/*.pl .
-ln -sf $ANALYSIS/*.pm .
-ln -sf $ANALYSIS/*.R .
-ln -sf $ANALYSIS/*.sh .
-ln -sf $ANALYSIS/post .
+ln -sf $ANALYSIS/scripts/*.pl .
+ln -sf $ANALYSIS/scripts/*.pm .
+ln -sf $ANALYSIS/scripts/*.R .
+ln -sf $ANALYSIS/scripts/*.sh .
+ln -sf $ANALYSIS/scripts/post .
 
 # python stuff
 mkdir -p python_scripts

@@ -1,13 +1,10 @@
 OTC-vect-easier:
-   out_directory: "../../out/experiment1_OTC_chr1/easier_harder"
+   out_directory: "../../out/experiment1_OTC_chr1/analysis_conditions"
    
    # integration simulation
    replicates: 3 
    hosts: 
       chr1 : "../../data/references/chrs/chr1.fa"
-      chr8 : "../../data/references/chrs/chr8.fa"
-      chr14: "../../data/references/chrs/chr14.fa"
-      chrX : "../../data/references/chrs/chrX.fa"
        
    viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
@@ -31,14 +28,14 @@ OTC-vect-easier:
    p_gap:
        - 0
    lambda_junction:
-       - 5
+       - 1
    p_host_deletion:
        - 0
    lambda_host_deletion:
        - 500
    min_sep:
        - 500
-   min_len: 
+   min_len:
        - 500
    # read simulation
    read_len: 
@@ -71,43 +68,32 @@ OTC-vect-easier:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100   
+       - 100
    cigar-tol:
+       - 1
        - 3
+       - 5
    clip-cutoff:
        - 20
-           
-   polyidus_params:
-     aligner:
-      - "bowtie2"
-
-   vifi_params:
-     host_info:
-       hg38: 
-         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
-         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
-         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         centromeres: "../../data/references/GRCh38/centromeres.bed"
-         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
-     vifi_dir: "../../ViFi"      
+       - 25
+   min-mapq:
+       - 0
+       - 5
+       - 10
+       - 15
+       - 20     
 
    # scoring
    score_ints: True
    score_ints_window: 20
 
 OTC-vect-harder:
-   out_directory: "../../out/experiment1_OTC_chr1/easier_harder"
+   out_directory: "../../out/experiment1_OTC_chr1/analysis_conditions"
    
    # integration simulation
    replicates: 3 
    hosts: 
       chr1 : "../../data/references/chrs/chr1.fa"
-      chr8 : "../../data/references/chrs/chr8.fa"
-      chr14: "../../data/references/chrs/chr14.fa"
-      chrX : "../../data/references/chrs/chrX.fa"
        
    viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
@@ -138,7 +124,7 @@ OTC-vect-harder:
        - 500
    min_sep:
        - 100
-   min_len: 
+   min_len:
        - 20
    # read simulation
    read_len: 
@@ -171,28 +157,20 @@ OTC-vect-harder:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100   
+       - 100
    cigar-tol:
+       - 1
        - 3
+       - 5
    clip-cutoff:
        - 20
-
-   polyidus_params:
-     aligner:
-      - "bowtie2"
-
-   vifi_params:
-     host_info:
-       hg38: 
-         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
-         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
-         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         centromeres: "../../data/references/GRCh38/centromeres.bed"
-         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
-     vifi_dir: "../../ViFi"      
+       - 25
+   min-mapq:
+       - 0
+       - 5
+       - 10
+       - 15
+       - 20
 
    # scoring
    score_ints: True

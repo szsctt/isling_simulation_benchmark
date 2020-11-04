@@ -18,3 +18,9 @@ NAME="condition-breakdown"
 
 bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
 
+CONFIG="../../config/experiment1_OTC_chr1/chromosomes.yml"
+NAME="chromosomes"
+
+bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
+
+

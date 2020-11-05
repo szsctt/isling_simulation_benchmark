@@ -1,5 +1,5 @@
-OTC-vect-easier:
-   out_directory: "../../out/experiment1_OTC_chr1/easier_harder"
+global:
+   out_directory: "../../out/experiment1_OTC_chr1/chromosomes"
    
    # integration simulation
    replicates: 3 
@@ -11,6 +11,7 @@ OTC-vect-easier:
        
    viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+
    
    initial_seed: 12345
    seed_increment: 123 
@@ -38,7 +39,7 @@ OTC-vect-easier:
        - 500
    min_sep:
        - 500
-   min_len: 
+   min_len:
        - 500
    # read simulation
    read_len: 
@@ -46,7 +47,7 @@ OTC-vect-easier:
    fcov: 
        - 5 
    frag_len: 
-       - 500
+       - 500 
    frag_std: 
        - 30
    seq_sys: 
@@ -59,8 +60,9 @@ OTC-vect-easier:
    analysis_viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    merge: 
-       - True
        - False
+   trim: 
+       - True
    dedup: 
        - False
    post:
@@ -71,12 +73,23 @@ OTC-vect-easier:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100   
+       - 100 
+   merge-n-min:
+       - 1
    cigar-tol:
-       - 3
+       - 1
    clip-cutoff:
        - 20
-           
+   min-mapq:
+       - 10
+       
+    # scoring
+   score_reads: True
+   score_ints: True
+   score_merged_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
+   
+   # other tools 
    polyidus_params:
      aligner:
       - "bowtie2"
@@ -92,30 +105,12 @@ OTC-vect-easier:
          centromeres: "../../data/references/GRCh38/centromeres.bed"
          conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
          segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
-     vifi_dir: "../../ViFi"      
+     vifi_dir: "../../ViFi" 
 
-   # scoring
-   score_ints: True
-   score_ints_window: 20
-
-OTC-vect-harder:
-   out_directory: "../../out/experiment1_OTC_chr1/easier_harder"
-   
-   # integration simulation
+OTC-vect-easier:
    replicates: 3 
-   hosts: 
-      chr1 : "../../data/references/chrs/chr1.fa"
-      chr8 : "../../data/references/chrs/chr8.fa"
-      chr14: "../../data/references/chrs/chr14.fa"
-      chrX : "../../data/references/chrs/chrX.fa"
-       
-   viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    
-   initial_seed: 12345
-   seed_increment: 123 
-   int_num: 
-       - 1000
+OTC-vect-harder:
    epi_num:
        - 1000
    p_whole:
@@ -138,64 +133,11 @@ OTC-vect-harder:
        - 500
    min_sep:
        - 100
-   min_len: 
+   min_len:
        - 20
    # read simulation
-   read_len: 
-       - 150
    fcov: 
-       - 5 
+       - 1.5
    frag_len: 
        - 250
-   frag_std: 
-       - 30
-   seq_sys: 
-       - "MSv3"
-
-   # analysis
-   analysis_hosts: 
-      hg38: "../../data/references/GRCh38.fa"
-       
-   analysis_viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
-   merge: 
-       - True
-       - False
-   dedup: 
-       - False
-   post:
-       -
-         - filter
-         - mask-exclude:
-           - "../../data/references/hg38_homologoustoOTCvec.bed"
-   bwa_mem:
-       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
-   merge-dist:
-       - 100   
-   cigar-tol:
-       - 3
-   clip-cutoff:
-       - 20
-
-   polyidus_params:
-     aligner:
-      - "bowtie2"
-
-   vifi_params:
-     host_info:
-       hg38: 
-         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
-         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
-         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         centromeres: "../../data/references/GRCh38/centromeres.bed"
-         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
-     vifi_dir: "../../ViFi"      
-
-   # scoring
-   score_ints: True
-   score_ints_window: 20
-
 

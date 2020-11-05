@@ -1,5 +1,5 @@
-read_len-frag_len-merge-easier:
-   out_directory: "../../out/experiment1_OTC_chr1/reads"
+global:
+   out_directory: "../../out/experiment1_OTC_chr1/easier-harder"
    
    # integration simulation
    replicates: 3 
@@ -34,8 +34,10 @@ read_len-frag_len-merge-easier:
    lambda_host_deletion:
        - 500
    min_sep:
+       - 50
        - 500
    min_len:
+       - 50
        - 500
    # read simulation
    read_len: 
@@ -44,6 +46,7 @@ read_len-frag_len-merge-easier:
    fcov: 
        - 5 
    frag_len:
+       - 200
        - 300
        - 500 
        - 1000
@@ -52,40 +55,44 @@ read_len-frag_len-merge-easier:
    seq_sys: 
        - "MSv3"
 
-
    # analysis
    analysis_hosts: 
       hg38: "../../data/references/GRCh38.fa"
        
    analysis_viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
-      
    merge: 
        - True
        - False
+   trim: 
+       - True
    dedup: 
        - False
    post:
        -
          - filter
-       -
          - mask-exclude:
-           - "../../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
-       -
-         - filter
-         - mask-exclude:
-           - "../../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
-           
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100  
+       - 100 
+   merge-n-min:
+       - 1
    cigar-tol:
-       - 3
+       - 1
    clip-cutoff:
        - 20
-       - 30
+   min-mapq:
+       - 10
        
+    # scoring
+   score_reads: False
+   score_ints: True
+   score_merged_ints: True
+   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
+   
+   # other tools 
    polyidus_params:
      aligner:
       - "bowtie2"
@@ -101,28 +108,12 @@ read_len-frag_len-merge-easier:
          centromeres: "../../data/references/GRCh38/centromeres.bed"
          conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
          segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
-     vifi_dir: "../../ViFi"      
+     vifi_dir: "../../ViFi" 
 
-   # scoring
-   score_ints: True
-   score_ints_window: 20
-
-
-read_len-frag_len-merge-harder:
-   out_directory: "../../out/experiment1_OTC_chr1/reads"
-   
-   # integration simulation
+read-props-easier:
    replicates: 3 
-   hosts: 
-      chr1 : "../../data/references/chrs/chr1.fa"
-       
-   viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    
-   initial_seed: 12345
-   seed_increment: 123 
-   int_num: 
-       - 1000
+read-props-harder:
    epi_num:
        - 1000
    p_whole:
@@ -148,72 +139,8 @@ read_len-frag_len-merge-harder:
    min_len:
        - 20
    # read simulation
-   read_len: 
-       - 150
-       - 250
    fcov: 
-       - 5 
-   frag_len:
-       - 300
-       - 500 
-       - 1000
-   frag_std: 
-       - 30
-   seq_sys: 
-       - "MSv3"
+       - 1.5
+   frag_len: 
+       - 250
 
-
-   # analysis
-   analysis_hosts: 
-      hg38: "../../data/references/GRCh38.fa"
-       
-   analysis_viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
-      
-   merge: 
-       - True
-       - False
-   dedup: 
-       - False
-   post:
-       -
-         - filter
-       -
-         - mask-exclude:
-           - "../../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
-       -
-         - filter
-         - mask-exclude:
-           - "../../data/references/GRCh38/hg38_homologoustoOTCvec.bed"
-           
-   bwa_mem:
-       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
-   merge-dist:
-       - 100  
-   cigar-tol:
-       - 3
-   clip-cutoff:
-       - 20
-       - 30
-       
-   polyidus_params:
-     aligner:
-      - "bowtie2"
-
-   vifi_params:
-     host_info:
-       hg38: 
-         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
-         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
-         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         centromeres: "../../data/references/GRCh38/centromeres.bed"
-         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
-     vifi_dir: "../../ViFi"      
-
-   # scoring
-   score_ints: True
-   score_ints_window: 20
-  

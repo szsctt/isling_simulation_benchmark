@@ -26,9 +26,10 @@ adapter_seqs = {'HS25':HS25, 'MSv3':HS25, 'MS': HS25}
 ############### global parameters ###################
 #####################################################
 
-# global parameters (defaults for this dataset) may be specified using the 'global' keyword
+# global parameters (defaults for this dataset) may be specified using a 'global' key
 # at the top of the config file.  These will be applied to any missing keys in the remaining 
-# datasets in the config file
+# datasets in the config file.  If a key is specified in both 'global' and a dataset,
+# the value specified in the dataset will be used
 
 if 'global' in config:		
 	# get default (global) options
@@ -53,6 +54,17 @@ config, sim_df, ref_dict = parse_config(config)
 ############## analysis parameters ##################
 #####################################################
 
+def get_bool_value_from_config(config, dataset, key, default):
+	if key not in config[dataset]:
+		return default
+		
+	if config[dataset][key] is True:
+		return 1
+	elif config[dataset][key] is False:
+		return 0
+	else:
+		raise ValueError(f"Boolean value for {key} in dataset {dataset} is neither True nor False.  Please specify one or the other")
+	
 
 # get unique analysis conditions - these are combinations of the analysis parameters that
 # can be set in our pipeline (merging, de-duplicaiton, bwa mem prarameters, etc), or
@@ -65,7 +77,7 @@ column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host
 								'virus', 'virus_fasta', 'bam_suffix',
 								'read_folder', 'R1_suffix', 'R2_suffix', 'outdir', 
 								'merge', 'trim', 'dedup', 'postargs', 'seq_sys', 'adapter_1', 'adapter_2', 
-								'bwa_mem_params', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 									'score_ints', 'score_ints_window', 'score_ints_tool',
+								'bwa_mem_params', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 									'score_ints', 'score_merged_ints', 'score_ints_window', 'score_ints_tool',
 								'host_mappability', 'host_mappability_exclude', 'host_genes', 'host_exons',
 								'host_oncogenes', 'host_centromeres', 'host_conserved_regions',
 								'host_segdup', 'vifi_dir')																
@@ -75,27 +87,17 @@ for dataset in datasets:
 	
 		#### parameters for comparison of analysis and simulation ####	
 	# are we doing per-read comparison of simulation with results?
-	score_reads = 1
-	if 'score_reads' in config[dataset]:
-		if config[dataset]['score_reads'] is False or config[dataset]['score_reads'].lower() == 'false':
-			score_ints = 0	
+	score_reads = get_bool_value_from_config(config, dataset, 'score_reads', 0)
+	
 
 	# are we doing per-integration comparison of simulation with results?	
-	score_ints = 0
-	if 'score_ints' in config[dataset]:
-		if config[dataset]['score_ints'] is True or config[dataset]['score_ints'].lower() == 'true':
-			score_ints = 1
+	score_ints = get_bool_value_from_config(config, dataset, 'score_ints', 1)
+	score_merged_ints = get_bool_value_from_config(config, dataset, 'score_ints', 1)
 			
-	score_ints_window = None	
 	# check if we've specified a window around simulated integrations to look
+	score_ints_window = None	
 	if 'score_ints_window' in config[dataset]:
-		score_ints_window = config[dataset]['score_ints_window']
-				
-	# are we scoring merged integrations as well?
-	score_merged_ints = 0
-	if 'score_merged_ints' in config[dataset]:
-		if config[dataset]['score_merged_ints'] is True or config[dataset]['score_merged_ints'].lower() == 'true':
-			score_merged_ints = 1	
+		score_ints_window = config[dataset]['score_ints_window']			
 			
 	# double check window is specified if score_ints or score_merged_ints is True
 	if score_ints == 1 or score_merged_ints == 1:
@@ -383,15 +385,16 @@ sim_summaries = expand("{outpath}/{exp}/simulation_summary.tsv",
 			outpath = [exp_targets[exp] for exp in experiments]
 			)
 
-			
-analysis_summaries = [f"{outdir}/{experiment}/analysis_conditions.tsv" for outdir, experiment in 
-												zip(sim_df.loc[:,'out_directory'],
-														sim_df.loc[:,'experiment']
-														)
-											]
+
+analysis_summaries = expand("{outdir}/{experiment}/analysis_conditions.tsv", 
+			zip,
+			exp = experiments, 
+			outpath = [exp_targets[exp] for exp in experiments]
+			)
+
 
 # outputs from our pipeline
-merged_targets = []
+merged_targets = set()
 for i, row in analysis_df.iterrows():
 	if row['tool'] != 'pipeline':
 		continue
@@ -405,13 +408,13 @@ for i, row in analysis_df.iterrows():
 	virus = row['virus']
 		
 	for samp, post in itertools.product(samples, (".post", "")):
-		merged_targets.append(
+		merged_targets.add(
 			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
 		)
 
 
 # polyidus outputs
-polyidus_targets = []
+polyidus_targets = set()
 for i, row in analysis_df.iterrows():
 	if row['tool'] != 'polyidus':
 		continue
@@ -425,16 +428,16 @@ for i, row in analysis_df.iterrows():
 	virus = row['virus']
 		
 	for samp in samples:
-		polyidus_targets.append(
+		polyidus_targets.add(
 			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 		)
-		polyidus_targets.append(
+		polyidus_targets.add(
 			f"{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.tsv"
 		)
 
 
 # vifi outputs
-vifi_targets = []
+vifi_targets = set()
 for i, row in analysis_df.iterrows():
 	if row['tool'] != 'vifi':
 		continue
@@ -447,39 +450,33 @@ for i, row in analysis_df.iterrows():
 	virus = row['virus']
 		
 	for samp in samples:
-		vifi_targets.append(
+		vifi_targets.add(
 			f"{outpath}/{dset}/vifi.{samp}.{host}.{virus}/output.clusters.txt"
 		)
-		vifi_targets.append(
+		vifi_targets.add(
 			f"{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.tsv"
 		)
 	
 # summary files
 
-# get experiments for which we want to score integrations
-exps_int_score = [exp for exp in config if 'score_ints' in config[exp]]
-exps_int_score = [exp for exp in exps_int_score if config[exp]['score_ints']]
-
-scored_summaries = expand('{outpath}/{exp}/{exp}.scored_reads_summary.tsv', 
-				zip,
-				exp = config.keys(), 
-				outpath = [exp_targets[exp] for exp in config]
-			) + expand(
-			"{outpath}/{exp}/{exp}.scored_ints_summary.tsv",
-				zip,
-				exp = exps_int_score, 
-				outpath = [exp_targets[exp] for exp in exps_int_score]
-			) 
+# scored reads
+scored_summaries = set()
+for i, row in analysis_df.iterrows():
+	if row['score_ints'] == 1 or row['score_merged_ints'] == 1:
+		scored_summaries.add(f"{row['outdir']}/{row['experiment']}/{row['experiment']}.scored_ints_summary.tsv")
+	if 'score_reads' in row:
+		if row['score_reads'] == 1:
+			scored_summaries.add(f"{row['outdir']}/{row['experiment']}/{row['experiment']}.scored_reads_summary.tsv")
 
 rule all:
 	input: 
 		set(sim_targets),
 		set(sim_summaries),
 		set(analysis_summaries),
-		set(merged_targets),
-		set(scored_summaries),
-		set(polyidus_targets),
-		set(vifi_targets)
+		merged_targets,
+		scored_summaries,
+		polyidus_targets,
+		vifi_targets
 		
 		
 #####################################################
@@ -970,6 +967,29 @@ def scores_to_combine(wildcards, score_type):
 	
 	scored_files = []
 	for i, row in analysis_df.iterrows():
+	
+		# check if we want to score reads or ints for this row
+		if score_type == 'reads':
+			if 'score_reads' not in row:
+				continue
+			if row['score_reads'] != 1:
+				continue
+		if score_type == 'ints':
+			if 'score_ints' not in row and 'score_merged_ints' not in row:
+				continue
+			if 'score_ints' in row and 'score_merged_ints' in row:
+				if row['score_ints'] != 1 and row['score_merged_ints'] != 1:
+					continue
+			if 'score_ints' in row and 'score_merged_ints' not in row:
+				if row['score_ints'] != 1:
+					continue
+			if 'score_merged_ints' in row and 'score_ints' not in row:
+				if row['score_merged_ints'] != 1:
+					continue
+					
+		# only scoring reads for our pipeline
+		if score_type == 'reads' and not re.search("analysis", analysis_condition):
+			continue
 		
 		# get information for this row
 		exp = row['experiment']
@@ -985,24 +1005,18 @@ def scores_to_combine(wildcards, score_type):
 		samples = set(sim_df[sim_df['experiment'] == exp]['sample'])
 		
 		# we only have merged integrations for integration scoring
-		if score_type == "reads":	
-			merged = ['']
-		else:
-			merged = ['.merged', '']
+		# only do this if the user requested merged integrations to be scored
+		merged = ['']
+		if score_type == 'ints' and 'score_merged_ints' in row:
+			if row['score_merged_ints'] == 1:
+				merged = ['.merged', '']
 		
 		# we only have postprocessed data for our pipeline
 		if re.search("analysis", analysis_condition):
-	
 			post = ['.post', '']
-			
-
 		else:
 			post = ['']
 			
-			# currently we're only scoring reads for our pipeline
-			if score_type == "reads":
-				continue		
-	
 		scored_files += [
 		f"{outpath}/{exp}/{folder}/{analysis_condition}.{samp}.{host}.{virus}{post}{merged}_summary.tsv"
 			for samp, post, merged

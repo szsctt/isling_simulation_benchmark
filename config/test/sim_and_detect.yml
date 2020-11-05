@@ -1,3 +1,7 @@
+global:
+   int_num:
+      - 3
+
 test-easier:
    out_directory: "../../out/test"
    
@@ -9,8 +13,6 @@ test-easier:
        "AAV" :  "../../data/references/test_AAV.fa"
    initial_seed: 12345
    seed_increment: 123 
-   int_num: 
-       - 3
    epi_num:
        - 0
    min_sep: 
@@ -91,6 +93,8 @@ test-easier:
      vifi_dir: "../../ViFi"
               
    # scoring
+   score_reads: True
    score_ints: True
+   score_merged_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
- 
+

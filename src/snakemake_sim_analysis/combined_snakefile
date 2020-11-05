@@ -23,6 +23,24 @@ HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
 adapter_seqs = {'HS25':HS25, 'MSv3':HS25, 'MS': HS25}
 
 #####################################################
+############### global parameters ###################
+#####################################################
+
+# global parameters (defaults for this dataset) may be specified using the 'global' keyword
+# at the top of the config file.  These will be applied to any missing keys in the remaining 
+# datasets in the config file
+
+if 'global' in config:		
+	# get default (global) options
+	default = config.pop('global')
+	for dataset in config:
+		for key in default:
+			if key not in config[dataset]:
+				config[dataset][key] = default[key]
+			
+
+
+#####################################################
 ############# simulation parameters #################
 #####################################################
 
@@ -57,15 +75,33 @@ column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host
 for dataset in datasets:
 	
 		#### parameters for comparison of analysis and simulation ####	
-	# are we doing per-integration comparison of simulation with results?
-	score_ints= 0
-	score_ints_window = None
+	# are we doing per-read comparison of simulation with results?
+	score_reads = 1
+	if 'score_reads' in config[dataset]:
+		if config[dataset]['score_reads'] is False or config[dataset]['score_reads'].lower() == 'false':
+			score_ints = 0	
+
+	# are we doing per-integration comparison of simulation with results?	
+	score_ints = 0
 	if 'score_ints' in config[dataset]:
 		if config[dataset]['score_ints'] is True or config[dataset]['score_ints'].lower() == 'true':
 			score_ints = 1
-			# check if we've specified a window around simulated integrations to look
-			if 'score_ints_window' in config[dataset]:
-				score_ints_window = config[dataset]['score_ints_window']
+			
+	score_ints_window = None	
+	# check if we've specified a window around simulated integrations to look
+	if 'score_ints_window' in config[dataset]:
+		score_ints_window = config[dataset]['score_ints_window']
+				
+	# are we scoring merged integrations as well?
+	score_merged_ints = 0
+	if 'score_merged_ints' in config[dataset]:
+		if config[dataset]['score_merged_ints'] is True or config[dataset]['score_merged_ints'].lower() == 'true':
+			score_merged_ints = 1	
+			
+	# double check window is specified if score_ints or score_merged_ints is True
+	if score_ints == 1 or score_merged_ints == 1:
+		if score_ints_window is None:
+			raise ValueError(f"score_ints or score_merged_ints was True for dataset {dataset}, but score_ints_window was not specified")
 	
 	#### parameters for our pipeline ####
 	# paramters for our pipeline should be lists, so that we can do combinations
@@ -135,7 +171,9 @@ for dataset in datasets:
 			'min_mapq'  : min_mapq,
 			'tool'			 : 'pipeline',
 			'merge_dist' : merge_dist,
+			'score_reads' : score_reads,
 			'score_ints' : score_ints,
+			'score_merged_ints' : score_merged_ints,
 			'score_ints_window' : score_ints_window,
 			'score_ints_tool' : "pipeline"	
 		})
@@ -169,7 +207,9 @@ for dataset in datasets:
 					'aligner'		 : aligner,
 					'merge'			 : 0,
 					'tool'			 : 'polyidus',
+					'score_reads' : score_reads,
 					'score_ints' : score_ints,
+					'score_merged_ints' : score_merged_ints,
 					'score_ints_window' : score_ints_window,
 					'score_ints_tool' : "polyidus"	
 					})	
@@ -214,7 +254,9 @@ for dataset in datasets:
 				'analysis_condition': condition,
 				'merge'			 : 0,
 				'tool'			 : 'vifi',			
+				'score_reads' : score_reads,
 				'score_ints' : score_ints,
+				'score_merged_ints' : score_merged_ints,
 				'score_ints_window' : score_ints_window,
 				'score_ints_tool' : "vifi",
 				'vifi_dir' : config[dataset]['vifi_params']['vifi_dir']
@@ -324,6 +366,7 @@ ruleorder: vifi > polyidus > combine_ints
 # target files for simulation
 sim_targets = sim_df.loc[:,'annotated_info_filename']
 
+# summaries about how experiment was conducted
 exp_targets = {}
 for i, row in sim_df.iterrows():
 	exp_targets[row['experiment']] = row['out_directory']

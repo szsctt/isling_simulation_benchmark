@@ -15,11 +15,11 @@ find "$SIM/scripts" -name '*' -exec ln -sf "$(realpath '{}')" "$(realpath script
 
 # analysis stuff
 find "$ANALYSIS/snakemake_rules" -name '*smk' -exec ln -sf "$(realpath '{}')" "$(realpath snakemake_rules)" \;
-find "$SIM/scripts" -name '*.pl' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
-find "$SIM/scripts" -name '*.pm' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
-find "$SIM/scripts" -name '*.R' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
-find "$SIM/scripts" -name '*.sh' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
-find "$SIM/scripts" -name 'post' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
+find "$ANALYSIS/scripts" -name '*.pl' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
+find "$ANALYSIS/scripts" -name '*.pm' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
+find "$ANALYSIS/scripts" -name '*.R' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
+find "$ANALYSIS/scripts" -name '*.sh' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
+find "$ANALYSIS/scripts" -name 'post' -exec ln -sf "$(realpath '{}')" "$(realpath scripts)" \;
 
 # python stuff
 mkdir -p python_scripts

@@ -10,7 +10,7 @@ module load singularity
 cd ../snakemake_sim_analysis 
 
 mkdir -p ../../out/test
-snakemake --configfile ../../config/test/sim_and_detect.yml --snakefile combined_snakefile --dag | dot -Tsvg > ../../out/test/test_combined.dag.svg
+#snakemake --configfile ../../config/test/sim_and_detect.yml --snakefile combined_snakefile --dag | dot -Tsvg > ../../out/test/test_combined.dag.svg
 
 #snakemake \
 # --snakefile combined_snakefile \
@@ -29,7 +29,7 @@ snakemake --configfile ../../config/test/sim_and_detect.yml --snakefile combined
 # --conda-frontend mamba \
 # --rerun-incomplete
 
-srun -c5 --time 2:00:00 --mem 50gb \
+#srun -c5 --time 2:00:00 --mem 50gb \
 snakemake \
  --snakefile combined_snakefile \
  --configfile ../../config/test/sim_and_detect.yml\

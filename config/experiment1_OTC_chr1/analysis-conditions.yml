@@ -100,14 +100,14 @@ global:
    vifi_params:
      host_info:
        hg38: 
-         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
-         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
-         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         centromeres: "../../data/references/GRCh38/centromeres.bed"
-         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
+         mappability: "../../data/references/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
+         mappability_exclude: "../../data/references/data_repo/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
+         genes:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
+         exons:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
+         oncogenes:  "../../data/references/data_repo/GRCh38/cancer/oncogenes/Census_oncomerge_hg38.gff"
+         centromeres:  "../../data/references/data_repo/GRCh38/GRCh38_centromere.bed"
+         conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
+         segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
      vifi_dir: "../../ViFi" 
 
 OTC-vect-easier:

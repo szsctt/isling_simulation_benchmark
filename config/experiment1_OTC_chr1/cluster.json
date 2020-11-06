@@ -2,102 +2,52 @@
 	"__default__":
 	{
 		"nodes" : "1",
-		"mail-user" : "suzanne.scott@csiro.au",
 		"output" : "../../logs/{rule}.%j.log"
 	},
-	"bam_to_fastq":
+	"extract_bam":
 	{	
 		"mem" : "20GB",
-		"time" : "24:00:00",
+		"time" : "2:00:00",
 		"job-name" : "simvi-convert"
 
 	},
 	"convert":
 	{	
 		"mem" : "20GB",
-		"time" : "24:00:00",
+		"time" : "2:00:00",
 		"job-name" : "simvi-convert"
 
 	},
-	"bamtobed":
+	"convert_to_bam":
 	{	
 		"mem" : "20GB",
 		"time" : "24:00:00",
-		"job-name" : "viInt-bamtobed"
-
-	},
-	"markdup":
-	{	
-		"mem" : "10GB",
-		"time" : "24:00:00",
-		"job-name" : "viInt-mkdup"
+		"job-name" : "viInt-convert"
 
 	},
 	"rmdup":
 	{	
 		"mem" : "10GB",
-		"time" : "24:00:00",
+		"time" : "2:00:00",
 		"job-name" : "viInt-rmdup"
 	},
-	"seqPrep":
+	"seqprep":
 	{	
-		"time" : "24:00:00",
+		"time" : "6:00:00",
 		"mem" : "5GB",
 		"job-name" : "viInt-seqPrep"
 	},
-	"extract_to_fastq_paired":
-	{
-		"time" : "24:00:00",
-		"mem" : "20GB",
-		"job-name" : "viInt-extract"
-	},
-	"extract_to_fastq_single":
-	{
-		"time" : "24:00:00",
-		"mem" : "10GB",
-		"job-name" : "viInt-extract"
-	},
-	"extract_vAligned_paired":
-	{
-		"time" : "24:00:00",
-		"mem" : "10GB",
-		"job-name" : "viInt-extract"
-	},
-	"extract_vAligned_single":
-	{
-		"time" : "24:00:00",
-		"mem" : "10GB",
-		"job-name" : "viInt-extract"
-	},
-	"align_bwa_host_single":
+	"align_bwa_virus":
 	{	
-		"time" : "24:00:00",
-		"mem" : "10GB",
-		"job-name" : "viInt-bwa-host"
-	},
-	"align_bwa_host_paired":
-	{	
-		"time" : "24:00:00",
-		"mem" : "10GB",
-		"job-name" : "viInt-bwa-host"
-	},
-	"align_bwa_virus_single":
-	{	
-		"time" : "24:00:00",
+		"time" : "2:00:00",
 		"mem" : "10GB",
 		"job-name" : "viInt-bwa-virus"
 	},
-	"align_bwa_virus_paired":
+	"host_align":
 	{	
-		"time" : "24:00:00",
+		"time" : "2:00:00",
 		"mem" : "10GB",
-		"job-name" : "viInt-bwa-virus"
-	},
-	"merge_reads":
-	{	
-		"time" : "24:00:00",
-		"mem" : "10GB",
-		"job-name" : "viInt-merge"
+		"job-name" : "viInt-bwa-host"
 	},
 	"index":
 	{
@@ -105,34 +55,15 @@
 		"mem" : "20GB",
 		"job-name" : "viInt-bwa-index"
 	},
-	"run_soft":
+	"ints":
 	{
-		"time" : "24:00:00",
-		"mem" : "40GB",
-		"job-name" : "viInt-soft"
-	},
-	"run_short":
-	{
-		"time" : "24:00:00",
-		"mem" : "40GB",
-		"job-name" : "viInt-short"
-	},
-	"run_discordant":
-	{
-		"time" : "24:00:00",
-		"mem" : "40GB",
-		"job-name" : "viInt-discordant"
-	},
-	"count_mapped":
-	{
-		"time" : "24:00:00",
-		"cpus-per-task" : "1",
+		"time" : "2:00:00",
 		"mem" : "20GB",
-		"job-name" : "viInt-count-mapped"
-	}	,
-	"summarise":
+		"job-name" : "viInt-ints"
+	},
+	"post":
 	{
-		"time" : "24:00:00",
+		"time" : "2:00:00",
 		"cpus-per-task" : "1",
 		"mem" : "20GB",
 		"job-name" : "summarise"
@@ -141,7 +72,7 @@
 	{
 		"time" : "24:00:00",
 		"cpus-per-task" : "1",
-		"mem" : "20GB",
+		"mem" : "40GB",
 		"job-name" : "score_reads"
 	}
 }

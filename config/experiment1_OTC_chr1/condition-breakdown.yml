@@ -102,7 +102,6 @@ global:
          centromeres:  "../../data/references/data_repo/GRCh38/GRCh38_centromere.bed"
          conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
          segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
-     vifi_dir: "../../ViFi" 
 
 # things that are different for each dataset
 OTC-whole:

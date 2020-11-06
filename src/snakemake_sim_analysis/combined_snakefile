@@ -603,7 +603,7 @@ rule vifi_faidx:
 	output:
 		fai = "{outpath}/vifi_refs/data_repo/{host}/{host}.fa.fai"
 	params:
-		fai = lambda wildcards: ref_names[wildcards.host] + ".fai"
+		fai = lambda wildcards, input: input.fa + ".fai"
 	container:
 		"docker://szsctt/bwa:1"
 	shell:

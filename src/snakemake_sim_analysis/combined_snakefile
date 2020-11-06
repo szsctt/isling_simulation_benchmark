@@ -518,7 +518,9 @@ rule bwt2_index:
 	input:
 		fasta = lambda wildcards: ref_names[wildcards.genome]
 	output:
-		"{outpath}/references/{genome}/{genome}.1.bt2"
+		multiext("{outpath}/references/{genome}/{genome}", 
+							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
+						)
 	container:
 		"docker://szsctt/polyidus:2"
 	params:

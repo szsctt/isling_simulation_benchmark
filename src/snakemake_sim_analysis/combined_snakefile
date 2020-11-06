@@ -17,8 +17,7 @@ from python_scripts.make_df import check_dataset_sample_unique, make_reference_d
 
 # https://sapac.support.illumina.com/bulletins/2016/12/what-sequences-do-i-use-for-adapter-trimming.html
 HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA", 
-				'read2-adapt' : "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"}
-				
+				'read2-adapt' : "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"}		
 
 adapter_seqs = {'HS25':HS25, 'MSv3':HS25, 'MS': HS25}
 
@@ -692,13 +691,11 @@ rule vifi:
 		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
 		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
 		chrom_list = rules.vifi_data_repo.output.chromosomes,
-		script = lambda wildcards: analysis_df_value(wildcards, 'vifi_dir') + "/scripts/run_vifi.py"
 	output:
 		clusters = "{outpath}/{dset}/vifi.{samp}.{host}.{virus}/output.clusters.txt",
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		fake_merged = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed")
 	params:
-		vifi_dir = lambda wildcards, input: os.path.dirname(os.path.dirname(input.script)),
 		reference_repo = lambda wildcards, input: os.path.dirname(input.fa),
 		aa_data_repo = lambda wildcards, input: os.path.dirname(input.host_list),
 		outdir = lambda wildcards, output: os.path.dirname(output.clusters),
@@ -706,18 +703,17 @@ rule vifi:
 	wildcard_constraints:
 		dset = ".+_vifi\d+"
 	container:
-		"docker://namphuon/vifi"
+		"docker://szsctt/vifi:1"
 	resources:
 		mem_mb= lambda wildcards, attempt: int(attempt * 10000),
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1]
 	threads: 5
 	shell:
 		"""
-		export VIFI_DIR=$(realpath {params.vifi_dir})
 		export AA_DATA_REPO=$(realpath {params.aa_data_repo})
 		export REFERENCE_REPO=$(realpath {params.reference_repo})
 		
-		python {params.vifi_dir}/scripts/run_vifi.py \
+		python $VIFI_DIR/scripts/run_vifi.py \
 		-c {threads} \
 		-f {input.fastq1} -r {input.fastq2} \
 		--reference {input.fa} \

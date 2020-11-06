@@ -79,7 +79,7 @@ column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host
 								'bwa_mem_params', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 									'score_ints', 'score_merged_ints', 'score_ints_window', 'score_ints_tool',
 								'host_mappability', 'host_mappability_exclude', 'host_genes', 'host_exons',
 								'host_oncogenes', 'host_centromeres', 'host_conserved_regions',
-								'host_segdup', 'vifi_dir')																
+								'host_segdup')																
 
 
 for dataset in datasets:
@@ -264,7 +264,6 @@ for dataset in datasets:
 				'score_merged_ints' : score_merged_ints,
 				'score_ints_window' : score_ints_window,
 				'score_ints_tool' : "vifi",
-				'vifi_dir' : config[dataset]['vifi_params']['vifi_dir']
 				})
 			i += 1
 

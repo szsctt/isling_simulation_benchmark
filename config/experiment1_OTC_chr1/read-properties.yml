@@ -1,5 +1,5 @@
 global:
-   out_directory: "../../out/experiment1_OTC_chr1/easier-harder"
+   out_directory: "../../out/experiment1_OTC_chr1/read-props"
    
    # integration simulation
    replicates: 3 
@@ -46,7 +46,7 @@ global:
    fcov: 
        - 5 
    frag_len:
-       - 200
+       - 250
        - 300
        - 500 
        - 1000

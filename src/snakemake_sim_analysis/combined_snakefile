@@ -79,7 +79,9 @@ column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host
 								'bwa_mem_params', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 									'score_ints', 'score_merged_ints', 'score_ints_window', 'score_ints_tool',
 								'host_mappability', 'host_mappability_exclude', 'host_genes', 'host_exons',
 								'host_oncogenes', 'host_centromeres', 'host_conserved_regions',
-								'host_segdup')																
+								'host_segdup', 'detection_mode', 'flank_region_size', 'sensitivity_level', 
+								'min_contig_length', 'blastn_evalue_thrd', 'similarity_thrd', 
+								'chop_read_length', 'minIdentity')																
 
 
 for dataset in datasets:
@@ -257,15 +259,70 @@ for dataset in datasets:
 				'virus'      : virus,		
 				'virus_fasta': config[dataset]['analysis_viruses'][virus],	
 				'analysis_condition': condition,
-				'merge'			 : 0,
 				'tool'			 : 'vifi',			
-				'score_reads' : score_reads,
+				'score_reads' : 0,
 				'score_ints' : score_ints,
 				'score_merged_ints' : score_merged_ints,
 				'score_ints_window' : score_ints_window,
 				'score_ints_tool' : "vifi",
 				})
 			i += 1
+
+	#### parameters for verse ####
+	# paramters should be lists, so that we can do combinations of all
+	if 'verse_params' in config[dataset]:
+		assert hasattr(config[dataset]['verse_params']['detection_mode'], '__iter__')
+		assert hasattr(config[dataset]['verse_params']['flank_region_size'], '__iter__')
+		assert hasattr(config[dataset]['verse_params']['sensitivity_level'], '__iter__')
+		assert hasattr(config[dataset]['verse_params']['min_contig_length'], '__iter__')
+		assert hasattr(config[dataset]['verse_params']['blastn_evalue_thrd'], '__iter__')	
+		assert hasattr(config[dataset]['verse_params']['similarity_thrd'], '__iter__')
+		assert hasattr(config[dataset]['verse_params']['chop_read_length'], '__iter__')
+		assert hasattr(config[dataset]['verse_params']['minIdentity'], '__iter__')
+ 
+	# each combination of these are a unique 'analysis condition' for our pipeline
+		i = 0 
+	
+	 
+		for host, virus, detection_mode, flank_region_size, sensitivity_level, min_contig_length, blastn_evalue_thrd, similarity_thrd, chop_read_length, minIdentity in itertools.product(
+																		config[dataset]['analysis_hosts'].keys(),
+																		config[dataset]['analysis_viruses'].keys(),
+																		config[dataset]['verse_params']['detection_mode'], 
+																		config[dataset]['verse_params']['flank_region_size'], 
+																		config[dataset]['verse_params']['sensitivity_level'],
+																		config[dataset]['verse_params']['min_contig_length'],
+																		config[dataset]['verse_params']['blastn_evalue_thrd'],
+																		config[dataset]['verse_params']['similarity_thrd'],
+																		config[dataset]['verse_params']['chop_read_length'],
+																		config[dataset]['verse_params']['minIdentity'],
+																		):
+		
+			condition = f"{dataset}_verse{i}"
+		
+			analysis_conditions.append({
+				'experiment' : dataset,
+				'host' 			: host,
+				'host_fasta': config[dataset]['analysis_hosts'][host],
+				'virus'     : virus,
+				'virus_fasta': config[dataset]['analysis_viruses'][virus],
+				'analysis_condition': condition,
+				'detection_mode' : detection_mode,
+				'flank_region_size' : flank_region_size,
+				'sensitivity_level' : sensitivity_level,
+				'min_contig_length' : min_contig_length,
+				'blastn_evalue_thrd': blastn_evalue_thrd,
+				'similarity_thrd'   : similarity_thrd,
+				'chop_read_length'  : chop_read_length,
+				'minIdentity'       : minIdentity,
+				'score_ints' : score_ints,
+				'score_merged_ints' : score_merged_ints,
+				'score_ints_window' : score_ints_window,
+				'score_ints_tool' : "verse",
+				'tool'			 : 'verse',	
+			})
+			i += 1
+
+
 
 ##### parameters that are common to each experiment ####
 for cond_dict in analysis_conditions:
@@ -362,7 +419,7 @@ localrules: write_summary, write_analysis_summary#, combine_int_scores, combine_
 # rule polyidus has a wildcard contstraint so it can't be used for our pipeline
 # so make it higher in the priority
 
-ruleorder: vifi > polyidus > combine_ints > merged_bed
+ruleorder: vifi > polyidus > verse > combine_ints > merged_bed
 
 #####################################################
 ################### target files ####################
@@ -454,6 +511,23 @@ for i, row in analysis_df.iterrows():
 		vifi_targets.add(
 			f"{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.tsv"
 		)
+		
+
+# verse targets
+verse_targets = set()
+for i, row in analysis_df.iterrows():
+	if row['tool'] != 'verse':
+		continue
+	outpath = row['outdir']
+	exp = row['experiment']
+	dset = row['analysis_condition']
+		
+	samples = sim_df[sim_df['experiment'] == exp]['sample']
+		
+	for samp in samples:
+		verse_targets.add(
+			f"{outpath}/{dset}/{samp}.{host}.{virus}/integration-sites.txt"
+		)
 	
 # summary files
 
@@ -474,7 +548,8 @@ rule all:
 		merged_targets,
 		scored_summaries,
 		polyidus_targets,
-		vifi_targets
+		vifi_targets,
+		verse_targets
 		
 		
 #####################################################
@@ -726,7 +801,148 @@ rule vifi:
 		cp {output.clusters} {output.ints}
 		cp {output.clusters} {output.fake_merged}
 		"""			
-				
+
+#####################################################
+###################### verse ########################
+#####################################################
+
+# verse uses a different version of bowtie2 than polyidus
+# in theory they could share the same indexes
+# but just to be safe, index again
+rule bwt2_verse:
+	input:
+		fasta = lambda wildcards: ref_names[wildcards.genome]
+	output:
+		multiext("{outpath}/verse_references/{genome}/{genome}", 
+							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
+						)
+	container:
+		"docker://szsctt/verse:1"
+	params:
+		prefix = lambda wildcards, output: path.splitext(path.splitext(output[0])[0])[0]
+	resources:
+		mem_mb= lambda wildcards, attempt, input: int(attempt * 5 * (os.stat(input.fasta).st_size/1e6)),
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	shell:
+		"bowtie2-build {input} {params.prefix}"
+		
+rule blastplus_verse:
+	input:
+		fasta = lambda wildcards: ref_names[wildcards.genome]
+	output:
+		multiext("{outpath}/verse_references/{genome}/{genome}", 
+							".nhr", ".nin", ".nsq"
+						)
+	container:
+		"docker://szsctt/verse:1"
+	params:
+		prefix = lambda wildcards, output: path.splitext(output[0])[0]
+	resources:
+		mem_mb= lambda wildcards, attempt, input: int(attempt * 5 * (os.stat(input.fasta).st_size/1e6)),
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	shell:
+		"makeblastdb -in {input} -dbtype nucl -out {params.prefix}"
+		
+rule verse_config:
+	input:
+		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
+		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
+		virus_fasta = lambda wildcards: ref_names[wildcards.virus],
+		host_fasta = lambda wildcards: ref_names[wildcards.host],
+		host_idx =  "{outpath}/verse_references/{host}/{host}.1.bt2",
+		virus_blast = "{outpath}/verse_references/{virus}/{virus}.nin",
+		host_blast = "{outpath}/verse_references/{host}/{host}.nin"
+	output:
+		config = "{outpath}/{dset}/{samp}.{host}.{virus}/config.txt"
+	params:
+		host_bowtie = lambda wildcards, input: path.splitext(path.splitext(path.realpath(input.host_idx))[0])[0],
+		virus_blast = lambda wildcards, input: path.splitext(path.realpath(input.virus_blast))[0],
+		host_blast = lambda wildcards, input: path.splitext(path.realpath(input.host_blast))[0],
+		host_fasta = lambda wildcards, input: path.splitext(path.splitext(path.realpath(input.host_idx))[0])[0] + '.fa',
+		virus_fasta = lambda wildcards, input: path.splitext(path.realpath(input.virus_blast))[0] + '.fa',
+		detection_mode = lambda wildcards: analysis_df_value(wildcards, 'detection_mode'),
+		flank_region_size = lambda wildcards: analysis_df_value(wildcards, 'flank_region_size'),
+		sensitivity_level = lambda wildcards: analysis_df_value(wildcards, 'sensitivity_level'),
+		min_contig_length = lambda wildcards: analysis_df_value(wildcards, 'min_contig_length'),
+		blastn_evalue_thrd = lambda wildcards: analysis_df_value(wildcards, 'blastn_evalue_thrd'),
+		similarity_thrd = lambda wildcards: analysis_df_value(wildcards, 'similarity_thrd'),
+		chop_read_length = lambda wildcards: analysis_df_value(wildcards, 'chop_read_length'),
+		minIdentity = lambda wildcards: analysis_df_value(wildcards, 'minIdentity'),		
+	shell:
+		"""
+  		echo "fastq1 = $(realpath {input.fastq1})" > {output.config}
+  		echo "fastq2 = $(realpath {input.fastq2})" >> {output.config}
+  		echo 'detect_integration = yes' >> {output.config}
+  		echo 'detect_mutation = no' >> {output.config}
+  		echo 'thread_no = {threads}' >> {output.config}
+  		echo 'blastn_bin = /usr/bin/blastn' >> {output.config}
+  		echo 'bowtie_bin = /usr/bin/bowtie2' >> {output.config}
+  		echo 'bwa_bin = /usr/bin/bwa' >> {output.config}
+  		echo 'trinity_script = /trinityrnaseq_r2013-02-16/Trinity.pl' >> {output.config}
+  		echo 'SVDetect_dir = /SVDetect_r0.8' >> {output.config}
+  		echo 'virus_database = {params.virus_fasta}' >> {output.config}
+  		echo 'bowtie_index_human = {params.host_bowtie}' >> {output.config}
+  		echo 'blastn_index_human = {params.host_blast}' >> {output.config}
+  		echo 'blastn_index_virus = {params.virus_blast}' >> {output.config}
+  		echo 'detection_mode     = {params.detection_mode}' >> {output.config}
+			echo 'flank_region_size  = {params.flank_region_size}' >> {output.config}
+			echo 'sensitivity_level  = {params.sensitivity_level}' >> {output.config}
+  		echo 'min_contig_length = {params.min_contig_length}' >> {output.config}
+  		echo 'blastn_evalue_thrd = {params.blastn_evalue_thrd}' >> {output.config}
+  		echo 'similarity_thrd = {params.similarity_thrd}' >> {output.config}
+  		echo 'chop_read_length = {params.chop_read_length}' >> {output.config}
+  		echo 'minIdentity = {params.minIdentity}' >> {output.config}
+  		
+  		ln -sf $(realpath {input.host_fasta}) {params.host_fasta}
+  		ln -sf $(realpath {input.virus_fasta}) {params.virus_fasta}
+  		
+		"""
+
+rule verse:
+	input:
+		config = rules.verse_config.output.config,
+		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
+		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
+		virus_fasta = lambda wildcards: ref_names[wildcards.virus],
+		host_fasta = lambda wildcards: ref_names[wildcards.host],
+		host_idx =  "{outpath}/verse_references/{host}/{host}.1.bt2",
+		virus_blast = "{outpath}/verse_references/{virus}/{virus}.nin",
+		host_blast = "{outpath}/verse_references/{host}/{host}.nin"
+	output:
+		output = "{outpath}/{dset}/{samp}.{host}.{virus}/integration-sites.txt",
+		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		fake_merged = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed")
+	params:
+		workdir = lambda wildcards, output: path.dirname(path.realpath(output.output)),
+		config = lambda wildcards, input: path.basename(input.config),
+		currdir = lambda wildcards: os.getcwd()
+	wildcard_constraints:
+		dset = ".+_verse\d+"
+	container:
+		"docker://szsctt/verse:1"
+	
+	shell:
+		"""
+		cd {params.workdir}
+		pwd
+		ls
+		perl /var/work/VirusFinder2.0/VirusFinder.pl -c {params.config}
+		
+		cd {params.currdir}
+		# virusFinder only makes an output file if it finds integration sites
+		# but snakemake always requires the same output files
+		if [ ! -e {output.output} ]; then
+			touch {output.output}
+		fi
+		
+		cp {output.output} {output.ints}
+		cp {output.output} {output.fake_merged}
+		"""
+		
+
+
 #####################################################
 ############ compare sim with analysis ##############
 #####################################################
@@ -866,8 +1082,6 @@ rule combine_read_scores:
 		"""
 		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
 		"""
-
-
 
 rule score_integrations:
 	input:

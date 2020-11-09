@@ -944,7 +944,7 @@ rule combine_int_scores:
 	container:
 		"docker://ubuntu:18.04"	
 	resources:
-		mem_mb= lambda wildcards, attempt: attempt * 5000,
+		mem_mb= lambda wildcards, attempt, input: attempt * len(input) * 10,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	shell:

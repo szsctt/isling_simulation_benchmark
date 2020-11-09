@@ -74,3 +74,5 @@ verse_test/sbatch_template.sb
 
 
 data/references/data_repo/
+verse_test/reads/
+verse_test/test-chr1/

@@ -1,0 +1,65 @@
+###########################################################################
+#
+# Configuration file for VirusFinder
+#
+###########################################################################
+
+
+################################
+## Input NGS data can be either of the following two options:
+##  (a) an alignment file (in BAM format).
+##  (b) FASTQ file(s) (preferred). For single end data, user needs to specify the variable fastq1; 
+##      for paired-end data, user has to specify both fastq1 and fastq2. 
+################################
+
+#alignment_file = /scratch/kingw/VirusFinder/simulation/simulation.bam
+fastq1        = /datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/verse_test/reads/cond0.rep01.fq
+fastq2        = /datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/verse_test/reads/cond0.rep02.fq
+
+mailto         = suzanne.scott@csiro.au
+thread_no      = 8
+
+detect_integration = yes   # if no is provided, VirusFinder will not detect virus integrations
+detect_mutation    = yes   # if no is provided, VirusFinder will not detect viral mutations
+
+
+################################
+## The full paths to the following third-party tools are required by VirusFinder:
+################################
+
+blastn_bin      = /usr/bin/blastn
+bowtie_bin      = /usr/bin/bowtie2
+bwa_bin         = /usr/bin/bwa
+trinity_script  = /trinityrnaseq_r2013-02-16/Trinity.pl
+SVDetect_dir    = /SVDetect_r0.8
+
+
+################################
+## Reference files indexed for Bowtie2 and BLAST
+################################
+
+virus_database     = /datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/verse_test/references/OTC-vec_rAAV-genome-only.fa
+bowtie_index_human = /datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/verse_test/references/GRCh38
+blastn_index_human = /datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/verse_test/references/GRCh38
+blastn_index_virus = /datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/verse_test/references/OTC-vec_rAAV-genome-only
+
+
+##########################################
+## Parameters of virus integration detection. They are ignored for single-end data
+##########################################
+
+detection_mode     = sensitive
+flank_region_size  = 4000
+sensitivity_level  = 1
+
+##########################################
+## Parameters of virus detection. Smaller “min_contig_length”, higher sensitivity
+##########################################
+
+min_contig_length  = 300
+blastn_evalue_thrd = 0.05
+similarity_thrd    = 0.8 
+chop_read_length   = 25
+minIdentity        = 80
+ 
+

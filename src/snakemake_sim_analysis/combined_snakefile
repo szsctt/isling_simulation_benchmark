@@ -21,6 +21,8 @@ HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
 
 adapter_seqs = {'HS25':HS25, 'MSv3':HS25, 'MS': HS25}
 
+verse_threads = 8
+
 #####################################################
 ############### global parameters ###################
 #####################################################
@@ -876,7 +878,7 @@ rule verse_config:
   		echo "fastq2 = $(realpath {input.fastq2})" >> {output.config}
   		echo 'detect_integration = yes' >> {output.config}
   		echo 'detect_mutation = no' >> {output.config}
-  		echo 'thread_no = {threads}' >> {output.config}
+  		echo 'thread_no = {verse_threads}' >> {output.config}
   		echo 'blastn_bin = /usr/bin/blastn' >> {output.config}
   		echo 'bowtie_bin = /usr/bin/bowtie2' >> {output.config}
   		echo 'bwa_bin = /usr/bin/bwa' >> {output.config}
@@ -922,12 +924,14 @@ rule verse:
 		dset = ".+_verse\d+"
 	container:
 		"docker://szsctt/verse:1"
-	
+	resources:
+		mem_mb= lambda wildcards, attempt: 100000 * attempt,
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	threads: verse_threads
 	shell:
 		"""
 		cd {params.workdir}
-		pwd
-		ls
 		perl /var/work/VirusFinder2.0/VirusFinder.pl -c {params.config}
 		
 		cd {params.currdir}

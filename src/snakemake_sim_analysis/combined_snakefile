@@ -877,8 +877,8 @@ rule verse_config:
 	input:
 		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
 		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
-		virus_fasta = lambda wildcards: ref_names[wildcards.virus],
-		host_fasta = lambda wildcards: ref_names[wildcards.host],
+		virus_fasta = "{outpath}/verse_references/{virus}/{virus}.fa",
+		host_fasta = "{outpath}/verse_references/{host}/{host}.fa",
 		host_idx = multiext("{outpath}/verse_references/{host}/{host}", 
 												".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
 												),
@@ -912,7 +912,7 @@ rule verse_config:
   		echo 'bwa_bin = /usr/bin/bwa' >> {output.config}
   		echo 'trinity_script = /trinityrnaseq_r2013-02-16/Trinity.pl' >> {output.config}
   		echo 'SVDetect_dir = /SVDetect_r0.8' >> {output.config}
-  		echo 'virus_database = {params.virus_fasta}' >> {output.config}
+  		echo 'virus_database = {input.virus_fasta}' >> {output.config}
   		echo 'bowtie_index_human = {params.host_bowtie}' >> {output.config}
   		echo 'blastn_index_human = {params.host_blast}' >> {output.config}
   		echo 'blastn_index_virus = {params.virus_blast}' >> {output.config}
@@ -924,9 +924,6 @@ rule verse_config:
   		echo 'similarity_thrd = {params.similarity_thrd}' >> {output.config}
   		echo 'chop_read_length = {params.chop_read_length}' >> {output.config}
   		echo 'minIdentity = {params.minIdentity}' >> {output.config}
-  		
-  		ln -sf $(realpath {input.host_fasta}) {params.host_fasta}
-  		ln -sf $(realpath {input.virus_fasta}) {params.virus_fasta}
   		
 		"""
 

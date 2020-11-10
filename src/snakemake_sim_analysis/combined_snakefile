@@ -620,8 +620,12 @@ rule polyidus:
 	input:
 		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
 		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
-		host_idx =  "{outpath}/references/{host}/{host}.1.bt2",
-		virus_idx = "{outpath}/references/{virus}/{virus}.1.bt2"
+		host_idx = multiext("{outpath}/references/{host}/{host}", 
+							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
+						),
+		virus_idx =  multiext("{outpath}/references/{virus}/{virus}, 
+							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
+						)
 	output:
 		temp_ints = temp("{outpath}/{dset}/polyidus.{host}.{virus}.{samp}/results/exactHpvIntegrations.tsv"),
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
@@ -764,11 +768,22 @@ rule data_repo_host_list:
 rule vifi:
 	input:
 		idx = rules.host_virus_index.output.idx,
-		fa = rules.host_virus_index.output.fa,
 		host_list = rules.data_repo_host_list.output[0],
 		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
 		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
 		chrom_list = rules.vifi_data_repo.output.chromosomes,
+		rules.vifi_data_repo.output.chromosomes,
+		rules.vifi_data_repo.output.file_list,		
+		rules.vifi_data_repo.output.fa,		
+		rules.vifi_data_repo.output.mappability,	
+		rules.vifi_data_repo.output.mappability_exclude,
+		rules.vifi_data_repo.output.genes,		
+		rules.vifi_data_repo.output.exons,		
+		rules.vifi_data_repo.output.oncogenes,
+		rules.vifi_data_repo.output.centromeres,		
+		rules.vifi_data_repo.output.conserved,		
+		rules.vifi_data_repo.output.segdup,		
+		rules.vifi_faidx.output.fai	
 	output:
 		clusters = "{outpath}/{dset}/vifi.{samp}.{host}.{virus}/output.clusters.txt",
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
@@ -853,17 +868,21 @@ rule verse_config:
 		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
 		virus_fasta = lambda wildcards: ref_names[wildcards.virus],
 		host_fasta = lambda wildcards: ref_names[wildcards.host],
-		host_idx =  "{outpath}/verse_references/{host}/{host}.1.bt2",
-		virus_blast = "{outpath}/verse_references/{virus}/{virus}.nin",
-		host_blast = "{outpath}/verse_references/{host}/{host}.nin"
+		host_idx = multiext("{outpath}/verse_references/{host}/{host}", 
+												".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
+												),
+		virus_blast = multiext("{outpath}/verse_references/{virus}/{virus}, 
+														".nhr", ".nin", ".nsq"),
+		host_blast = multiext("{outpath}/verse_references/{host}/{host}, 
+														".nhr", ".nin", ".nsq"),
 	output:
-		config = "{outpath}/{dset}/{samp}.{host}.{virus}/config.txt"
+		config = "{outpath}/{dset}/{samp}.{host}.{virus}/config.txt",
+		virus_fasta = "{outpath}/verse_references/{virus}/{virus}.fa",
+		host_fasta = "{outpath}/verse_references/{host}/{host}.fa",		
 	params:
-		host_bowtie = lambda wildcards, input: path.splitext(path.splitext(path.realpath(input.host_idx))[0])[0],
-		virus_blast = lambda wildcards, input: path.splitext(path.realpath(input.virus_blast))[0],
-		host_blast = lambda wildcards, input: path.splitext(path.realpath(input.host_blast))[0],
-		host_fasta = lambda wildcards, input: path.splitext(path.splitext(path.realpath(input.host_idx))[0])[0] + '.fa',
-		virus_fasta = lambda wildcards, input: path.splitext(path.realpath(input.virus_blast))[0] + '.fa',
+		host_bowtie = lambda wildcards, input: path.splitext(path.splitext(path.realpath(input.host_idx[0]))[0])[0],
+		virus_blast = lambda wildcards, input: path.splitext(path.realpath(input.virus_blast[0]))[0],
+		host_blast = lambda wildcards, input: path.splitext(path.realpath(input.host_blast[0]))[0],
 		detection_mode = lambda wildcards: analysis_df_value(wildcards, 'detection_mode'),
 		flank_region_size = lambda wildcards: analysis_df_value(wildcards, 'flank_region_size'),
 		sensitivity_level = lambda wildcards: analysis_df_value(wildcards, 'sensitivity_level'),
@@ -907,11 +926,15 @@ rule verse:
 		config = rules.verse_config.output.config,
 		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
 		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
-		virus_fasta = lambda wildcards: ref_names[wildcards.virus],
-		host_fasta = lambda wildcards: ref_names[wildcards.host],
-		host_idx =  "{outpath}/verse_references/{host}/{host}.1.bt2",
-		virus_blast = "{outpath}/verse_references/{virus}/{virus}.nin",
-		host_blast = "{outpath}/verse_references/{host}/{host}.nin"
+		virus_fasta = rules.verse_config.output.virus_fasta,
+		host_fasta = rules.verse_config.output.host_fasta,
+		host_idx = multiext("{outpath}/verse_references/{host}/{host}", 
+												".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
+												),
+		virus_blast = multiext("{outpath}/verse_references/{virus}/{virus}, 
+														".nhr", ".nin", ".nsq"),
+		host_blast = multiext("{outpath}/verse_references/{host}/{host}, 
+														".nhr", ".nin", ".nsq"),
 	output:
 		output = "{outpath}/{dset}/{samp}.{host}.{virus}/integration-sites.txt",
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",

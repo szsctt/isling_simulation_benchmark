@@ -632,8 +632,8 @@ rule polyidus:
 		fake_merged = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed")
 	params:
 		output = lambda wildcards, output: path.dirname(path.dirname(output.temp_ints)),
-		host_idx = lambda wildcards, input: path.splitext(path.splitext(input.host_idx)[0])[0],
-		virus_idx = lambda wildcards, input: path.splitext(path.splitext(input.virus_idx)[0])[0],
+		host_idx = lambda wildcards, input: path.splitext(path.splitext(input.host_idx[0])[0])[0],
+		virus_idx = lambda wildcards, input: path.splitext(path.splitext(input.virus_idx[0])[0])[0],
 	resources:
 		mem_mb= lambda wildcards, attempt: int(attempt * 10000),
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1]
@@ -667,7 +667,7 @@ rule host_virus_index:
 		fa = "{outpath}/vifi_refs/data/{virus}/{host}_{virus}.fas",
 		idx = multiext("{outpath}/vifi_refs/data/{virus}/{host}_{virus}.fas", ".amb", ".ann", ".bwt", ".pac", ".sa")
 	container:
-		"docker://namphuon/vifi"
+		"docker://szsctt/vifi:1"
 	resources:
 		mem_mb= lambda wildcards, attempt, input: int(attempt * 5 * (os.stat(input.host).st_size/1e6 + os.stat(input.virus).st_size/1e6)),
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
@@ -686,7 +686,7 @@ rule vifi_faidx:
 	params:
 		fai = lambda wildcards, input: input.fa + ".fai"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/vifi:1"
 	shell:
 		"""
 		samtools faidx {input.fa}

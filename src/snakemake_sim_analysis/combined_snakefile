@@ -623,7 +623,7 @@ rule polyidus:
 		host_idx = multiext("{outpath}/references/{host}/{host}", 
 							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
 						),
-		virus_idx =  multiext("{outpath}/references/{virus}/{virus}, 
+		virus_idx =  multiext("{outpath}/references/{virus}/{virus}", 
 							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
 						)
 	output:
@@ -767,11 +767,6 @@ rule data_repo_host_list:
 		
 rule vifi:
 	input:
-		idx = rules.host_virus_index.output.idx,
-		host_list = rules.data_repo_host_list.output[0],
-		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
-		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
-		chrom_list = rules.vifi_data_repo.output.chromosomes,
 		rules.vifi_data_repo.output.chromosomes,
 		rules.vifi_data_repo.output.file_list,		
 		rules.vifi_data_repo.output.fa,		
@@ -783,7 +778,13 @@ rule vifi:
 		rules.vifi_data_repo.output.centromeres,		
 		rules.vifi_data_repo.output.conserved,		
 		rules.vifi_data_repo.output.segdup,		
-		rules.vifi_faidx.output.fai	
+		rules.vifi_faidx.output.fai,
+		idx = rules.host_virus_index.output.idx,
+		host_list = rules.data_repo_host_list.output[0],
+		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
+		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
+		chrom_list = rules.vifi_data_repo.output.chromosomes,
+
 	output:
 		clusters = "{outpath}/{dset}/vifi.{samp}.{host}.{virus}/output.clusters.txt",
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
@@ -862,6 +863,16 @@ rule blastplus_verse:
 	shell:
 		"makeblastdb -in {input} -dbtype nucl -out {params.prefix}"
 		
+rule copy_reference_verse:
+	input:
+		fasta = lambda wildcards: ref_names[wildcards.genome],
+	output:
+		fasta = "{outpath}/verse_references/{genome}/{genome}.fa",
+	shell:
+		"""
+		ln -sf $(realpath {input.fasta}) $(realpath {output.fasta})
+		"""
+	
 rule verse_config:
 	input:
 		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
@@ -871,14 +882,12 @@ rule verse_config:
 		host_idx = multiext("{outpath}/verse_references/{host}/{host}", 
 												".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
 												),
-		virus_blast = multiext("{outpath}/verse_references/{virus}/{virus}, 
+		virus_blast = multiext("{outpath}/verse_references/{virus}/{virus}", 
 														".nhr", ".nin", ".nsq"),
-		host_blast = multiext("{outpath}/verse_references/{host}/{host}, 
+		host_blast = multiext("{outpath}/verse_references/{host}/{host}", 
 														".nhr", ".nin", ".nsq"),
 	output:
-		config = "{outpath}/{dset}/{samp}.{host}.{virus}/config.txt",
-		virus_fasta = "{outpath}/verse_references/{virus}/{virus}.fa",
-		host_fasta = "{outpath}/verse_references/{host}/{host}.fa",		
+		config = "{outpath}/{dset}/{samp}.{host}.{virus}/config.txt",	
 	params:
 		host_bowtie = lambda wildcards, input: path.splitext(path.splitext(path.realpath(input.host_idx[0]))[0])[0],
 		virus_blast = lambda wildcards, input: path.splitext(path.realpath(input.virus_blast[0]))[0],
@@ -926,14 +935,14 @@ rule verse:
 		config = rules.verse_config.output.config,
 		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
 		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
-		virus_fasta = rules.verse_config.output.virus_fasta,
-		host_fasta = rules.verse_config.output.host_fasta,
+		virus_fasta = "{outpath}/verse_references/{virus}/{virus}.fa",
+		host_fasta = "{outpath}/verse_references/{host}/{host}.fa",	
 		host_idx = multiext("{outpath}/verse_references/{host}/{host}", 
 												".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
 												),
-		virus_blast = multiext("{outpath}/verse_references/{virus}/{virus}, 
+		virus_blast = multiext("{outpath}/verse_references/{virus}/{virus}", 
 														".nhr", ".nin", ".nsq"),
-		host_blast = multiext("{outpath}/verse_references/{host}/{host}, 
+		host_blast = multiext("{outpath}/verse_references/{host}/{host}", 
 														".nhr", ".nin", ".nsq"),
 	output:
 		output = "{outpath}/{dset}/{samp}.{host}.{virus}/integration-sites.txt",

@@ -894,13 +894,13 @@ rule verse_config:
 		host_blast = lambda wildcards, input: path.splitext(path.realpath(input.host_blast[0]))[0],
 		virus_fa = lambda wilcards, input: path.realpath(input.virus_fasta),
 		detection_mode = lambda wildcards: analysis_df_value(wildcards, 'detection_mode'),
-		flank_region_size = lambda wildcards: analysis_df_value(wildcards, 'flank_region_size'),
-		sensitivity_level = lambda wildcards: analysis_df_value(wildcards, 'sensitivity_level'),
-		min_contig_length = lambda wildcards: analysis_df_value(wildcards, 'min_contig_length'),
+		flank_region_size = lambda wildcards: int(analysis_df_value(wildcards, 'flank_region_size')),
+		sensitivity_level = lambda wildcards: int(analysis_df_value(wildcards, 'sensitivity_level')),
+		min_contig_length = lambda wildcards: int(analysis_df_value(wildcards, 'min_contig_length')),
 		blastn_evalue_thrd = lambda wildcards: analysis_df_value(wildcards, 'blastn_evalue_thrd'),
 		similarity_thrd = lambda wildcards: analysis_df_value(wildcards, 'similarity_thrd'),
-		chop_read_length = lambda wildcards: analysis_df_value(wildcards, 'chop_read_length'),
-		minIdentity = lambda wildcards: analysis_df_value(wildcards, 'minIdentity'),		
+		chop_read_length = lambda wildcards: int(analysis_df_value(wildcards, 'chop_read_length')),
+		minIdentity = lambda wildcards: int(analysis_df_value(wildcards, 'minIdentity')),		
 	shell:
 		"""
   		echo "fastq1 = $(realpath {input.fastq1})" > {output.config}

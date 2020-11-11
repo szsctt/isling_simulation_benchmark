@@ -870,7 +870,7 @@ rule copy_reference_verse:
 		fasta = "{outpath}/verse_references/{genome}/{genome}.fa",
 	shell:
 		"""
-		ln -sf $(realpath {input.fasta}) $(realpath {output.fasta})
+		cp $(realpath {input.fasta}) $(realpath {output.fasta})
 		"""
 	
 rule verse_config:
@@ -892,6 +892,7 @@ rule verse_config:
 		host_bowtie = lambda wildcards, input: path.splitext(path.splitext(path.realpath(input.host_idx[0]))[0])[0],
 		virus_blast = lambda wildcards, input: path.splitext(path.realpath(input.virus_blast[0]))[0],
 		host_blast = lambda wildcards, input: path.splitext(path.realpath(input.host_blast[0]))[0],
+		virus_fa = lambda wilcards, input: path.realpath(input.virus_fasta),
 		detection_mode = lambda wildcards: analysis_df_value(wildcards, 'detection_mode'),
 		flank_region_size = lambda wildcards: analysis_df_value(wildcards, 'flank_region_size'),
 		sensitivity_level = lambda wildcards: analysis_df_value(wildcards, 'sensitivity_level'),
@@ -912,7 +913,7 @@ rule verse_config:
   		echo 'bwa_bin = /usr/bin/bwa' >> {output.config}
   		echo 'trinity_script = /trinityrnaseq_r2013-02-16/Trinity.pl' >> {output.config}
   		echo 'SVDetect_dir = /SVDetect_r0.8' >> {output.config}
-  		echo 'virus_database = {input.virus_fasta}' >> {output.config}
+  		echo 'virus_database = {params.virus_fa}' >> {output.config}
   		echo 'bowtie_index_human = {params.host_bowtie}' >> {output.config}
   		echo 'blastn_index_human = {params.host_blast}' >> {output.config}
   		echo 'blastn_index_virus = {params.virus_blast}' >> {output.config}

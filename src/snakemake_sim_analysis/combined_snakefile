@@ -957,6 +957,8 @@ rule verse:
 		mem_mb= lambda wildcards, attempt: 100000 * attempt,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
+	log:
+		"{outpath}/logs/verse_{dset}_{samp}_{host}_{virus}.log"
 	threads: verse_threads
 	shell:
 		"""

@@ -1,0 +1,69 @@
+# conduct multiple experiments
+# each experiment has multiple conditions, which have different parameteres
+# within each experiment, use all possible combinations of all parameters ('conditions')
+# and perform a number of replicates of each condition
+
+test:
+
+    ### experiment parameters ###
+    out_directory: "verse_test/chr1_sim_data" # root directory for output
+    replicates: 1 # number of replicates for each condition (combination of parameters)
+
+    ### parameters for integration simulation (python script) ###
+    # fasta files to use for simulating integrations
+    # and names for each 
+    hosts: 
+        "human" : "data/references/chrs/chr1.fa"
+    viruses:
+        "AAV" :  "data/references/OTC-vec_rAAV-genome-only.fa"
+
+    # random seed for first replicate - will be incremented on successive replicates
+    # use the same seed for the python script and ART
+    initial_seed: 12345
+    seed_increment: 123 
+    
+     # number of integrations to perform
+    int_num: 
+        - 50
+    min_sep: 
+        - 500  
+    epi_num:
+        - 0
+    # probabilities
+    p_whole:
+        - 0.5
+    min_len: 
+        - 500 
+    p_rearrange:
+        - 0.1
+    p_delete:
+        - 0.1
+    lambda_split:
+        - 1
+    p_overlap:
+        - 0.2
+    p_gap:
+        - 0.2
+    lambda_junction:
+        - 1
+    p_host_deletion:
+        - 0.2
+    lambda_host_deletion:
+        - 20
+
+    ### parameters for read simulation (art) ###
+    read_len: 
+        - 150
+    # fold coverage (-f)
+    fcov: 
+        - 10 
+    # mean fragment length (-m)
+    frag_len: 
+        - 500 
+    # fragment length standard deviation (-s)
+    frag_std: 
+        - 30
+    # sequencing system profile for art-illumna
+    seq_sys: 
+        - "MSv3"
+    

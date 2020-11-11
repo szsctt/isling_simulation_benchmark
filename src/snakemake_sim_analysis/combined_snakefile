@@ -947,8 +947,8 @@ rule verse:
 		fake_merged = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed")
 	params:
 		workdir = lambda wildcards, output: path.dirname(path.realpath(output.output)),
-		config = lambda wildcards, input: path.basename(input.config),
-		currdir = lambda wildcards: os.getcwd()
+		currdir = lambda wildcards: os.getcwd(),
+		config = lambda wildcards, input: path.basename(input.config)
 	wildcard_constraints:
 		dset = ".+_verse\d+"
 	container:
@@ -963,7 +963,7 @@ rule verse:
 	shell:
 		"""
 		cd {params.workdir}
-		cp {input.config} .
+		
 		perl /var/work/VirusFinder2.0/VirusFinder.pl -c {params.config}
 		
 		cd {params.currdir}

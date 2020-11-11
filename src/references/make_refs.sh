@@ -25,6 +25,10 @@ awk 'match ($3, /gene/) || match($1, /^#/)' gencode.v35.annotation.gff3 > hg38.g
 
 awk 'match ($3, /exon/) || match($1, /^#/)' gencode.v35.annotation.gff3 > hg38.gencode.v35.annotation.exons.gff3
 
+
+# get data repo for vifi
+#https://drive.google.com/drive/folders/0ByYcg0axX7udeGFNVWtaUmxrOFk
+
 # get mappability/uniqueness
 #https://wiki.bits.vib.be/index.php/Create_a_mappability_track
 GEM="gem.sif"

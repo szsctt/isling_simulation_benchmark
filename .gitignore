@@ -69,7 +69,7 @@ vifi_latest.sif
 polyidus.sif
 polyidus_test/larger-dataset-timing.log
 verse_test/sbatch_template.sb
-
+config/experiment1_OTC_chr1/*.cloud.yml
 
 
 
@@ -81,3 +81,4 @@ verse_test/data/
 verse_test/refs/
 verse_test/test-chr1-cloud/
 verse_test/*sif
+config/*/*.cloud/yml

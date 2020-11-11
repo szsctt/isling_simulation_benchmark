@@ -768,8 +768,7 @@ rule data_repo_host_list:
 rule vifi:
 	input:
 		rules.vifi_data_repo.output.chromosomes,
-		rules.vifi_data_repo.output.file_list,		
-		rules.vifi_data_repo.output.fa,		
+		rules.vifi_data_repo.output.file_list,				
 		rules.vifi_data_repo.output.mappability,	
 		rules.vifi_data_repo.output.mappability_exclude,
 		rules.vifi_data_repo.output.genes,		
@@ -779,6 +778,7 @@ rule vifi:
 		rules.vifi_data_repo.output.conserved,		
 		rules.vifi_data_repo.output.segdup,		
 		rules.vifi_faidx.output.fai,
+		fa = rules.vifi_data_repo.output.fa,
 		idx = rules.host_virus_index.output.idx,
 		host_list = rules.data_repo_host_list.output[0],
 		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),

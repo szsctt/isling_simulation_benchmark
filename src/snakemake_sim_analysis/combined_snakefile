@@ -961,6 +961,7 @@ rule verse:
 	shell:
 		"""
 		cd {params.workdir}
+		cp {input.config} .
 		perl /var/work/VirusFinder2.0/VirusFinder.pl -c {params.config}
 		
 		cd {params.currdir}

@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-CONFIG="../../config/experiment1_OTC_chr1/analysis-conditions.yml"
+#CONFIG="../../config/experiment1_OTC_chr1/analysis-conditions.yml"
 
-bash ./run-cloud.sh $CONFIG
+#bash ./run-cloud.sh $CONFIG
 
 CONFIG="../../config/experiment1_OTC_chr1/easier-harder.yml"
 

@@ -46,8 +46,9 @@ fi
 cp $CONFIG .
 
 # run container
+date
 singularity exec \
  -B$(realpath $DATADIR) -B$(realpath $REFDIR) \
  verse_1.sif  \
  perl /var/work/VirusFinder2.0/VirusFinder.pl -c $(basename $CONFIG) &> verse_test.log
-
+date

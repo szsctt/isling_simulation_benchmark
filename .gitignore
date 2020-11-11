@@ -76,3 +76,8 @@ verse_test/sbatch_template.sb
 data/references/data_repo/
 verse_test/reads/
 verse_test/test-chr1/
+src/snakemake_sim_analysis/sjs_snakemake_test/
+verse_test/data/
+verse_test/refs/
+verse_test/test-chr1-cloud/
+verse_test/*sif

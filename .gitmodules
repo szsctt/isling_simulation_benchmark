@@ -10,3 +10,6 @@
 [submodule "ViFi"]
 	path = ViFi
 	url = https://github.com/szsctt/ViFi.git
+[submodule "intvi_other-tools"]
+	path = intvi_other-tools
+	url = https://bitbucket.csiro.au/scm/~sco305/intvi_other-tools.git

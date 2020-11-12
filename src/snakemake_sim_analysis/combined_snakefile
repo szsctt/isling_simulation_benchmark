@@ -810,7 +810,7 @@ rule vifi:
 		python $VIFI_DIR/scripts/run_vifi.py \
 		-c {threads} \
 		-f {input.fastq1} -r {input.fastq2} \
-		--reference {input.fa} \
+		--reference {params.reference} \
 		-v {wildcards.virus} \
 		-o {params.outdir} \
 		-d True \

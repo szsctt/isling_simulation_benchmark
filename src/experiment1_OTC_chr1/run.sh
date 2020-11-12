@@ -23,6 +23,7 @@ snakemake \
  --configfile ${CONFIG}\
  --jobs 100 \
  --use-singularity \
+ --singularity-args "-B$(realpath ../../)"
  --profile slurm \
  --cluster-config ${CLUSTER} \
  --rerun-incomplete

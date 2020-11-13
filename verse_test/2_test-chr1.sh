@@ -54,7 +54,7 @@ if [ ! -e verse_1.sif ]; then
 fi
 
 
-srun --time 24:00:00 --mem 200gb -c8 \
+srun --time 7-00:00:00 --mem 2000gb -c8 \
 singularity exec \
  -B${READDIR} -B$REFDIR \
  verse_1.sif  \

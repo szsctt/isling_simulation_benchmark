@@ -14,15 +14,19 @@ sed -i 's%../../out%out%g' $NEW
 
 snakemake \
  --snakefile combined_snakefile \
- --configfile ${NEW}\
+ --configfile ${CONFIG} \
  --cores 8 \
  --jobs 3 \
  --restart-times 3 \
  --keep-going \
  --resources mem_mb=28000 \
  --use-singularity \
+ --singularity-args '-B $(realpath ../..)' \
  --rerun-incomplete \
- --default-remote-provider "GS" \
- --default-remote-prefix sjs_snakemake_test
+ --until vifi
+
+# --configfile ${NEW}\
+# --default-remote-provider "GS" \
+# --default-remote-prefix sjs_snakemake_test
 
 

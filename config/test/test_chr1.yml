@@ -82,7 +82,7 @@ test-easier:
 
    vifi_params:
      host_info:
-       hg38: 
+       chr1: 
          mappability: "../../data/references/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
          mappability_exclude: "../../data/references/data_repo/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
          genes:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"

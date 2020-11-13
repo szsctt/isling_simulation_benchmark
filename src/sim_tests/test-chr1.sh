@@ -8,6 +8,6 @@ snakemake \
  --configfile ../../config/test/test_chr1.yml\
  --jobs 1 \
  --use-singularity \
- --singularity-args "-B $(realpath ../..)"
+ --singularity-args "-B $(realpath ../..)" \
  --rerun-incomplete \
  --notemp

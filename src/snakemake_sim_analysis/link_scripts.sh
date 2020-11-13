@@ -11,7 +11,8 @@ LNK="-sf"
 
 # simulation stuff
 mkdir -p snakemake_rules
-mkdir -p scripts
+mkdir -p scripts/post
+
 find $SIM/snakemake_rules -name "*smk" -exec ln $LNK  $(realpath {}) $(realpath snakemake_rules/) \;
 find $SIM/scripts -name "*" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;
 
@@ -22,7 +23,7 @@ find $ANALYSIS/scripts -name "*.pl" -exec ln $LNK $(realpath {}) $(realpath scri
 find $ANALYSIS/scripts -name "*.pm" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;
 find $ANALYSIS/scripts -name "*.R" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;
 find $ANALYSIS/scripts -name "*.sh" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;
-find $ANALYSIS/scripts -name "post" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;
+find $ANALYSIS/scripts/post -name "*.R" -exec ln $LNK $(realpath {}) $(realpath scripts/post/) \;
 
 # other tools stuff
 find $TOOLS/scripts -name "*py" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;

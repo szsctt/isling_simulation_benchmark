@@ -8,9 +8,6 @@ global:
       chr8 : "../../data/references/chrs/chr8.fa"
       chr14: "../../data/references/chrs/chr14.fa"
       chrX : "../../data/references/chrs/chrX.fa"
-       
-   viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
 
    
    initial_seed: 12345
@@ -56,9 +53,6 @@ global:
    # analysis
    analysis_hosts: 
       hg38: "../../data/references/GRCh38.fa"
-       
-   analysis_viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    merge: 
        - False
    trim: 
@@ -126,10 +120,21 @@ global:
 #     minIdentity:
 #      - 80 
 
-OTC-vect-easier:
-   replicates: 3 
+AAV-easier:
+   viruses:
+      AAV2 :  "../../data/references/NC_001401.2.fa"
+   analysis_viruses:
+      AAV2 :  "../../data/references/NC_001401.2.fa"
+
+OTC-easier:
+   viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    
 OTC-vect-harder:
+   viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    epi_num:
        - 1000
    p_whole:
@@ -159,4 +164,5 @@ OTC-vect-harder:
        - 1.5
    frag_len: 
        - 250
-
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"

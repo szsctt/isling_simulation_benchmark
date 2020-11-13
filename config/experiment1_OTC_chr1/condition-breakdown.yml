@@ -209,3 +209,9 @@ OTC-min_len:
        - 300
        - 500
        - 1000
+       
+AAV:
+   viruses:
+      AAV2 :  "../../data/references/NC_001401.2.fa"
+   analysis_viruses:
+      AAV2 :  "../../data/references/NC_001401.2.fa"

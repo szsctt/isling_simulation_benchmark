@@ -14,6 +14,8 @@ from python_scripts.make_df import make_df, make_post_args, make_reference_dict
 
 from python_scripts.make_df import check_dataset_sample_unique, make_reference_dict, make_post_args, check_fastas_unique
 
+from scripts.parse_analysis_config import parse_analysis_config, get_bool_value_from_config
+
 
 # https://sapac.support.illumina.com/bulletins/2016/12/what-sequences-do-i-use-for-adapter-trimming.html
 HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA", 
@@ -22,6 +24,9 @@ HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
 adapter_seqs = {'HS25':HS25, 'MSv3':HS25, 'MS': HS25}
 
 verse_threads = 8
+
+#defaults for scoring
+default_scoring = {'score_ints' : 0, 'score_merged_ints' : 1, 'score_reads' : 0}
 
 #####################################################
 ############### global parameters ###################
@@ -55,57 +60,13 @@ config, sim_df, ref_dict = parse_config(config)
 ############## analysis parameters ##################
 #####################################################
 
-def get_bool_value_from_config(config, dataset, key, default):
-	if key not in config[dataset]:
-		return default
-		
-	if config[dataset][key] is True:
-		return 1
-	elif config[dataset][key] is False:
-		return 0
-	else:
-		raise ValueError(f"Boolean value for {key} in dataset {dataset} is neither True nor False.  Please specify one or the other")
-	
-
-# get unique analysis conditions - these are combinations of the analysis parameters that
-# can be set in our pipeline (merging, de-duplicaiton, bwa mem prarameters, etc), or
-# the tool to be used in analysis
-
-analysis_conditions = []
-datasets = list(config.keys())
-
-column_names = ('experiment', 'exp', 'analysis_condition', 'tool', 'host', 'host_fasta',
-								'virus', 'virus_fasta', 'bam_suffix',
-								'read_folder', 'R1_suffix', 'R2_suffix', 'outdir', 
-								'merge', 'trim', 'dedup', 'postargs', 'seq_sys', 'adapter_1', 'adapter_2', 
-								'bwa_mem_params', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 									'score_ints', 'score_merged_ints', 'score_ints_window', 'score_ints_tool',
-								'host_mappability', 'host_mappability_exclude', 'host_genes', 'host_exons',
-								'host_oncogenes', 'host_centromeres', 'host_conserved_regions',
-								'host_segdup', 'detection_mode', 'flank_region_size', 'sensitivity_level', 
-								'min_contig_length', 'blastn_evalue_thrd', 'similarity_thrd', 
-								'chop_read_length', 'minIdentity')																
+# make data frame for other tools
+analysis_df = parse_analysis_config(config)
 
 
-for dataset in datasets:
-	
-		#### parameters for comparison of analysis and simulation ####	
-	# are we doing per-read comparison of simulation with results?
-	score_reads = get_bool_value_from_config(config, dataset, 'score_reads', 0)
-	
-
-	# are we doing per-integration comparison of simulation with results?	
-	score_ints = get_bool_value_from_config(config, dataset, 'score_ints', 1)
-	score_merged_ints = get_bool_value_from_config(config, dataset, 'score_ints', 1)
-			
-	# check if we've specified a window around simulated integrations to look
-	score_ints_window = None	
-	if 'score_ints_window' in config[dataset]:
-		score_ints_window = config[dataset]['score_ints_window']			
-			
-	# double check window is specified if score_ints or score_merged_ints is True
-	if score_ints == 1 or score_merged_ints == 1:
-		if score_ints_window is None:
-			raise ValueError(f"score_ints or score_merged_ints was True for dataset {dataset}, but score_ints_window was not specified")
+# assume that we're doing our pipeline on all datasets
+extra_rows = []							
+for dataset in config:
 	
 	#### parameters for our pipeline ####
 	# paramters for our pipeline should be lists, so that we can do combinations
@@ -121,6 +82,14 @@ for dataset in datasets:
 	assert hasattr(config[dataset]['clip-cutoff'], '__iter__')
 	assert hasattr(config[dataset]['cigar-tol'], '__iter__')
 	assert hasattr(config[dataset]['min-mapq'], '__iter__')
+	
+	scoring = {}
+	for score_type, default in default_scoring.items():
+		scoring[score_type] = get_bool_value_from_config(config, dataset, score_type, default)
+	if scoring['score_ints'] == 1 or scoring['score_merged_ints'] == 1:
+		score_ints_window = config[dataset]['score_ints_window']
+	else:
+		score_ints_window = 0
 
 	# each combination of these are a unique 'analysis condition' for our pipeline
 	i = 0
@@ -160,7 +129,7 @@ for dataset in datasets:
 		else:
 			dedup = 0
 
-		analysis_conditions.append({
+		extra_rows.append({
 			'experiment' : dataset,
 			'host' 			: host,
 			'host_fasta': config[dataset]['analysis_hosts'][host],
@@ -180,169 +149,58 @@ for dataset in datasets:
 			'tool'			 : 'pipeline',
 			'merge_dist' : merge_dist,
 			'merge_n_min': merge_n_min,
-			'score_reads' : score_reads,
-			'score_ints' : score_ints,
-			'score_merged_ints' : score_merged_ints,
 			'score_ints_window' : score_ints_window,
-			'score_ints_tool' : "pipeline"	
+			**scoring
 		})
 		i += 1
-	
-	#### parameters for polyidus ####
-	i = 0
-	if 'polyidus_params' in config[dataset]:
-			
-			# are we trying multiple aligners?
-			if 'aligner' in config[dataset]['polyidus_params']:
-				assert hasattr(config[dataset]['polyidus_params']['aligner'], '__iter__')
-				aligners = config[dataset]['polyidus_params']['aligner']
-			else:
-				aligners = ['bowtie2']
-				
-			for host, virus, aligner in itertools.product(
-																		config[dataset]['analysis_hosts'].keys(),
-																		config[dataset]['analysis_viruses'].keys(),
-																		aligners):
-				# give this analysis condition a name
-				condition = f"{dataset}_polyidus{i}"
 
-				analysis_conditions.append({
-					'experiment' : dataset,
-					'host' 			 : host,
-					'host_fasta' : config[dataset]['analysis_hosts'][host],
-					'virus'      : virus,
-					'virus_fasta': config[dataset]['analysis_viruses'][virus],
-					'analysis_condition': condition,
-					'aligner'		 : aligner,
-					'merge'			 : 0,
-					'tool'			 : 'polyidus',
-					'score_reads' : score_reads,
-					'score_ints' : score_ints,
-					'score_merged_ints' : score_merged_ints,
-					'score_ints_window' : score_ints_window,
-					'score_ints_tool' : "polyidus"	
-					})	
-				i += 1
 	
-	#### parameters for vifi ####
-	# if we're also doing vifi
-	i = 0
-	if 'vifi_params' in config[dataset]:
-		# make sure the required information about the host genome has been provided
-		host_file_keys = ('mappability', 'mappability_exclude', 'genes', 'exons', 'oncogenes', 'centromeres',
-												'conserved_regions', 'segdup')
-		hosts_to_use = []
-		for host in config[dataset]['analysis_hosts'].keys():
-			# check that this host is in host_info
-			if host not in config[dataset]['vifi_params']['host_info']:
-				print(f"host_info not provided: skipping ViFi for {host}")
-				continue
-			# check that all necessary files have been specified
-			if not all([key in config[dataset]['vifi_params']['host_info'][host] for key in host_file_keys]):
-				print(f"one or more of the required files ({host_file_keys}) for host {host} is not specfied: skipping ViFi for host {host}")
-				continue
-			hosts_to_use.append(host)
-									
+extra = pd.DataFrame(extra_rows)
+analysis_df = pd.concat((extra, analysis_df), axis=0, ignore_index=True)
 
-		for host, virus in itertools.product(hosts_to_use, config[dataset]['analysis_viruses'].keys()):
-			condition = f"{dataset}_vifi{i}"
-			analysis_conditions.append({
-				'experiment' : dataset,
-				'host' 			 : host,
-				'host_fasta' : config[dataset]['analysis_hosts'][host],
-				'host_mappability' : config[dataset]['vifi_params']['host_info'][host]['mappability'],
-				'host_mappability_exclude' : config[dataset]['vifi_params']['host_info'][host]['mappability_exclude'],				
-				'host_genes' : config[dataset]['vifi_params']['host_info'][host]['genes'],				
-				'host_exons' : config[dataset]['vifi_params']['host_info'][host]['exons'],				
-				'host_oncogenes' : config[dataset]['vifi_params']['host_info'][host]['oncogenes'],	
-				'host_centromeres' : config[dataset]['vifi_params']['host_info'][host]['centromeres'],	
-				'host_conserved_regions' : config[dataset]['vifi_params']['host_info'][host]['conserved_regions'],		
-				'host_segdup' : config[dataset]['vifi_params']['host_info'][host]['segdup'],																
-				'virus'      : virus,		
-				'virus_fasta': config[dataset]['analysis_viruses'][virus],	
-				'analysis_condition': condition,
-				'tool'			 : 'vifi',			
-				'score_reads' : 0,
-				'score_ints' : score_ints,
-				'score_merged_ints' : score_merged_ints,
-				'score_ints_window' : score_ints_window,
-				'score_ints_tool' : "vifi",
-				})
-			i += 1
+# 	##### parameters that are common to each experiment ####
 
-	#### parameters for verse ####
-	# paramters should be lists, so that we can do combinations of all
-	if 'verse_params' in config[dataset]:
-		assert hasattr(config[dataset]['verse_params']['detection_mode'], '__iter__')
-		assert hasattr(config[dataset]['verse_params']['flank_region_size'], '__iter__')
-		assert hasattr(config[dataset]['verse_params']['sensitivity_level'], '__iter__')
-		assert hasattr(config[dataset]['verse_params']['min_contig_length'], '__iter__')
-		assert hasattr(config[dataset]['verse_params']['blastn_evalue_thrd'], '__iter__')	
-		assert hasattr(config[dataset]['verse_params']['similarity_thrd'], '__iter__')
-		assert hasattr(config[dataset]['verse_params']['chop_read_length'], '__iter__')
-		assert hasattr(config[dataset]['verse_params']['minIdentity'], '__iter__')
- 
-	# each combination of these are a unique 'analysis condition' for our pipeline
-		i = 0 
+analysis_df['bam_suffix'] = ['.sam' for i in range(analysis_df.shape[0])]
+analysis_df['R1_suffix'] = ['1.fq' for i in range(analysis_df.shape[0])]
+analysis_df['R2_suffix'] = ['2.fq' for i in range(analysis_df.shape[0])]
+
+analysis_df['read_folder'] = [os.path.join(config[dataset]['out_directory'], dataset, "sim_reads") for dataset in analysis_df['experiment']]
+
+analysis_df['outdir'] = [config[dataset]['out_directory'] for dataset in analysis_df['experiment']]
+analysis_df['exp'] = analysis_df['experiment']	
+
+# also add columns indicating if we want to score integrations, merged integrations, and reads
+
+# rows to add 'score_reads' 'score_ints', 'score_merged_ints', 'score_ints_window',  for other tools
+# we only score reads from our pipeline
+
+score_reads = []
+score_ints = []
+score_merged_ints = []
+score_ints_window = []
+for i, row in analysis_df.iterrows():
+	# only score reads from our pipeline
+	if row['tool'] != 'pipeline':
+		score_reads.append(0)
+	else:
+		score_reads.append(get_bool_value_from_config(config, row['experiment'], 'score_reads', default_scoring['score_reads']))
 	
-	 
-		for host, virus, detection_mode, flank_region_size, sensitivity_level, min_contig_length, blastn_evalue_thrd, similarity_thrd, chop_read_length, minIdentity in itertools.product(
-																		config[dataset]['analysis_hosts'].keys(),
-																		config[dataset]['analysis_viruses'].keys(),
-																		config[dataset]['verse_params']['detection_mode'], 
-																		config[dataset]['verse_params']['flank_region_size'], 
-																		config[dataset]['verse_params']['sensitivity_level'],
-																		config[dataset]['verse_params']['min_contig_length'],
-																		config[dataset]['verse_params']['blastn_evalue_thrd'],
-																		config[dataset]['verse_params']['similarity_thrd'],
-																		config[dataset]['verse_params']['chop_read_length'],
-																		config[dataset]['verse_params']['minIdentity'],
-																		):
+	# scoring ints, merged_ints
+	score_ints.append(get_bool_value_from_config(config, row['experiment'], 
+																							'score_ints', default_scoring['score_ints']))
+	score_merged_ints.append(get_bool_value_from_config(config, row['experiment'], 
+																							'score_merged_ints', default_scoring['score_merged_ints']))
+																							
+	# get score_ints_window if appropriate
+	if score_ints[i] == 1 or score_merged_ints[i] == 1:
+		score_ints_window.append(config[row['experiment']]['score_ints_window'])
+	else:
+		score_ints_window.append(None)
 		
-			condition = f"{dataset}_verse{i}"
-		
-			analysis_conditions.append({
-				'experiment' : dataset,
-				'host' 			: host,
-				'host_fasta': config[dataset]['analysis_hosts'][host],
-				'virus'     : virus,
-				'virus_fasta': config[dataset]['analysis_viruses'][virus],
-				'analysis_condition': condition,
-				'detection_mode' : detection_mode,
-				'flank_region_size' : flank_region_size,
-				'sensitivity_level' : sensitivity_level,
-				'min_contig_length' : min_contig_length,
-				'blastn_evalue_thrd': blastn_evalue_thrd,
-				'similarity_thrd'   : similarity_thrd,
-				'chop_read_length'  : chop_read_length,
-				'minIdentity'       : minIdentity,
-				'score_ints' : score_ints,
-				'score_merged_ints' : score_merged_ints,
-				'score_ints_window' : score_ints_window,
-				'score_ints_tool' : "verse",
-				'tool'			 : 'verse',	
-			})
-			i += 1
-
-
-
-##### parameters that are common to each experiment ####
-for cond_dict in analysis_conditions:
-	dataset = cond_dict['experiment']
-	cond_dict['bam_suffix'] = '.sam'
-	cond_dict['R1_suffix'] = '1.fq'
-	cond_dict['R2_suffix'] = '2.fq'
-	cond_dict['read_folder'] = os.path.join(config[dataset]['out_directory'], dataset, "sim_reads")
-	cond_dict['outdir'] = config[dataset]['out_directory'] 
-	cond_dict['score_ints'] = score_ints
-	cond_dict['score_ints_window'] = score_ints_window
-	cond_dict['exp'] = cond_dict['experiment']
-
-	
-# make data frame 
-analysis_df = pd.DataFrame(analysis_conditions, columns = column_names)
-
-
+analysis_df['score_reads'] = score_reads
+analysis_df['score_ints'] = score_ints
+analysis_df['score_merged_ints'] = score_merged_ints
+analysis_df['score_ints_window'] = score_ints_window
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
 
@@ -391,11 +249,9 @@ ref_names = make_reference_dict(toDo)
 
 POSTARGS, TOSORT, SORTED = make_post_args(config)
 
-
 #####################################################
 ############ wildcard constraints ###################
 #####################################################
-
 
 wildcard_constraints:
 	cond = "|".join(set(sim_df.loc[:, 'condition'])),
@@ -411,7 +267,6 @@ wildcard_constraints:
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
 	
 localrules: write_summary, write_analysis_summary#, combine_int_scores, combine_read_scores
-
 
 #####################################################
 ################## ruleorder ########################
@@ -469,66 +324,18 @@ for i, row in analysis_df.iterrows():
 			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
 		)
 
-
-# polyidus outputs
-polyidus_targets = set()
+# targets for other tools
+other_tool_targets = set()
 for i, row in analysis_df.iterrows():
-	if row['tool'] != 'polyidus':
-		continue
-		
 	outpath = row['outdir']
 	exp = row['experiment']
 	dset = row['analysis_condition']
 		
 	samples = sim_df[sim_df['experiment'] == exp]['sample']
-	host = row['host']
-	virus = row['virus']
 		
 	for samp in samples:
-		polyidus_targets.add(
+		other_tool_targets.add(
 			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
-		)
-		polyidus_targets.add(
-			f"{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.tsv"
-		)
-
-
-# vifi outputs
-vifi_targets = set()
-for i, row in analysis_df.iterrows():
-	if row['tool'] != 'vifi':
-		continue
-	outpath = row['outdir']
-	exp = row['experiment']
-	dset = row['analysis_condition']
-		
-	samples = sim_df[sim_df['experiment'] == exp]['sample']
-	host = row['host']
-	virus = row['virus']
-		
-	for samp in samples:
-		vifi_targets.add(
-			f"{outpath}/{dset}/vifi.{samp}.{host}.{virus}/output.clusters.txt"
-		)
-		vifi_targets.add(
-			f"{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.tsv"
-		)
-		
-
-# verse targets
-verse_targets = set()
-for i, row in analysis_df.iterrows():
-	if row['tool'] != 'verse':
-		continue
-	outpath = row['outdir']
-	exp = row['experiment']
-	dset = row['analysis_condition']
-		
-	samples = sim_df[sim_df['experiment'] == exp]['sample']
-		
-	for samp in samples:
-		verse_targets.add(
-			f"{outpath}/{dset}/{samp}.{host}.{virus}/integration-sites.txt"
 		)
 	
 # summary files
@@ -549,9 +356,7 @@ rule all:
 		set(analysis_summaries),
 		merged_targets,
 		scored_summaries,
-		polyidus_targets,
-		vifi_targets,
-		verse_targets
+		other_tool_targets
 		
 		
 #####################################################
@@ -576,409 +381,20 @@ include: "snakemake_rules/postprocessing.smk"
 #####################################################
 ##################### polyidus ######################
 #####################################################
-def analysis_df_value(wildcards, column_name):
-	
-	# get a value from the row of the df corresponding to this analysis condition
-	unique = f"{wildcards.dset}"
 
-	return analysis_df.loc[(analysis_df['analysis_condition'] == unique).idxmax(), column_name] 
-	
-def sim_df_value(wildcards, column_name):
-	
-	
-	# get a value from the row of the df corresponding to this analysis condition
-	unique = f"{wildcards.exp}__{wildcards.samp}"
-	return sim_df.loc[(sim_df['unique'] == unique).idxmax(), column_name] 
-	
-
-rule bwt2_index:
-	input:
-		fasta = lambda wildcards: ref_names[wildcards.genome]
-	output:
-		multiext("{outpath}/references/{genome}/{genome}", 
-							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
-						)
-	container:
-		"docker://szsctt/polyidus:2"
-	params:
-		prefix = lambda wildcards, output: path.splitext(path.splitext(output[0])[0])[0]
-	resources:
-		mem_mb= lambda wildcards, attempt, input: int(attempt * 5 * (os.stat(input.fasta).st_size/1e6)),
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
-		nodes = 1
-	shell:
-		"bowtie2-build {input} {params.prefix}"
-
-def get_polyidus_reads(wildcards, read_num):
-	assert read_num in (1, 2)
-	if read_num == 1:
-		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'exp')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R1_suffix')}"
-	if read_num == 2:
-		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'exp')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R2_suffix')}"	
-
-rule polyidus:
-	input:
-		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
-		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
-		host_idx = multiext("{outpath}/references/{host}/{host}", 
-							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
-						),
-		virus_idx =  multiext("{outpath}/references/{virus}/{virus}", 
-							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
-						)
-	output:
-		temp_ints = temp("{outpath}/{dset}/polyidus.{host}.{virus}.{samp}/results/exactHpvIntegrations.tsv"),
-		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		fake_merged = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed")
-	params:
-		output = lambda wildcards, output: path.dirname(path.dirname(output.temp_ints)),
-		host_idx = lambda wildcards, input: path.splitext(path.splitext(input.host_idx[0])[0])[0],
-		virus_idx = lambda wildcards, input: path.splitext(path.splitext(input.virus_idx[0])[0])[0],
-	resources:
-		mem_mb= lambda wildcards, attempt: int(attempt * 10000),
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1]
-	container:
-		"docker://szsctt/polyidus:2"
-	wildcard_constraints:
-		dset = ".+_polyidus\d+"
-	shell:
-		"""
-		rm -rf {params.output}/*
-		
-		python3 /usr/src/app/src/polyidus.py \
-		{params.host_idx} \
-		{params.virus_idx} \
-		--fastq {input.fastq1} {input.fastq2} \
-		--outdir {params.output}
-		
-		cp {output.temp_ints} {output.ints}
-		cp {output.temp_ints} {output.fake_merged}
-		"""
+include: "snakemake_rules/polyidus.smk"
 
 #####################################################
 ####################### vifi ########################
 #####################################################
 
-rule host_virus_index:
-	input:
-		virus = lambda wildcards: ref_names[wildcards.virus],
-		host = lambda wildcards: ref_names[wildcards.host]
-	output:
-		fa = "{outpath}/vifi_refs/data/{virus}/{host}_{virus}.fas",
-		idx = multiext("{outpath}/vifi_refs/data/{virus}/{host}_{virus}.fas", ".amb", ".ann", ".bwt", ".pac", ".sa")
-	container:
-		"docker://szsctt/vifi:1"
-	resources:
-		mem_mb= lambda wildcards, attempt, input: int(attempt * 5 * (os.stat(input.host).st_size/1e6 + os.stat(input.virus).st_size/1e6)),
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
-		nodes = 1
-	shell:
-		"""
-		cat {input.virus} {input.host} > {output.fa}
-		bwa index {output.fa}
-		"""
-		
-rule vifi_faidx:
-	input:
-		fa = lambda wildcards: ref_names[wildcards.host]
-	output:
-		fai = "{outpath}/vifi_refs/data_repo/{host}/{host}.fa.fai"
-	params:
-		fai = lambda wildcards, input: input.fa + ".fai"
-	container:
-		"docker://szsctt/vifi:1"
-	shell:
-		"""
-		samtools faidx {input.fa}
-		mv {params.fai} {output.fai}
-		"""
-
-def get_vifi_resource(wildcards, resource_name):
-	"""Get resources required for vifi"""
-	host_idx = analysis_df[(analysis_df['host'] == wildcards.host) & (analysis_df['tool'] == 'vifi')].index[0]
-	return analysis_df.loc[host_idx, resource_name]
-		
-rule vifi_data_repo:
-	input:
-		fa = lambda wildcards: ref_names[wildcards.host],
-		fai = rules.vifi_faidx.output.fai,
-		mappability = lambda wildcards: get_vifi_resource(wildcards, 'host_mappability'),
-		mappability_exclude = lambda wildcards: get_vifi_resource(wildcards, 'host_mappability_exclude'),
-		genes = lambda wildcards: get_vifi_resource(wildcards, 'host_genes'),
-		exons = lambda wildcards: get_vifi_resource(wildcards, 'host_exons'),
-		oncogenes = lambda wildcards: get_vifi_resource(wildcards, 'host_oncogenes'),
-		centromeres = lambda wildcards: get_vifi_resource(wildcards, 'host_centromeres'),
-		conserved = lambda wildcards: get_vifi_resource(wildcards, 'host_conserved_regions'),
-		segdup = lambda wildcards: get_vifi_resource(wildcards, 'host_segdup')	
-	output:
-		chromosomes = "{outpath}/vifi_refs/data_repo/{host}/{host}_chromosome-list.txt",
-		file_list = "{outpath}/vifi_refs/data_repo/{host}/file_list.txt",
-		fa = "{outpath}/vifi_refs/data_repo/{host}/{host}.fa",
-		mappability = "{outpath}/vifi_refs/data_repo/{host}/{host}.mappability.bed",
-		mappability_exclude = "{outpath}/vifi_refs/data_repo/{host}/{host}.mappability-exclude.bed",
-		genes = "{outpath}/vifi_refs/data_repo/{host}/{host}.genes.gff",
-		exons = "{outpath}/vifi_refs/data_repo/{host}/{host}.exons.gff"	,
-		oncogenes = "{outpath}/vifi_refs/data_repo/{host}/{host}.oncogenes.gff",
-		centromeres = "{outpath}/vifi_refs/data_repo/{host}/{host}.centromeres.bed",
-		conserved = "{outpath}/vifi_refs/data_repo/{host}/{host}.conserved.bed",
-		segdup = "{outpath}/vifi_refs/data_repo/{host}/{host}.segdup.bed"
-	shell:
-		"""
-		cp {input.fa} {output.fa}
-		cp {input.mappability} {output.mappability}
-		cp {input.mappability_exclude} {output.mappability_exclude}
-		cp {input.genes} {output.genes}
-		cp {input.exons} {output.exons}
-		cp {input.oncogenes} {output.oncogenes}
-		cp {input.centromeres} {output.centromeres}
-		cp {input.conserved} {output.conserved}
-		cp {input.segdup} {output.segdup}
-		
-		awk 'BEGIN {{ ORS = " " }} {{a[$1]}} END {{for (i in a) print i}}' \
-				{input.fai} > {output.chromosomes}
-				
-		echo "fa_file 		                  $(basename {output.fa})" > {output.file_list}
-		echo "chrLen_file 		              $(basename {input.fai})" >> {output.file_list}
-  	echo "duke35_filename 		          $(basename {output.mappability})" >> {output.file_list}
-  	echo "mapability_exclude_filename   $(basename {output.mappability_exclude})" >> {output.file_list}
-  	echo "gene_filename 		            $(basename {output.genes})" >> {output.file_list}
-  	echo "exon_file 		                $(basename {output.exons})" >> {output.file_list}
-  	echo "oncogene_filename 		        $(basename {output.oncogenes})" >> {output.file_list}
-  	echo "centromere_filename 		      $(basename {output.centromeres})" >> {output.file_list}
-  	echo "conserved_regions_filename 		$(basename {output.conserved})" >> {output.file_list}
-  	echo "segdup_filename 		          $(basename {output.segdup})" >> {output.file_list}		
-		"""
-	
-def vifi_hosts(wildcards):
-	"""get all the names of the hosts used for vifi"""
-	subset = analysis_df[(analysis_df['tool'] == 'vifi') & (analysis_df['outdir'] == wildcards.outpath)]
-	return set(subset['host'])
-	
-rule data_repo_host_list:
-	input: 
-		lambda wildcards: [f"{wildcards.outpath}/vifi_refs/data_repo/{host}/file_list.txt" for host in vifi_hosts(wildcards)]
-	output: "{outpath}/vifi_refs/data_repo/reference.txt"
-	run:
-		shell("rm -f {output}")
-		shell("touch {output}")	
-		hosts = vifi_hosts(wildcards)	
-		for host in hosts:
-			shell("echo {host} >> {output}")
-		
-rule vifi:
-	input:
-		rules.vifi_data_repo.output.chromosomes,
-		rules.vifi_data_repo.output.file_list,				
-		rules.vifi_data_repo.output.mappability,	
-		rules.vifi_data_repo.output.mappability_exclude,
-		rules.vifi_data_repo.output.genes,		
-		rules.vifi_data_repo.output.exons,		
-		rules.vifi_data_repo.output.oncogenes,
-		rules.vifi_data_repo.output.centromeres,		
-		rules.vifi_data_repo.output.conserved,		
-		rules.vifi_data_repo.output.segdup,		
-		rules.vifi_faidx.output.fai,
-		fa = rules.vifi_data_repo.output.fa,
-		idx = rules.host_virus_index.output.idx,
-		host_list = rules.data_repo_host_list.output[0],
-		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
-		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
-		chrom_list = rules.vifi_data_repo.output.chromosomes,
-
-	output:
-		clusters = "{outpath}/{dset}/vifi.{samp}.{host}.{virus}/output.clusters.txt",
-		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		fake_merged = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed")
-	params:
-		reference_repo = lambda wildcards, input: os.path.dirname(input.fa),
-		aa_data_repo = lambda wildcards, input: os.path.dirname(input.host_list),
-		outdir = lambda wildcards, output: os.path.dirname(output.clusters),
-		reference = lambda wildcards, input: os.path.splitext(input.idx[0])[0]
-	wildcard_constraints:
-		dset = ".+_vifi\d+"
-	container:
-		"docker://szsctt/vifi:1"
-	resources:
-		mem_mb= lambda wildcards, attempt: int(attempt * 10000),
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1]
-	threads: 5
-	shell:
-		"""
-		export AA_DATA_REPO=$(realpath {params.aa_data_repo})
-		export REFERENCE_REPO=$(realpath {params.reference_repo})
-		
-		python $VIFI_DIR/scripts/run_vifi.py \
-		-c {threads} \
-		-f {input.fastq1} -r {input.fastq2} \
-		--reference {input.fa} \
-		-v {wildcards.virus} \
-		-o {params.outdir} \
-		-d True \
-		-C {input.chrom_list}
-		
-		cp {output.clusters} {output.ints}
-		cp {output.clusters} {output.fake_merged}
-		"""			
+include: "snakemake_rules/vifi.smk"
 
 #####################################################
 ###################### verse ########################
 #####################################################
 
-# verse uses a different version of bowtie2 than polyidus
-# in theory they could share the same indexes
-# but just to be safe, index again
-rule bwt2_verse:
-	input:
-		fasta = lambda wildcards: ref_names[wildcards.genome]
-	output:
-		multiext("{outpath}/verse_references/{genome}/{genome}", 
-							".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
-						)
-	container:
-		"docker://szsctt/verse:1"
-	params:
-		prefix = lambda wildcards, output: path.splitext(path.splitext(output[0])[0])[0]
-	resources:
-		mem_mb= lambda wildcards, attempt, input: int(attempt * 5 * (os.stat(input.fasta).st_size/1e6)),
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
-		nodes = 1
-	shell:
-		"bowtie2-build {input} {params.prefix}"
-		
-rule blastplus_verse:
-	input:
-		fasta = lambda wildcards: ref_names[wildcards.genome]
-	output:
-		multiext("{outpath}/verse_references/{genome}/{genome}", 
-							".nhr", ".nin", ".nsq"
-						)
-	container:
-		"docker://szsctt/verse:1"
-	params:
-		prefix = lambda wildcards, output: path.splitext(output[0])[0]
-	resources:
-		mem_mb= lambda wildcards, attempt, input: int(attempt * 5 * (os.stat(input.fasta).st_size/1e6)),
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
-		nodes = 1
-	shell:
-		"makeblastdb -in {input} -dbtype nucl -out {params.prefix}"
-		
-rule copy_reference_verse:
-	input:
-		fasta = lambda wildcards: ref_names[wildcards.genome],
-	output:
-		fasta = "{outpath}/verse_references/{genome}/{genome}.fa",
-	shell:
-		"""
-		cp $(realpath {input.fasta}) $(realpath {output.fasta})
-		"""
-	
-rule verse_config:
-	input:
-		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
-		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
-		virus_fasta = "{outpath}/verse_references/{virus}/{virus}.fa",
-		host_fasta = "{outpath}/verse_references/{host}/{host}.fa",
-		host_idx = multiext("{outpath}/verse_references/{host}/{host}", 
-												".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
-												),
-		virus_blast = multiext("{outpath}/verse_references/{virus}/{virus}", 
-														".nhr", ".nin", ".nsq"),
-		host_blast = multiext("{outpath}/verse_references/{host}/{host}", 
-														".nhr", ".nin", ".nsq"),
-	output:
-		config = "{outpath}/{dset}/{samp}.{host}.{virus}/config.txt",	
-	params:
-		host_bowtie = lambda wildcards, input: path.splitext(path.splitext(path.realpath(input.host_idx[0]))[0])[0],
-		virus_blast = lambda wildcards, input: path.splitext(path.realpath(input.virus_blast[0]))[0],
-		host_blast = lambda wildcards, input: path.splitext(path.realpath(input.host_blast[0]))[0],
-		virus_fa = lambda wilcards, input: path.realpath(input.virus_fasta),
-		detection_mode = lambda wildcards: analysis_df_value(wildcards, 'detection_mode'),
-		flank_region_size = lambda wildcards: int(analysis_df_value(wildcards, 'flank_region_size')),
-		sensitivity_level = lambda wildcards: int(analysis_df_value(wildcards, 'sensitivity_level')),
-		min_contig_length = lambda wildcards: int(analysis_df_value(wildcards, 'min_contig_length')),
-		blastn_evalue_thrd = lambda wildcards: analysis_df_value(wildcards, 'blastn_evalue_thrd'),
-		similarity_thrd = lambda wildcards: analysis_df_value(wildcards, 'similarity_thrd'),
-		chop_read_length = lambda wildcards: int(analysis_df_value(wildcards, 'chop_read_length')),
-		minIdentity = lambda wildcards: int(analysis_df_value(wildcards, 'minIdentity')),		
-	shell:
-		"""
-  		echo "fastq1 = $(realpath {input.fastq1})" > {output.config}
-  		echo "fastq2 = $(realpath {input.fastq2})" >> {output.config}
-  		echo 'detect_integration = yes' >> {output.config}
-  		echo 'detect_mutation = no' >> {output.config}
-  		echo 'thread_no = {verse_threads}' >> {output.config}
-  		echo 'blastn_bin = /usr/bin/blastn' >> {output.config}
-  		echo 'bowtie_bin = /usr/bin/bowtie2' >> {output.config}
-  		echo 'bwa_bin = /usr/bin/bwa' >> {output.config}
-  		echo 'trinity_script = /trinityrnaseq_r2013-02-16/Trinity.pl' >> {output.config}
-  		echo 'SVDetect_dir = /SVDetect_r0.8' >> {output.config}
-  		echo 'virus_database = {params.virus_fa}' >> {output.config}
-  		echo 'bowtie_index_human = {params.host_bowtie}' >> {output.config}
-  		echo 'blastn_index_human = {params.host_blast}' >> {output.config}
-  		echo 'blastn_index_virus = {params.virus_blast}' >> {output.config}
-  		echo 'detection_mode     = {params.detection_mode}' >> {output.config}
-			echo 'flank_region_size  = {params.flank_region_size}' >> {output.config}
-			echo 'sensitivity_level  = {params.sensitivity_level}' >> {output.config}
-  		echo 'min_contig_length = {params.min_contig_length}' >> {output.config}
-  		echo 'blastn_evalue_thrd = {params.blastn_evalue_thrd}' >> {output.config}
-  		echo 'similarity_thrd = {params.similarity_thrd}' >> {output.config}
-  		echo 'chop_read_length = {params.chop_read_length}' >> {output.config}
-  		echo 'minIdentity = {params.minIdentity}' >> {output.config}
-  		
-		"""
-
-rule verse:
-	input:
-		config = rules.verse_config.output.config,
-		fastq1 = lambda wildcards: get_polyidus_reads(wildcards, 1),
-		fastq2 = lambda wildcards: get_polyidus_reads(wildcards, 2),
-		virus_fasta = "{outpath}/verse_references/{virus}/{virus}.fa",
-		host_fasta = "{outpath}/verse_references/{host}/{host}.fa",	
-		host_idx = multiext("{outpath}/verse_references/{host}/{host}", 
-												".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
-												),
-		virus_blast = multiext("{outpath}/verse_references/{virus}/{virus}", 
-														".nhr", ".nin", ".nsq"),
-		host_blast = multiext("{outpath}/verse_references/{host}/{host}", 
-														".nhr", ".nin", ".nsq"),
-	output:
-		output = "{outpath}/{dset}/{samp}.{host}.{virus}/integration-sites.txt",
-		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		fake_merged = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed")
-	params:
-		workdir = lambda wildcards, output: path.dirname(path.realpath(output.output)),
-		currdir = lambda wildcards: os.getcwd(),
-		config = lambda wildcards, input: path.basename(input.config)
-	wildcard_constraints:
-		dset = ".+_verse\d+"
-	container:
-		"docker://szsctt/verse:1"
-	resources:
-		mem_mb= lambda wildcards, attempt: 100000 * attempt,
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
-		nodes = 1
-	log:
-		"{outpath}/logs/verse_{dset}_{samp}_{host}_{virus}.log"
-	threads: verse_threads
-	shell:
-		"""
-		cd {params.workdir}
-		
-		perl /var/work/VirusFinder2.0/VirusFinder.pl -c {params.config}
-		
-		cd {params.currdir}
-		# virusFinder only makes an output file if it finds integration sites
-		# but snakemake always requires the same output files
-		if [ ! -e {output.output} ]; then
-			touch {output.output}
-		fi
-		
-		cp {output.output} {output.ints}
-		cp {output.output} {output.fake_merged}
-		"""
-		
-
+include: "snakemake_rules/verse.smk"
 
 #####################################################
 ############ compare sim with analysis ##############
@@ -1134,7 +550,7 @@ rule score_integrations:
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	params:
-		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'score_ints_tool')}",
+		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'tool')}",
 		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}",
 	threads: 1
 	container:
@@ -1169,7 +585,7 @@ rule score_merged_integrations:
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	params:
-		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'score_ints_tool')}",
+		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'tool')}",
 		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}",
 		merged = "--merged"
 	threads: 1
@@ -1236,7 +652,7 @@ def scores_to_combine(wildcards, score_type):
 					continue
 					
 		# only scoring reads for our pipeline
-		if score_type == 'reads' and not re.search("analysis", analysis_condition):
+		if score_type == 'reads' and not re.search("analysis", row['analysis_condition']):
 			continue
 		
 		# get information for this row

@@ -55,7 +55,7 @@ test-easier:
    analysis_viruses:
        "AAV" :  "../../data/references/test_AAV.fa"
    merge: 
-       - True
+       - False
    trim: 
        - True
    dedup: 
@@ -80,6 +80,8 @@ test-easier:
    polyidus_params:
      aligner:
       - "bowtie2"
+     trim: 
+      - False
       
    # run vifi
    vifi_params:
@@ -94,6 +96,8 @@ test-easier:
          centromeres: "../../data/references/GRCh38/centromeres.bed"
          conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
          segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
+     trim: 
+      - True
      
    # run verse
    # https://bioinfo.uth.edu/VirusFinder/VirusFinder-manual.pdf?csrt=2093584511125027598
@@ -114,6 +118,8 @@ test-easier:
       - 25
      minIdentity:
       - 80     
+     trim: 
+      - True
   
    # scoring
    score_reads: True

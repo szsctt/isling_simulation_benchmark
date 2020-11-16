@@ -60,9 +60,23 @@ config, sim_df, ref_dict = parse_config(config)
 ############## analysis parameters ##################
 #####################################################
 
+def convert_bool_to_int(input_bool, dataset, name):
+	if isinstance(input_bool, bool):
+		if input_bool:
+			return 1
+		else:
+			return 0
+	elif isinstance(input_bool, str):
+		if input_bool.lower() == "true":
+			return 1
+		else:
+			return 0
+	else:
+		raise ValueError(f"Unrecgonised input for key {name} in dataset {dataset}")
+
+
 # make data frame for other tools
 analysis_df = parse_analysis_config(config)
-
 
 # assume that we're doing our pipeline on all datasets
 extra_rows = []							
@@ -118,17 +132,13 @@ for dataset in config:
 		read1_adapt = adapter_seqs[seq_sys]['read1-adapt']
 		read2_adapt = adapter_seqs[seq_sys]['read2-adapt']
 		
-		# convert merge and dedup to 1 or 0
-		if merge is True or merge == 'true' or merge == 'True':
-			merge = 1
-		else:
-			merge = 0
-			
-		if dedup is True or dedup == 'true' or dedup == 'True':
-			dedup = 1
-		else:
-			dedup = 0
+		# convert merge and dedup to 1 or 0			
+		merge = convert_bool_to_int(merge, dataset, 'merge')
 
+		dedup = convert_bool_to_int(dedup, dataset, 'dedup')
+		
+		trim = convert_bool_to_int(trim, dataset, 'trim')
+			
 		extra_rows.append({
 			'experiment' : dataset,
 			'host' 			: host,
@@ -330,6 +340,8 @@ for i, row in analysis_df.iterrows():
 	outpath = row['outdir']
 	exp = row['experiment']
 	dset = row['analysis_condition']
+	host = row['host']
+	virus = row['virus']
 		
 	samples = sim_df[sim_df['experiment'] == exp]['sample']
 		
@@ -383,6 +395,15 @@ include: "snakemake_rules/postprocessing.smk"
 #####################################################
 
 include: "snakemake_rules/polyidus.smk"
+
+# overwrite input function to get simulated reads (which are in a different location to other pipeline)
+def get_input_reads(wildcards, read_num):
+	assert read_num in (1, 2)
+	if read_num == 1:
+		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R1_suffix')}"
+	if read_num == 2:
+		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R2_suffix')}"	
+
 
 #####################################################
 ####################### vifi ########################

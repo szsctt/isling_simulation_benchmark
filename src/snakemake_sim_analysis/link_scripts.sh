@@ -34,7 +34,6 @@ mkdir -p python_scripts
 find $SIM/snakemake_rules -name "parse_config.py" -exec ln $LNK $(realpath {}) $(realpath python_scripts/) \;
 find $ANALYSIS/snakemake_rules -name "make_df.py" -exec ln $LNK $(realpath {}) $(realpath python_scripts/) \;
 
-
 # conda envs
 mkdir -p envs
 find $SIM/envs -name "*.yml" -exec ln $LNK $(realpath {}) $(realpath envs/) \;

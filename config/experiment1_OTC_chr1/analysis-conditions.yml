@@ -91,6 +91,9 @@ global:
    polyidus_params:
      aligner:
       - "bowtie2"
+     trim:
+       - True
+       - False
 
    vifi_params:
      host_info:
@@ -103,12 +106,19 @@ global:
          centromeres:  "../../data/references/data_repo/GRCh38/GRCh38_centromere.bed"
          conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
          segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
-
-AAV-easier:
-   viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
-   analysis_viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
+     trim:
+       - True
+       - False
+       
+   seeksv_params:
+     trim:
+      - False
+     dedup:
+      - False
+     min_reads:
+      - 2
+     merge_dist:
+      - 100
 
 OTC-easier:
    viruses:
@@ -116,7 +126,7 @@ OTC-easier:
    analysis_viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
   
-OTC-vect-harder:
+OTC-harder:
    viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    epi_num:

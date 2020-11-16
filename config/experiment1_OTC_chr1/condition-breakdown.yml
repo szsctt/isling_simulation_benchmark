@@ -90,6 +90,8 @@ global:
    polyidus_params:
      aligner:
       - "bowtie2"
+     trim:
+       - True
 
    vifi_params:
      host_info:
@@ -102,6 +104,8 @@ global:
          centromeres:  "../../data/references/data_repo/GRCh38/GRCh38_centromere.bed"
          conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
          segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
+     trim:
+       - True
          
    # run verse
    # https://bioinfo.uth.edu/VirusFinder/VirusFinder-manual.pdf?csrt=2093584511125027598
@@ -122,6 +126,16 @@ global:
 #      - 25
 #     minIdentity:
 #      - 80 
+
+   seeksv_params:
+     trim:
+      - False
+     dedup:
+      - False
+     min_reads:
+      - 2
+     merge_dist:
+      - 100
 
 # things that are different for each dataset
 OTC-whole:

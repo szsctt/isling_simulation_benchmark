@@ -266,7 +266,7 @@ wildcard_constraints:
 	analysis_condition = "|".join(analysis_df['analysis_condition']),
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
 	
-localrules: write_summary, write_analysis_summary#, combine_int_scores, combine_read_scores
+localrules: write_summary, write_analysis_summary, write_analysis_summary_all_tools#, combine_int_scores, combine_read_scores
 
 #####################################################
 ################## ruleorder ########################
@@ -297,13 +297,11 @@ sim_summaries = expand("{outpath}/{exp}/simulation_summary.tsv",
 			outpath = [exp_targets[exp] for exp in experiments]
 			)
 
-
-analysis_summaries = expand("{outdir}/{experiment}/analysis_conditions.tsv", 
+analysis_summaries = expand("{outpath}/{exp}/analysis_conditions.tsv", 
 			zip,
 			exp = experiments, 
 			outpath = [exp_targets[exp] for exp in experiments]
 			)
-
 
 # outputs from our pipeline
 merged_targets = set()
@@ -337,8 +335,6 @@ for i, row in analysis_df.iterrows():
 		other_tool_targets.add(
 			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 		)
-	
-# summary files
 
 # scored reads
 scored_summaries = set()
@@ -383,6 +379,7 @@ include: "snakemake_rules/postprocessing.smk"
 #####################################################
 
 include: "snakemake_rules/polyidus.smk"
+
 
 #####################################################
 ####################### vifi ########################

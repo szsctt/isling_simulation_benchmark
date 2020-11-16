@@ -286,7 +286,7 @@ localrules: write_summary, write_analysis_summary#, combine_int_scores, combine_
 # rule polyidus has a wildcard contstraint so it can't be used for our pipeline
 # so make it higher in the priority
 
-ruleorder: vifi > polyidus > verse > combine_ints > merged_bed
+ruleorder: vifi > polyidus > verse > seeksv > combine_ints > merged_bed
 
 #####################################################
 ################### target files ####################

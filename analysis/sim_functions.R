@@ -65,39 +65,120 @@ importReadScoreExperiment <- function(experiment_path) {
 importReadData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
   # function to import read score summaries from an experiment
   
-  sim_cols <- c('experiment', 'condition', 'replicate', 'sim_host', 'sim_virus',
-                'int_num', 'epi_num', 'min_sep', 'p_whole', 'p_rearrange', 
-                'p_delete', 'lambda_split', 'p_overlap', 'p_gap',
-                'lambda_junction', 'p_host_deletion', 'lambda_host_deletion',
-                'read_len', 'fcov', 'frag_len', 'frag_std',
-                'seq_sys', 'out_directory', 'host_fasta', 'virus_fasta',
-                'random_seed', 'sim_fa_filename', 'sim_int_info_filename',
-                'sim_epi_info_filename', 'read_sam_filename',
-                'sorted_bam_filename', 'annotated_info_filename',
-                'sample', 'unique_sim')
+  sim_cols <- cols(experiment = col_character(), 
+                condition = col_character(), 
+                replicate = col_character(), 
+                host_name = col_character(), 
+                virus_name = col_character(),
+                int_num = col_integer(), 
+                epi_num = col_integer(), 
+                min_sep = col_integer(), 
+                min_len = col_integer(), 
+                p_whole = col_double(), 
+                p_rearrange = col_double(), 
+                p_delete = col_double(), 
+                lambda_split = col_double(), 
+                p_overlap = col_double(), 
+                p_gap = col_double(),
+                lambda_junction = col_double(), 
+                p_host_deletion = col_double(), 
+                lambda_host_deletion = col_double(),
+                read_len = col_integer(), 
+                fcov = col_double(), 
+                frag_len = col_double(), 
+                frag_std = col_double(),
+                seq_sys = col_character(), 
+                out_directory = col_character(), 
+                host_fasta = col_character(), 
+                virus_fasta = col_character(),
+                random_seed = col_integer(), 
+                sim_fa_filename = col_character(), 
+                sim_int_info_filename = col_character(),
+                sim_epi_info_filename = col_character(), 
+                read_sam_filename = col_character(),
+                sorted_bam_filename = col_character(), 
+                annotated_info_filename = col_character(),
+                sample = col_character(), 
+                unique = col_character())
   
-  sim <- read_tsv(sim_sum_path, col_names = sim_cols, skip=1)
-  
-  analy_cols <- c('experiment', 'experimet_dup', 'analysis_condition', 'tool', 'analysis_host',
-                  'host_fasta', 'analysis_virus', 'virus_fasta', 'bam_suffix', 'read_folder',
-                  'R1_suffix', 'R2_suffix', 'outdir', 'merge', 'dedup', 'postargs',
-                  'seq_sys', 'adapter_1', 'adapter_2', 'bwa_mem_params', 'score_ints',
-                   'score_ints_window', 'score_ints_tool')
+  sim <- read_tsv(sim_sum_path, col_types = sim_cols) 
+    
+  sim <- sim %>% 
+    rename(sim_host = host_name) %>% 
+    rename(sim_virus = virus_name) %>% 
+    rename(sim_unique = unique)
   
   # import analysis table and add experiment and analysis_condition columns
-  analysis <- read_tsv(analy_sum_path, col_names = analy_cols, skip=1)
-    
+  analy_cols <- cols(
+    experiment= col_character(),   
+    host = col_character(),    
+    host_fasta = col_character(),      
+    virus = col_character(),   
+    virus_fasta = col_character(),     
+    analysis_condition = col_character(),      
+    merge = col_double(),  
+    trim = col_logical(), 
+    dedup = col_double(),   
+    postargs = col_character(),
+    adapter_1 = col_character(),        
+    adapter_2 = col_character(),       
+    bwa_mem_params = col_character(),  
+    clip_cutoff = col_integer(),  
+    cigar_tol = col_integer(),       
+    min_mapq = col_integer(),        
+    tool = col_character(),    
+    merge_dist = col_integer(),    
+    merge_n_min = col_integer(),      
+    score_ints_window = col_integer(),       
+    score_ints = col_logical(),     
+    score_merged_ints = col_logical(),        
+    score_reads = col_logical(),      
+    exp = col_character(),     
+    read_folder = col_character(),    
+    R1_suffix = col_character(),       
+    R2_suffix = col_character(),       
+    outdir = col_character(),  
+    bam_suffix = col_character(),      
+    host_mappability = col_character(),        
+    host_mappability_exclude = col_character(),        
+    host_genes = col_character(),     
+    host_exons = col_character(),      
+    host_oncogenes = col_character(),  
+    host_centromeres = col_character(),       
+    host_conserved_regions = col_character(), 
+    host_segdup = col_character(),     
+    detection_mode = col_character(), 
+    flank_region_size = col_integer(),     
+    sensitivity_level = col_integer(),     
+    min_contig_length = col_integer(),      
+    blastn_evalue_thrd = col_double(),      
+    similarity_thrd = col_double(),
+    chop_read_length = col_double(),        
+    minIdentity = col_double()
+  )
+  analysis <- read_tsv(analy_sum_path, col_types = analy_cols) %>% 
+    rename(analysis_host = host,
+           analysis_virus = virus)
+  
   # join simulation and analysis tables
   joined <- left_join(analysis, sim, by=c('experiment'))
   
   # import scored reads summary
-  scored_cols <- c('sim_info_file', 'sim_bam_file', 'analysis_info',
-                   'results_file', 'junc_type', 'score_type',
-                   'true_positive', 'true_negative',
-                   'false_positive', 'false_negative')
+  scored_cols <-cols(
+    sim_info_file = col_character(),
+    sim_sam_file = col_character(),
+    analysis_info_file = col_character(),
+    results_file = col_character(),
+    junc_type = col_character(),
+    score_type = col_character(),
+    true_positives = col_double(),
+    true_negatives = col_double(),
+    false_positives = col_double(),
+    false_negatives = col_double()
+  )
   
   # import and extract info for joining
-  scored <- read_tsv(results_sum_path, col_names = scored_cols, skip = 1)  
+  scored <- read_tsv(results_sum_path, col_types = scored_cols)  
     
   scored <- scored %>% 
     mutate(results_info = basename(results_file)) %>% 
@@ -114,15 +195,14 @@ importReadData <- function(sim_sum_path, analy_sum_path, results_sum_path) {
     mutate(post = str_detect(results_info_2, "post")) %>% 
     mutate(config_dataset = paste0(experiment, "_", analysis_condition)) %>% 
     arrange(sample, analysis_host, analysis_virus, post) 
-  
 
   
   scored <- scored %>% 
-    mutate(TPR = true_positive / (true_positive + false_negative)) %>% 
-    mutate(TNR = true_negative / (true_negative + false_positive)) %>% 
-    mutate(PPV = true_positive / (true_positive + false_positive)) %>% 
-    mutate(accuracy = (true_positive + true_negative) / 
-             (true_positive + true_negative + false_positive + false_negative)) %>% 
+    mutate(TPR = true_positives / (true_positives + false_negatives)) %>% 
+    mutate(TNR = true_negatives / (true_negatives + false_positives)) %>% 
+    mutate(PPV = true_positives / (true_positives + false_positives)) %>% 
+    mutate(accuracy = (true_positives + true_negatives) / 
+             (true_positives + true_negatives + false_positives + false_negatives)) %>% 
     mutate(balanced_accuracy = (TPR + TNR)/2)
     
     #https://en.wikipedia.org/wiki/Precision_and_recall
@@ -382,7 +462,6 @@ importIntScoreExperiment <- function(exp_path) {
   
   # get files with analysis conditions
   cond_files <- list.files(exp_dir, pattern = analysis_condtions_file, recursive = TRUE)
-  cond_files <- cond_files[!str_detect(cond_files, "pipeline")]
   
   # import analysis conditions
   analysis_conditions <- tibble(

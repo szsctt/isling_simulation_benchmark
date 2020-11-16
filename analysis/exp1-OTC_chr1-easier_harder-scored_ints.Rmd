@@ -9,7 +9,7 @@ library(gganimate)
 library(kableExtra)
 source("sim_functions.R")
 
-exp_dir <- "../out/experiment1_OTC_chr1/easier_harder"
+exp_dir <- "../out/experiment1_OTC_chr1/easier-harder"
 ```
 
 ```{css, include=FALSE}
@@ -44,9 +44,6 @@ cat ../config/experiment1_OTC_chr1/easier-harder.yml
 
 In the 'easier' condition, there are 1000 integrations of the whole virus, with clean junctions and no rearrangements, deletions of the virus, and no host deletions either.  In the 'harder' condition the host and virus reference are the same, but there's a high probability of rearrangements, deletions, gaps and overlaps at the junctions, and host deletions.  There are also some 'episomal' sequences included in the output fasta.
 
-The DAG from snakemake looks like this:
-![DAG for this experiment](../out/experiment1_OTC_chr1/easier-harder.dag.svg)
-
 
 # Results
 
@@ -54,45 +51,29 @@ There are a few different ways of scoring the results from these experiments.  O
 
 
 ```{r include=FALSE}
-scored_int_files <- list.files(exp_dir, pattern = "scored_ints_summary.tsv", recursive = TRUE)
-
-int_scores <- tibble(
-  file = list.files(exp_dir, pattern = "scored_ints_summary.tsv", recursive = TRUE)
-) %>% 
-  mutate(data = map(file, ~read_tsv(paste0(exp_dir, "/", .)))) %>% 
-  unnest(data)
+int_scores <- importIntScoreExperiment(exp_dir) %>% 
+  distinct() %>% 
+  filter(!str_detect(experiment, "OTC-vect-easier")) 
 
 
 int_scores <- int_scores %>% 
-  mutate(results_file = basename(found_info)) %>% 
-  mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
-  mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
-  mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
-  mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
-  mutate(post = str_detect(results_file, "post")) %>% 
-  mutate(analysis_condition = basename(dirname(dirname(found_info)))) %>%
-  rowwise() %>% 
-  mutate(TPR = tp/(tp+fn)) %>% 
-  mutate(PPV = tp/(tp+fp)) %>% 
-  ungroup()
-
-
-analysis_conditions <- read_tsv("../out/experiment1_OTC_chr1/easier_harder/OTC-vect-easier/analysis_conditions.tsv")
-
-int_scores <- int_scores %>% left_join(analysis_conditions, by="analysis_condition") %>% 
-  mutate(merge = case_when(
-    merge == 1 ~ "merged",
-    merge == 0 ~ "unmerged",
-    TRUE ~ "unmerged"
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) %>% 
+  mutate(experient = case_when(
+    experiment == "OTC_vect-harder" ~ "OTC-harder",
+    TRUE ~ experiment
   ))
+
 ```
 
-## Table of results
+## Scoring integrations
 
 ```{r}
 int_scores %>% 
-  select(experiment, replicate, analysis_host, post, analysis_tool, merge, TPR, PPV, tp:fn) %>% 
-  arrange(analysis_tool, replicate, analysis_host)
+  select(experiment, replicate, analysis_host, post, analysis_tool, `merged-ints`, TPR, PPV, tp:fn) %>% 
+  arrange(experiment, analysis_tool, replicate, analysis_host) 
 ```
 
 For each replicate, we can calulate the positive predictive value (how many of the predicted positves are true positves - high means few false positves), and the true positve rate (how many of the real positves are detected - high means few false negatives).
@@ -107,23 +88,14 @@ $$PPV = \frac{TP}{TP+FP}$$
 
 ```{r include=FALSE}
 p <- int_scores %>% 
-  ggplot(aes(x = PPV, y = TPR, color = analysis_tool, shape=post)) +
+  filter(experiment == exp) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_tool)) +
   geom_point() +
   xlim(0, 1) +
   ylim(0, 1) +
-  facet_grid(vars(analysis_host), vars(merge)) +
-    transition_states(experiment,
-                    transition_length = 2,
-                    state_length = 1) +
-  enter_fade() +
-  exit_shrink() +
-  ease_aes('sine-in-out')+
-  labs(title = "Chimeric reads",
-      subtitle = "Simulation condition: {closest_state}") 
-
-anim_save("animations/expt1_easier-harder_int-scores.gif", p)
+  facet_grid(vars(`merged-ints`),vars(experiment))
+print(p)
 ```
-![](animations/expt1_easier-harder_int-scores.gif)
 
 So the three different pipelines seem to have quite different performances.  
 
@@ -137,16 +109,15 @@ The main problem for our pipeline seems to be false positives, particularly in t
 
 ### Wrong location or not junction fragments?
 
-First, check all the false positives that were identified, and see if the reads in those false positives are actually indicated to cross integrations.
+First, check all the false positives that were identified, and see if the reads in those false positives are actually indicated to cross integrations.  We can only investigate the individual reads here (ie without merging), rather than the merged clusters.
 
 ```{r include=FALSE}
-exps <- c("OTC-vect-harder", "OTC-vect-easier")
+exps <- unique(int_scores$experiment)
 folder <- "../out/experiment1_OTC_chr1/easier_harder"
-
-filenames <- c()
+filenames = c()
 
 for (exp in exps) {
-  scored_ints_folder <- file.path(folder, exp, "scored_ints")
+  scored_ints_folder <- file.path(exp_dir, exp, "scored_ints")
   files <- list.files(scored_ints_folder, pattern = "tsv")
   
   # exclude summary files
@@ -156,13 +127,28 @@ for (exp in exps) {
   
 }
 
-scored_ints <- tibble(
+column_types <- cols(
+  id = col_double(),
+  score = col_character(),
+  chr = col_character(),
+  pos = col_double(),
+  hv_count = col_double(),
+  vh_count = col_double(),
+  total_count = col_double(),
+  hv_reads = col_logical(),
+  vh_reads = col_logical(),
+  total_reads = col_character()
+)
+
+scored_ints <-tibble(
   filename = filenames,
-  data = map(filename, ~read_tsv(.))
+  data = map(filename, ~read_tsv(., col_types = column_types))
 ) %>% 
   unnest(data)
 
 ```
+
+
 Each integration may consist of one or more reads, each of which may cross a junction fragment or not.
 ```{r warning=FALSE}
 scored_ints <- scored_ints %>% 
@@ -180,7 +166,11 @@ scored_ints <- scored_ints %>%
 
 ```{r}
 scored_ints %>% 
-  filter(str_detect(analysis_condition, "analysis")) %>% 
+  filter(!str_detect(filename, "merged"))  %>% 
+  filter(case_when(!str_detect(analysis_condition, "analysis") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) %>% 
   group_by(condition, analysis_host, post, analysis_condition) %>% 
   summarise(wrong_location = sum(junc),
             not_junc = sum(!junc),
@@ -188,16 +178,7 @@ scored_ints %>%
   pivot_longer(wrong_location:not_junc, names_to = "type", values_to = "frac") %>% 
   ggplot(aes(x = analysis_condition, y = frac, fill = type)) +
   geom_bar(stat = "identity") +
-  theme(axis.text.x = element_text(angle = 90, hjust=1))  +
-  facet_wrap(vars(post))
-
-```
-
-A reminder of how those analysis conditions are different:
-```{r}
-analysis_conditions %>% 
-  select(experiment:host, virus, merge) %>% 
-  filter(str_detect(analysis_condition, "analysis"))
+  theme(axis.text.x = element_text(angle = 90, hjust=1)) 
 ```
 
 So, in most conditions it looks like the majority of integrations are actually junction fragments, but they're just in the wrong place.  We have a significant number of integrations that are not actually junction fragments in the merged condition.  This is kind of weird - check out a few of these.
@@ -215,11 +196,11 @@ scored_ints %>%
 We can look for the closest integration to the each false positive.  If they are further away, then they're probably incorrectly identified.
 
 ```{r include=FALSE}
-exps <- c("OTC-vect-harder", "OTC-vect-easier")
-folder <- "../out/experiment1_OTC_chr1/easier_harder"
+exps <- unique(int_scores$experiment)
+filenames = c()
 
 for (exp in exps) {
-  this_folder <- file.path(folder, exp)
+  this_folder <- file.path(exp_dir, exp)
 scored_ints_folder <- file.path(this_folder, "scored_ints")
 int_info_folder <- file.path(this_folder, "sim_ints")
 files <- list.files(scored_ints_folder, pattern = "tsv")
@@ -393,6 +374,39 @@ fp_blacklist %>%
   facet_grid(vars(post), vars(class))
 ```
 So this doesn't appear to explain most of the integrations mapped to the wrong place.
+
+## Scoring reads
+
+```{r include=FALSE}
+read_scores <- importReadScoreExperiment(exp_dir) 
+```
+
+```{r}
+read_scores %>% 
+  select(junc_type, score_type, experiment, analysis_condition, post, sample, TPR, PPV, merge, trim, dedup) %>% 
+  arrange(sample, score_type, experiment, analysis_condition)
+```
+
+```{r}
+read_scores %>% 
+  filter(post) %>% 
+  filter(score_type == 'found_score') %>% 
+  ggplot(aes(x = PPV, y = TPR, color = junc_type)) +
+  geom_point() +
+  facet_grid(vars(experiment), vars(junc_type)) +
+  xlim(0, 1) +
+  ylim(0, 1)
+```
+
+```{r}
+read_scores %>% 
+  filter(post) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = junc_type)) +
+  geom_point() +
+  facet_grid(vars(score_type), vars(experiment)) +
+  xlim(0, 1) +
+  ylim(0, 1)
+```
 
 
 ```{r}

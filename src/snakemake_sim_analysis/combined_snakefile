@@ -276,7 +276,7 @@ wildcard_constraints:
 	analysis_condition = "|".join(analysis_df['analysis_condition']),
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
 	
-localrules: write_summary, write_analysis_summary#, combine_int_scores, combine_read_scores
+localrules: write_summary, write_analysis_summary, write_analysis_summary_all_tools#, combine_int_scores, combine_read_scores
 
 #####################################################
 ################## ruleorder ########################
@@ -307,13 +307,11 @@ sim_summaries = expand("{outpath}/{exp}/simulation_summary.tsv",
 			outpath = [exp_targets[exp] for exp in experiments]
 			)
 
-
-analysis_summaries = expand("{outdir}/{experiment}/analysis_conditions.tsv", 
+analysis_summaries = expand("{outpath}/{exp}/analysis_conditions.tsv", 
 			zip,
 			exp = experiments, 
 			outpath = [exp_targets[exp] for exp in experiments]
 			)
-
 
 # outputs from our pipeline
 merged_targets = set()
@@ -349,8 +347,6 @@ for i, row in analysis_df.iterrows():
 		other_tool_targets.add(
 			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 		)
-	
-# summary files
 
 # scored reads
 scored_summaries = set()
@@ -403,7 +399,6 @@ def get_input_reads(wildcards, read_num):
 		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R1_suffix')}"
 	if read_num == 2:
 		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R2_suffix')}"	
-
 
 #####################################################
 ####################### vifi ########################

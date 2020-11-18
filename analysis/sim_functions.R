@@ -483,3 +483,44 @@ importIntScoreExperiment <- function(exp_path) {
   return(int_scores)
   
 }
+
+importIntScoresFromSummaries <- function(exp_path) {
+  
+  # list files
+  scored_ints_folder <- "scored_ints"
+  summary_suffix <- "_summary.tsv"
+  
+  folders <- list.dirs(exp_dir)
+  folders <- folders[str_detect(folders, scored_ints_folder)]
+  
+  # get files for each folder
+  filenames <- c()
+  for (dir in folders) {
+    files <- list.files(dir, pattern = summary_suffix)
+    files <- file.path(dir, files)
+    filenames <- c(filenames, files)
+  }
+  
+  # import each file
+  int_scores <- tibble(
+    filename = filenames,
+    scores = map(filenames, ~read_tsv(.))
+  ) %>% 
+    unnest(scores)
+  
+  # add extra info to scored integrations
+  int_scores <- int_scores %>% 
+    mutate(results_file = basename(found_info)) %>% 
+    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
+    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
+    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+    mutate(post = str_detect(results_file, "post")) %>% 
+    mutate(analysis_condition = basename(dirname(dirname(found_info)))) %>%
+    rowwise() %>% 
+    mutate(TPR = tp/(tp+fn)) %>% 
+    mutate(PPV = tp/(tp+fp)) %>% 
+    ungroup()
+  
+  return(int_scores)
+}

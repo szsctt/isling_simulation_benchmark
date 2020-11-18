@@ -86,5 +86,11 @@
 		"time" : "2:00:00",
 		"mem" : "50GB",
 		"job-name" : "viInt-seeksv"
+	},
+	"trim":
+	{	
+		"time" : "2:00:00",
+		"mem" : "10GB",
+		"job-name" : "viInt-trim"
 	}
 }

@@ -21,7 +21,7 @@
 	"convert_to_bam":
 	{	
 		"mem" : "20GB",
-		"time" : "24:00:00",
+		"time" : "2:00:00",
 		"job-name" : "viInt-convert"
 
 	},
@@ -33,8 +33,8 @@
 	},
 	"seqprep":
 	{	
-		"time" : "6:00:00",
-		"mem" : "5GB",
+		"time" : "2:00:00",
+		"mem" : "10GB",
 		"job-name" : "viInt-seqPrep"
 	},
 	"align_bwa_virus":
@@ -51,7 +51,7 @@
 	},
 	"index":
 	{
-		"time" : "24:00:00",
+		"time" : "2:00:00",
 		"mem" : "20GB",
 		"job-name" : "viInt-bwa-index"
 	},
@@ -74,5 +74,17 @@
 		"cpus-per-task" : "1",
 		"mem" : "40GB",
 		"job-name" : "score_reads"
+	},
+	"seeksv":
+	{	
+		"time" : "2:00:00",
+		"mem" : "50GB",
+		"job-name" : "viInt-seeksv"
+	},
+	"host_virus_index_seeksv":
+	{	
+		"time" : "2:00:00",
+		"mem" : "50GB",
+		"job-name" : "viInt-seeksv"
 	}
 }

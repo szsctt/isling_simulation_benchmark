@@ -30,11 +30,4 @@ snakemake \
  --rerun-incomplete \
  --latency-wait 120
 
-if [ "$?" != "0" ]; then
-	echo "didn't finish: rerunning:"
-	cd $WD
-	bash run.sh $1 $2 $3 $4
-else
-	echo "finished normally"
-	exit
-fi
+

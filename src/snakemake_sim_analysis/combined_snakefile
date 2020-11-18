@@ -78,6 +78,7 @@ def convert_bool_to_int(input_bool, dataset, name):
 # make data frame for other tools
 analysis_df = parse_analysis_config(config)
 
+
 # assume that we're doing our pipeline on all datasets
 extra_rows = []							
 for dataset in config:
@@ -168,7 +169,7 @@ for dataset in config:
 extra = pd.DataFrame(extra_rows)
 analysis_df = pd.concat((extra, analysis_df), axis=0, ignore_index=True)
 
-# 	##### parameters that are common to each experiment ####
+###### parameters that are common to each experiment ####
 
 analysis_df['bam_suffix'] = ['.sam' for i in range(analysis_df.shape[0])]
 analysis_df['R1_suffix'] = ['1.fq' for i in range(analysis_df.shape[0])]
@@ -178,6 +179,7 @@ analysis_df['read_folder'] = [os.path.join(config[dataset]['out_directory'], dat
 
 analysis_df['outdir'] = [config[dataset]['out_directory'] for dataset in analysis_df['experiment']]
 analysis_df['exp'] = analysis_df['experiment']	
+
 
 # also add columns indicating if we want to score integrations, merged integrations, and reads
 
@@ -365,12 +367,11 @@ rule all:
 		merged_targets,
 		scored_summaries,
 		other_tool_targets
-		
-		
+
+
 #####################################################
 ############### simulate integrations ###############
 #####################################################
-
 
 include: "snakemake_rules/simulate_integrations.smk"
 include: "snakemake_rules/art.smk"
@@ -394,11 +395,59 @@ include: "snakemake_rules/polyidus.smk"
 
 # overwrite input function to get simulated reads (which are in a different location to other pipeline)
 def get_input_reads(wildcards, read_num):
-	assert read_num in (1, 2)
+	assert read_num in {1, 2}
+	
 	if read_num == 1:
 		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R1_suffix')}"
 	if read_num == 2:
 		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R2_suffix')}"	
+
+#####################################################
+##################### trimming ######################
+#####################################################
+
+# we need a different rule for trimming than the one in preprocessing.smk
+# because that one gets adapters from toDo, which for now only has 
+# parameters for our pipeline in it
+
+def get_adapters(wildcards, num):
+	# get adapters depending on sequencing system used for this 'sample'
+	assert num in (1, 2)
+	
+	# get sequencing system for this experiment/sample
+	experiment = "_".join(wildcards.dset.split("_")[:-1])
+	unique = f"{experiment}__{wildcards.samp}"
+	seq_sys = sim_df.loc[(sim_df['unique'] == unique).idxmax(), 'seq_sys']
+	
+	# get adapter for this sequencing system
+	if num == 1:
+		return adapter_seqs[seq_sys]['read1-adapt']
+	else:
+		return adapter_seqs[seq_sys]['read2-adapt']		
+
+rule trim:
+	input:
+		r1 = lambda wildcards: get_input_reads(wildcards, 1),
+		r2 = lambda wildcards: get_input_reads(wildcards, 2)
+	output:
+		proc_r1 = temp("{outpath}/{dset}/trimmed_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/trimmed_reads/{samp}.2.fastq.gz")
+	resources:
+		mem_mb= lambda wildcards, attempt: int(attempt * 5000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	conda:	
+		"../envs/seqprep.yml"
+	container:
+		"docker://szsctt/seqprep:1"
+	params:
+		A = lambda wildcards: get_adapters(wildcards, 1),
+		B = lambda wildcards: get_adapters(wildcards, 2)
+	shell:
+		"""
+		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2}
+		"""
+
 
 #####################################################
 ####################### vifi ########################

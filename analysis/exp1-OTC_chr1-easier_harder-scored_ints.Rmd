@@ -51,21 +51,14 @@ There are a few different ways of scoring the results from these experiments.  O
 
 
 ```{r include=FALSE}
-int_scores <- importIntScoreExperiment(exp_dir) %>% 
-  distinct() %>% 
-  filter(!str_detect(experiment, "OTC-vect-easier")) 
+int_scores <- importIntScoreExperiment(exp_dir) 
 
-
+# only use postprocessed data from our pipeline
 int_scores <- int_scores %>% 
   filter(case_when((analysis_tool != "pipeline") ~ TRUE,
                     post ~ TRUE,
                     TRUE ~ FALSE
-    )) %>% 
-  mutate(experient = case_when(
-    experiment == "OTC_vect-harder" ~ "OTC-harder",
-    TRUE ~ experiment
-  ))
-
+    )) 
 ```
 
 ## Scoring integrations
@@ -86,7 +79,7 @@ And the positive predictive value as
 $$PPV = \frac{TP}{TP+FP}$$
 
 
-```{r include=FALSE}
+```{r}
 p <- int_scores %>% 
   filter(experiment == exp) %>% 
   ggplot(aes(x = PPV, y = TPR, color = analysis_tool)) +
@@ -113,7 +106,6 @@ First, check all the false positives that were identified, and see if the reads 
 
 ```{r include=FALSE}
 exps <- unique(int_scores$experiment)
-folder <- "../out/experiment1_OTC_chr1/easier_harder"
 filenames = c()
 
 for (exp in exps) {
@@ -264,9 +256,16 @@ fp_dists <- int_scores %>%
     analysis_virus, ".",
     "closest.bed"
   )) %>% 
-  mutate(data = map(fp_closest_file, ~read_tsv(file.path(folder, exp, "scored_ints", .),
+  mutate(data = map(fp_closest_file, ~read_tsv(file.path(exp_dir, exp, "scored_ints", .),
                                                col_names = column_names)) ) %>% 
   unnest(data)
+
+fp_dists <- fp_dists %>% 
+  filter(!`merged-ints`) %>% 
+  filter(case_when((tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) 
 
 ```
 
@@ -329,7 +328,7 @@ fp_dists %>%
   )) %>% 
   filter(class != "wrong_chr") %>% 
   ggplot(aes(x = found_start, color = class)) +
-  geom_density(bw = 1e4) +
+  geom_freqpoly(binwidth = 1e4) +
   facet_grid(rows = vars(class), scales = "free")
 
 ```

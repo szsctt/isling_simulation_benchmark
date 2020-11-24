@@ -79,7 +79,8 @@ global:
    min-mapq:
        - 0
        - 10
-       - 20     
+       - 20    
+       - 30
 
    # scoring
    score_reads: False
@@ -112,11 +113,12 @@ global:
        
    seeksv_params:
      trim:
-      - False
+       - True
+       - False
      dedup:
       - False
      min_reads:
-      - 2
+      - 1
      merge_dist:
       - 100
 

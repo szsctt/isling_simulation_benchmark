@@ -129,11 +129,11 @@ global:
 
    seeksv_params:
      trim:
-      - False
+      - True
      dedup:
       - False
      min_reads:
-      - 2
+      - 1
      merge_dist:
       - 100
 

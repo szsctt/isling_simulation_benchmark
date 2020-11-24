@@ -78,7 +78,7 @@ global:
        - 10
        
     # scoring
-   score_reads: True
+   score_reads: False
    score_ints: True
    score_merged_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
@@ -126,11 +126,11 @@ global:
 
    seeksv_params:
      trim:
-      - False
+      - True
      dedup:
       - False
      min_reads:
-      - 2
+      - 1
      merge_dist:
       - 100
 

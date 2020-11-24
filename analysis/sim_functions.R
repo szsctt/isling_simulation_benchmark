@@ -436,32 +436,15 @@ fp_reads_explained_by_wrong_location <- function(read_scores_path, score_type = 
 
 importIntScoreExperiment <- function(exp_path) {
   
-  scored_ints_file <- "scored_ints_summary.tsv"
   analysis_condtions_file <- "analysis_conditions.tsv"
+  sim_conditions_file <- "simulation_summary.tsv"
   
   # import scored integrations
-  int_scores <- tibble(
-    file = list.files(exp_dir, pattern = scored_ints_file, recursive = TRUE)
-  ) %>% 
-    mutate(data = map(file, ~read_tsv(paste0(exp_dir, "/", .)))) %>% 
-    unnest(data)
-  
-  # add extra info to scored integrations
-  int_scores <- int_scores %>% 
-    mutate(results_file = basename(found_info)) %>% 
-    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
-    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
-    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
-    mutate(post = str_detect(results_file, "post")) %>% 
-    mutate(analysis_condition = basename(dirname(dirname(found_info)))) %>%
-    rowwise() %>% 
-    mutate(TPR = tp/(tp+fn)) %>% 
-    mutate(PPV = tp/(tp+fp)) %>% 
-    ungroup()
+  int_scores <- importIntScoresFromSummaries(exp_path)
   
   # get files with analysis conditions
   cond_files <- list.files(exp_dir, pattern = analysis_condtions_file, recursive = TRUE)
+  cond_files <- cond_files[!str_detect(cond_files, "pipeline_analysis_conditions.tsv")]
   
   # import analysis conditions
   analysis_conditions <- tibble(
@@ -480,7 +463,21 @@ importIntScoreExperiment <- function(exp_path) {
       TRUE ~ "unmerged"
     ))
   
-  return(int_scores)
+  # get files with simulation condtions
+  cond_files <- list.files(exp_dir, pattern = sim_conditions_file, recursive = TRUE)
+  
+  # import analysis conditions
+  sim_conditions <- tibble(
+    file = file.path(exp_dir, cond_files),
+    conds = map(file, ~read_tsv(.))
+  ) %>% 
+    unnest(conds) %>% 
+    select(-file) %>% 
+    distinct() 
+  
+  
+  
+  return(left_join(int_scores, sim_conditions, by=c("experiment", "condition", "replicate")))
   
 }
 
@@ -513,10 +510,12 @@ importIntScoresFromSummaries <- function(exp_path) {
     mutate(results_file = basename(found_info)) %>% 
     mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
     mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
+    mutate(replicate = as.double(str_extract(replicate, "\\d+"))) %>% 
     mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
     mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
     mutate(post = str_detect(results_file, "post")) %>% 
     mutate(analysis_condition = basename(dirname(dirname(found_info)))) %>%
+    rename(merged_ints = `merged-ints`) %>% 
     rowwise() %>% 
     mutate(TPR = tp/(tp+fn)) %>% 
     mutate(PPV = tp/(tp+fp)) %>% 

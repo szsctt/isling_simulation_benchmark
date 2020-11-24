@@ -1,0 +1,121 @@
+---
+title: "Results for publication"
+output: html_notebook
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggpubr)
+library(kableExtra)
+
+source("sim_functions.R")
+
+results_dir <- "../out/experiment1_OTC_chr1"
+```
+
+```{css, include=FALSE}
+.scroll_100 {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+
+# Overview
+I conducted several experiments in order to investigate the performatce of the pipeline, and compare it to similar tools.
+
+## 'Easier' and 'harder'
+
+The first experiment simulated some 'easier' and some 'harder' conditions.  I also tried out some wild-type virus (AAV2) and vector (OTC vector).
+
+### Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chromosome 1 from hg38.   
+
+For the virus I used the OTC vector genome (the subsequence of the plasmid from ITR to ITR)
+
+### Simulation parameters
+
+I simulated two different situations using this data: one that I thought would be 'easier' for the pipeline to handle, and one that is 'harder'.
+
+These conditions are summarised in the config file:
+
+```{bash attr.output='style="max-height: 300px;"'}
+cat ../config/experiment1_OTC_chr1/analysis-conditions.yml
+```
+
+
+### Comparison with other tools
+
+We can compare the performance of our pipeline with other tools
+
+For each replicate, we can calulate the positive predictive value (how many of the predicted positves are true positves - high means few false positves), and the true positve rate (how many of the real positves are detected - high means few false negatives).
+
+
+We can calculate the true positive rate (sensitivity, recall) as
+$$TPR = \frac{TP}{P} = \frac{TP}{TP+FN}$$
+
+And the positive predictive value as
+$$PPV = \frac{TP}{TP+FP}$$
+
+```{r include=FALSE}
+exp_dir <- file.path(results_dir, "easier-harder")
+int_scores <- importIntScoreExperiment(exp_dir) 
+
+# only use postprocessed data from our pipeline
+int_scores <- int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) %>% 
+  rename(merged_ints = `merged-ints`)
+```
+
+First, a table of results:
+```{r}
+int_scores %>% 
+  select(experiment, replicate, analysis_host, post, analysis_tool, `merged_ints`, TPR, PPV, tp:fn) %>% 
+  arrange(experiment, analysis_tool, replicate, analysis_host) 
+```
+
+And also, a plot:
+```{r}
+p <- int_scores %>% 
+  filter(experiment == exp) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_tool)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_grid(vars(`merged_ints`),vars(experiment))
+print(p)
+```
+
+We can instead use ggpubr to make the plot:
+
+
+```{r}
+p <- ggscatter(int_scores, x = "PPV", y = "TPR", color = "analysis_tool",
+               facet.by = c("merged_ints", "experiment"))
+ggpar(p, xlim= c(0, 1), ylim = c(0, 1), xlab = "Positive predictive value", ylab = "True positive rate",
+      xtickslab.rt = 45)
+```
+
+Really, we only care about the 'harder' conditions, and we won't merge nearby sites:
+
+```{r}
+p <- ggscatter(int_scores, x = "PPV", y = "TPR", color = "analysis_tool",
+               facet.by = c("merged_ints", "experiment"))
+ggpar(p, xlim= c(0, 1), ylim = c(0, 1), xlab = "Positive predictive value", ylab = "True positive rate")
+```
+
+
+
+
+
+```{r}
+sessionInfo()
+```
+

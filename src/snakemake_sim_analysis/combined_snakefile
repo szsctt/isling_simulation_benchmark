@@ -15,7 +15,7 @@ from python_scripts.make_df import make_df, make_post_args, make_reference_dict
 from python_scripts.make_df import check_dataset_sample_unique, make_reference_dict, make_post_args, check_fastas_unique
 
 from scripts.parse_analysis_config import parse_analysis_config, get_bool_value_from_config
-
+from scripts.input_functions import *
 
 # https://sapac.support.illumina.com/bulletins/2016/12/what-sequences-do-i-use-for-adapter-trimming.html
 HS25 = {'read1-adapt' : "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA", 
@@ -350,6 +350,7 @@ for i, row in analysis_df.iterrows():
 			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 		)
 
+
 # scored reads
 scored_summaries = set()
 for i, row in analysis_df.iterrows():
@@ -398,9 +399,9 @@ def get_input_reads(wildcards, read_num):
 	assert read_num in {1, 2}
 	
 	if read_num == 1:
-		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R1_suffix')}"
+		return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R1_suffix')}"
 	if read_num == 2:
-		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R2_suffix')}"	
+		return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R2_suffix')}"	
 
 #####################################################
 ##################### trimming ######################
@@ -622,8 +623,8 @@ rule score_integrations:
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	params:
-		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'tool')}",
-		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}",
+		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, analysis_df, 'tool')}",
+		window = lambda wildcards: f"--window {analysis_df_value(wildcards, analysis_df, 'score_ints_window')}",
 	threads: 1
 	container:
 		"docker://szsctt/simvi:2"
@@ -657,8 +658,8 @@ rule score_merged_integrations:
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	params:
-		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'tool')}",
-		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}",
+		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, analysis_df, 'tool')}",
+		window = lambda wildcards: f"--window {analysis_df_value(wildcards, analysis_df, 'score_ints_window')}",
 		merged = "--merged"
 	threads: 1
 	container:

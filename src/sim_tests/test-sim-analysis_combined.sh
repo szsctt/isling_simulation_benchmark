@@ -33,8 +33,9 @@ mkdir -p ../../out/test
 snakemake \
  --snakefile combined_snakefile \
  --configfile ../../config/test/sim_and_detect.yml\
- --cores 5 \
+ --cores 1 \
  --jobs 1 \
  --use-singularity \
+ --singularity-args '-B $(realpath ../..)' \
  --rerun-incomplete
 

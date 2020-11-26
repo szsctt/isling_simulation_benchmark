@@ -194,7 +194,7 @@ OTC-host_deletion:
        - 1
 
 OTC-fcov:
-   frag_len: 
+   fcov: 
        - 0.75
        - 1.5
        - 3

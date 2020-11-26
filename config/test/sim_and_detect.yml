@@ -1,3 +1,5 @@
+
+
 global:
    int_num:
       - 3
@@ -98,32 +100,37 @@ test-easier:
          segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
      trim: 
       - True
-     
+
+   seeksv_params:
+     trim:
+      - True
+     dedup:
+      - False    
+
    # run verse
    # https://bioinfo.uth.edu/VirusFinder/VirusFinder-manual.pdf?csrt=2093584511125027598
-   verse_params:
-     detection_mode:
-      - sensitive
-     flank_region_size:
-      - 4000
-     sensitivity_level:
-      - 1
-     min_contig_length:
-      - 300
-     blastn_evalue_thrd:
-      - 0.05
-     similarity_thrd:
-      - 0.8
-     chop_read_length:
-      - 25
-     minIdentity:
-      - 80     
-     trim: 
-      - True
+#   verse_params:
+#     detection_mode:
+#      - sensitive
+#     flank_region_size:
+#      - 4000
+#     sensitivity_level:
+#      - 1
+#     min_contig_length:
+#      - 300
+#     blastn_evalue_thrd:
+#      - 0.05
+#     similarity_thrd:
+#      - 0.8
+#     chop_read_length:
+#      - 25
+#     minIdentity:
+#      - 80     
+#     trim: 
+#      - True
   
    # scoring
    score_reads: True
    score_ints: True
-   score_merged_ints: True
    score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
 

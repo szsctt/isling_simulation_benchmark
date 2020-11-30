@@ -216,6 +216,7 @@ for i, row in analysis_df.iterrows():
 		
 analysis_df['score_reads'] = score_reads
 analysis_df['score_ints'] = score_ints
+analysis_df['score_ints_window'] = analysis_df['score_ints_window'].astype('object')
 analysis_df['score_ints_window'] = score_ints_window
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
@@ -280,6 +281,7 @@ wildcard_constraints:
 	post = "|\.post",
 	merged = "|\.merged",
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
+	dist = "\d+"
 	
 localrules: write_summary, write_analysis_summary, write_analysis_summary_all_tools
 
@@ -640,16 +642,16 @@ rule score_integrations:
 		analysis_info = lambda wildcards: get_result(wildcards),
 		merged_reads = rules.merged_list.output.merged_reads
 	output:
-		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}_summary.tsv",
-		temp = temp("{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.tmp.tsv"),
-		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.tsv"
+		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}{post}_summary.tsv",
+		temp = temp("{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}{post}.tmp.tsv"),
+		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}{post}.tsv"
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 5000,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	params:
 		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, analysis_df, 'tool')}",
-		window = lambda wildcards: f"--window {analysis_df_value(wildcards, analysis_df, 'score_ints_window')}",
+		window = lambda wildcards: f"--window {wildcards.dist}",
 	threads: 1
 	container:
 		"docker://szsctt/simvi:2"
@@ -725,16 +727,24 @@ def scores_to_combine(wildcards, score_type):
 		# get samples for this experiment
 		samples = set(sim_df[sim_df['experiment'] == exp]['sample'])
 		
+		# get distances for this experiment
+		dists = analysis_df[analysis_df['experiment'] == wildcards.exp]['score_ints_window']
+		row_num = dists.index[0]
+		assert all([entry == dists[row_num] for entry in dists])
+		dists = dists[row_num]
+		if not hasattr(dists, '__iter__'):
+			dists = [dists]
+		
 		# we only have postprocessed data for our pipeline
 		if re.search("analysis", unique):
-			post = ['.post', '']
+			post = '.post'
 		else:
-			post = ['']
+			post = ''
 			
 		scored_files += [
-		f"{outpath}/{exp}/{folder}/{unique}.{samp}.{host}.{virus}{post}_summary.tsv"
-			for samp, post, 
-			in itertools.product(samples, post)
+		f"{outpath}/{exp}/{folder}/{unique}.{samp}.{host}.{virus}.{dist}{post}_summary.tsv"
+			for samp, dist
+			in itertools.product(samples, dists)
 		]
 	
 	return scored_files

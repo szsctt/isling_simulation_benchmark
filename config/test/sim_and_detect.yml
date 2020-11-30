@@ -132,5 +132,7 @@ test-easier:
    # scoring
    score_reads: True
    score_ints: True
-   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
+   score_ints_window:  # window either side of simulated integrations to look for detected integrations
+    - 20
+    - 100
 

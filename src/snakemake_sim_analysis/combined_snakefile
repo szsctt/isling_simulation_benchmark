@@ -197,6 +197,7 @@ analysis_df['unique'] = [f"{exp}_{cond}" for exp, cond in zip(analysis_df['exper
 score_reads = []
 score_ints = []
 score_ints_window = []
+score_ints_type = []
 for i, row in analysis_df.iterrows():
 	# only score reads from our pipeline
 	if row['tool'] != 'pipeline':
@@ -211,13 +212,16 @@ for i, row in analysis_df.iterrows():
 	# get score_ints_window if appropriate
 	if score_ints[i] == 1 or score_merged_ints[i] == 1:
 		score_ints_window.append(config[row['experiment']]['score_ints_window'])
+		score_ints_type.append(config[row['experiment']]['score_ints_type'])
 	else:
 		score_ints_window.append(None)
+		score_ints_type.append(None)
 		
 analysis_df['score_reads'] = score_reads
 analysis_df['score_ints'] = score_ints
 analysis_df['score_ints_window'] = analysis_df['score_ints_window'].astype('object')
 analysis_df['score_ints_window'] = score_ints_window
+analysis_df['score_ints_type'] = score_ints_type
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
 
@@ -281,7 +285,8 @@ wildcard_constraints:
 	post = "|\.post",
 	merged = "|\.merged",
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
-	dist = "\d+"
+	dist = "\d+",
+	score_type = "coords|overlap"
 	
 localrules: write_summary, write_analysis_summary, write_analysis_summary_all_tools
 
@@ -642,9 +647,9 @@ rule score_integrations:
 		analysis_info = lambda wildcards: get_result(wildcards),
 		merged_reads = rules.merged_list.output.merged_reads
 	output:
-		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}{post}_summary.tsv",
-		temp = temp("{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}{post}.tmp.tsv"),
-		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}{post}.tsv"
+		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_summary.tsv",
+		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}.tsv",
+#		temp = temp("{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}.tmp.tsv"),
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 5000,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
@@ -652,6 +657,7 @@ rule score_integrations:
 	params:
 		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, analysis_df, 'tool')}",
 		window = lambda wildcards: f"--window {wildcards.dist}",
+		score_type = lambda wildcards: f"--score-type {wildcards.score_type}"
 	threads: 1
 	container:
 		"docker://szsctt/simvi:2"
@@ -662,16 +668,17 @@ rule score_integrations:
 		python3 scripts/score_integrations.py \
 		--sim-info {input.sim_info} \
 		--found-info {input.analysis_info} \
-		--output {output.temp} \
+		--output {output.scored_ints} \
 		--summary {output.summary} \
-		{params.tool} {params.window}
-		
-		python3 scripts/int_fp_type.py \
-		--sim-info {input.sim_info} \
-		--merged {input.merged_reads} \
-		--scored-ints {output.temp} \
-		--output {output.scored_ints}
+		{params}
 		"""
+
+#		python3 scripts/int_fp_type.py \
+#		--sim-info {input.sim_info} \
+#		--merged {input.merged_reads} \
+#		--scored-ints {output.temp} \
+#		--output {output.scored_ints}
+#		"""
 		
 rule combine_int_scores:
 	input:
@@ -734,6 +741,14 @@ def scores_to_combine(wildcards, score_type):
 		dists = dists[row_num]
 		if not hasattr(dists, '__iter__'):
 			dists = [dists]
+			
+		# get score types for this experiment
+		types = analysis_df[analysis_df['experiment'] == wildcards.exp]['score_ints_type']
+		row_num = types.index[0]
+		assert all([entry == types[row_num] for entry in types])
+		types = types[row_num]
+		if not hasattr(types, '__iter__'):
+			types = [types]		
 		
 		# we only have postprocessed data for our pipeline
 		if re.search("analysis", unique):
@@ -742,9 +757,9 @@ def scores_to_combine(wildcards, score_type):
 			post = ''
 			
 		scored_files += [
-		f"{outpath}/{exp}/{folder}/{unique}.{samp}.{host}.{virus}.{dist}{post}_summary.tsv"
-			for samp, dist
-			in itertools.product(samples, dists)
+		f"{outpath}/{exp}/{folder}/{unique}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_summary.tsv"
+			for samp, dist, score_type
+			in itertools.product(samples, dists, types)
 		]
 	
 	return scored_files

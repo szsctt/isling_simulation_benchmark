@@ -135,4 +135,7 @@ test-easier:
    score_ints_window:  # window either side of simulated integrations to look for detected integrations
     - 20
     - 100
+   score_ints_type:  
+    - "coords"
+    - "overlap"
 

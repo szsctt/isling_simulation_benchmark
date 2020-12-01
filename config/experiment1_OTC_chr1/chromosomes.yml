@@ -84,7 +84,10 @@ global:
    score_ints_window: 
     - 20
     - 150
-    - 500 
+    - 600 
+   score_ints_type: 
+    - "coords"
+    - "overlap"
    
    # other tools 
    polyidus_params:

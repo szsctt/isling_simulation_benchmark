@@ -52,6 +52,7 @@ global:
        
    merge: 
        - False
+       - True
    trim: 
        - True
    dedup: 
@@ -65,6 +66,7 @@ global:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
        - 100 
+       - 200 
    merge-n-min:
        - 1
    cigar-tol:
@@ -81,7 +83,10 @@ global:
    score_ints_window: 
     - 20
     - 150
-    - 500 
+    - 600 
+   score_ints_type: 
+    - "coords"
+    - "overlap"
    
    # other tools 
    polyidus_params:

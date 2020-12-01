@@ -456,7 +456,7 @@ importIntScoreExperiment <- function(exp_path) {
     distinct() 
   
   # add analysis condition info to int scores
-  int_scores <- int_scores %>% left_join(analysis_conditions, by="analysis_condition") %>% 
+  int_scores <- int_scores %>% left_join(analysis_conditions, by="unique") %>% 
     mutate(merge = case_when(
       merge == 1 ~ "merged",
       merge == 0 ~ "unmerged",
@@ -507,15 +507,14 @@ importIntScoresFromSummaries <- function(exp_path) {
   
   # add extra info to scored integrations
   int_scores <- int_scores %>% 
-    mutate(results_file = basename(found_info)) %>% 
-    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
+    mutate(results_file = basename(filename)) %>% 
+    mutate(unique = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>%   
+    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
     mutate(replicate = as.double(str_extract(replicate, "\\d+"))) %>% 
-    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
-    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>% 
     mutate(post = str_detect(results_file, "post")) %>% 
-    mutate(analysis_condition = basename(dirname(dirname(found_info)))) %>%
-    rename(merged_ints = `merged-ints`) %>% 
     rowwise() %>% 
     mutate(TPR = tp/(tp+fn)) %>% 
     mutate(PPV = tp/(tp+fp)) %>% 

@@ -86,10 +86,9 @@ global:
    score_merged_ints: True
    score_ints_window: 
     - 20
-    - 150
-    - 600  
    score_ints_type: 
-    - "coords"
+    - "coords_min"
+    - "coords_mean"
     - "overlap"
    
    # other tools 

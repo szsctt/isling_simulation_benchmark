@@ -90,8 +90,13 @@ global:
    score_reads: False
    score_ints: True
    score_merged_ints: True
-   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
-   
+   score_ints_window: 
+    - 20
+   score_ints_type: 
+    - "coords_min"
+    - "coords_mean"
+    - "overlap"
+       
    # other tools 
    polyidus_params:
      aligner:

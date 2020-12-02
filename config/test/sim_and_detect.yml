@@ -1,10 +1,4 @@
-
-
 global:
-   int_num:
-      - 3
-
-test-easier:
    out_directory: "../../out/test"
    
    # integration simulation
@@ -15,6 +9,8 @@ test-easier:
        "AAV" :  "../../data/references/test_AAV.fa"
    initial_seed: 12345
    seed_increment: 123 
+   int_num:
+      - 5
    epi_num:
        - 0
    min_sep: 
@@ -134,8 +130,12 @@ test-easier:
    score_ints: True
    score_ints_window:  # window either side of simulated integrations to look for detected integrations
     - 20
-    - 100
+#    - 100
    score_ints_type:  
-    - "coords"
+    - "coords_min"
+    - "coords_mean"
     - "overlap"
 
+test-easier:
+   int_num:
+      - 3

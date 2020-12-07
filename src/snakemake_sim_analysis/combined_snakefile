@@ -92,17 +92,23 @@ for dataset in config:
 	#### parameters for our pipeline ####
 	# paramters for our pipeline should be lists, so that we can do combinations
 	# of each 
+	# adding the sequencing system and fragment length in here isn't ideal, because the pipeline will analyse all data in the dataset
+	# which may have different fragment lengths, with the same value (and will do this for every sample in the dataset)
 	assert hasattr(config[dataset]['merge'], '__iter__')
 	assert hasattr(config[dataset]['dedup'], '__iter__')
 	assert hasattr(config[dataset]['trim'], '__iter__')
 	assert hasattr(config[dataset]['post'], '__iter__')
 	assert hasattr(config[dataset]['bwa_mem'], '__iter__')	
 	assert hasattr(config[dataset]['seq_sys'], '__iter__')
+	assert hasattr(config[dataset]['frag_len'], '__iter__')
 	assert hasattr(config[dataset]['merge-dist'], '__iter__')
 	assert hasattr(config[dataset]['merge-n-min'], '__iter__')
 	assert hasattr(config[dataset]['clip-cutoff'], '__iter__')
 	assert hasattr(config[dataset]['cigar-tol'], '__iter__')
 	assert hasattr(config[dataset]['min-mapq'], '__iter__')
+	
+	if len(config[dataset]['seq_sys']) > 1:
+		print(f"WARNING: there was more than one sequencing system requested for experiment {dataset}. Each sample in this dataset will be analysed with the appropriate set of adapters for each sequencing system, regardless of whether or not those adapters are appropriate for each sample.  Take care to only use results with matching sequencing systems for analysis and simulation.")
 	
 	scoring = {}
 	for score_type, default in default_scoring.items():
@@ -119,8 +125,8 @@ for dataset in config:
 																		config[dataset]['trim'], 
 																		config[dataset]['dedup'],
 																		config[dataset]['post'],
-																		config[dataset]['bwa_mem'],
-																		config[dataset]['seq_sys'],
+																		config[dataset]['bwa_mem'],		
+																		config[dataset]['seq_sys'],																
 																		config[dataset]['analysis_hosts'].keys(),
 																		config[dataset]['analysis_viruses'].keys(),
 																		config[dataset]['merge-dist'],
@@ -132,12 +138,12 @@ for dataset in config:
 		
 		condition = f"analysis{i}"
 
-		# format parameters required for this condition
-		post_args = make_post_args({dataset: {'post':post}})[0][dataset]
-		
-		# figure out which adapters to use, based on which sequencing system used for art
+		# get adapters
 		read1_adapt = adapter_seqs[seq_sys]['read1-adapt']
 		read2_adapt = adapter_seqs[seq_sys]['read2-adapt']
+
+		# format parameters required for this condition
+		post_args = make_post_args({dataset: {'post':post}})[0][dataset]
 		
 		# convert merge and dedup to 1 or 0			
 		merge = convert_bool_to_int(merge, dataset, 'merge')
@@ -227,7 +233,7 @@ analysis_df['score_ints_type'] = score_ints_type
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
 
-column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq']
+column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len']
 
 rows = []
 
@@ -254,6 +260,15 @@ for i, row in analysis_df.iterrows():
 		# add sample name
 		todo_row['sample'] = sample
 		todo_row['unique'] = f"{dataset}+++{sample}"
+		
+		# get the correct adapters and fragment length for this sample
+		exp_df = sim_df[sim_df['experiment'] == experiment]
+		seq_sys = exp_df[exp_df['sample'] == sample]['seq_sys'].tolist()[0]
+		todo_row['adapter_1'] = adapter_seqs[seq_sys]['read1-adapt']
+		todo_row['adapter_2'] = adapter_seqs[seq_sys]['read2-adapt']
+		
+		# get the mean fragment length used for simulation
+		todo_row['mean_frag_len'] = exp_df[exp_df['sample'] == sample]['frag_len'].tolist()[0]
 		
 		# read file names
 		read_prefix = os.path.join(row['outdir'], experiment, 'sim_reads', sample)

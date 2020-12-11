@@ -67,7 +67,7 @@ global:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100 
+       - 1000 
    merge-n-min:
        - 1
    cigar-tol:
@@ -82,7 +82,9 @@ global:
    score_ints: True
    score_merged_ints: True
    score_ints_window: 
+    - 5
     - 20
+    - 120
    score_ints_type: 
     - "coords_min"
     - "coords_mean"

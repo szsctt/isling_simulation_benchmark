@@ -1,0 +1,209 @@
+---
+title: "OTC vector integrations into chromosome 1: easier and harder conditions, scored integrations"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(gganimate)
+library(kableExtra)
+source("sim_functions.R")
+
+exp_dir <- "../out/experiment1_OTC_chr1/easier-harder"
+```
+
+```{css, include=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+
+# Overview
+In this experiment I tried to mimic vector (rather than wild-type) integration.  I wanted to compare the perfomance of various integration detection tools in this situtaiton.
+
+# Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chromosome 1 from hg38.   
+
+For the virus I used the OTC vector genome (the subsequence of the plasmid from ITR to ITR)
+
+# Simulation parameters
+
+I simulated two different situations using this data: one that I thought would be 'easier' for the pipeline to handle, and one that is 'harder'.
+
+These conditions are summarised in the config file:
+
+```{bash class.output="scroll-100"}
+cat ../config/experiment1_OTC_chr1/easier-harder.yml
+```
+
+
+In the 'easier' condition, there are 1000 integrations of the whole virus, with clean junctions and no rearrangements, deletions of the virus, and no host deletions either.  In the 'harder' condition the host and virus reference are the same, but there's a high probability of rearrangements, deletions, gaps and overlaps at the junctions, and host deletions.  There are also some 'episomal' sequences included in the output fasta.
+
+
+# Results
+
+There are a few different ways of scoring the results from these experiments.  One thing to look at is just simply if all the integrations were found or not, and if there's any integrations we detected, but shouldn't have.
+
+
+```{r include=FALSE}
+int_scores <- importIntScoreExperiment(exp_dir) 
+
+# only use postprocessed data from our pipeline
+int_scores <- int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) 
+```
+
+## Scoring integrations
+
+```{r}
+int_scores %>% 
+  select(experiment, replicate, window, coords_score_type, analysis_condition, TPR, PPV, tp:fn, results_file) %>% 
+  arrange(experiment, analysis_condition, replicate, window) 
+
+```
+
+For each replicate, we can calulate the positive predictive value (how many of the predicted positves are true positves - high means few false positves), and the true positve rate (how many of the real positves are detected - high means few false negatives).
+
+
+We can calculate the true positive rate (sensitivity, recall) as
+$$TPR = \frac{TP}{P} = \frac{TP}{TP+FN}$$
+
+And the positive predictive value as
+$$PPV = \frac{TP}{TP+FP}$$
+
+```{r}
+p <- int_scores %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape = coords_score_type)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_grid(vars(experiment), vars(coords_score_type)) +
+  theme_bw()
+print(p)
+```
+
+So the different pipelines seem to have quite different performances, and the performance of our pipeline and vifi seem to be very dependent on distance metric.
+
+## Distance to nearest integration
+
+Instead of just picking a binary threshold, we can look at each output integration, and measure the distance to the nearest simulated integration.
+
+First, check the output integrations for each analysis tool and find the distance to the nearest simulated integration.
+
+```{r include=FALSE}
+found_scores <- importNearestSimToFound(exp_dir) 
+```
+
+We expect all integrations to be on chromosomes 1, since this was the only chromosome used for simulation.  Plot the number of integrations on chromosome 1 and other chromosomes, in each condition.
+
+
+```{r}
+found_scores %>% 
+  mutate(correct_chr = (chr == "chr1")) %>% 
+  filter(score_type == 'overlap') %>% 
+  ggplot(aes(x = analysis_condition, fill = correct_chr)) +
+  geom_bar()
+```
+
+Next, for all the integrations on the correct chromosome, plot the distance to the nearest simulated integration
+
+```{r}
+found_scores %>% 
+  mutate(dist = dist+1) %>% 
+  ggplot(aes(x = dist, color = analysis_condition)) +
+  geom_freqpoly(bins = 1000) +
+  facet_grid(vars(experiment), vars(score_type), scales = 'free') +
+  scale_x_log10()
+```
+
+We're most interested in the coords_mean score type, so plot these separately:
+```{r}
+found_scores %>% 
+  filter(score_type == 'coords_mean') %>% 
+  mutate(dist = dist+1) %>% 
+  ggplot(aes(x = dist, color = analysis_condition)) +
+  geom_freqpoly(bins = 1000) +
+  facet_grid(vars(experiment), vars(analysis_condition), scales = 'free_y') +
+  scale_x_log10() +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+Most integrations seem to be very close, but there is a strange peak at ~100bp for the coords_mean score type.  I would guess that this comes from unmerged discordant pairs, because these would always  have a larger coords_mean distance to simulated integrations.  Check out the clusters that are about this distance
+
+```{r}
+found_scores %>% 
+  filter(analysis_condition == 'analysis0') %>% 
+  filter(dist > 80 & dist < 120) 
+```
+
+
+Check out a few of these reads from condtion 0, replicate 0 of the AAV-easier dataset: chr1-5573666, chr1-685850, chr1-1209220, chr1-1137210.
+
+Firstly, were they involved in integrations? Look for them in the annotated
+
+```{r}
+inspect <- read_tsv("../out/experiment1_OTC_chr1/easier-harder/AAV-easier/sim_ints/cond0.rep0.int-info.annotated.tsv")
+```
+
+```{r}
+reads <- 'chr1-5573666|chr1-685850|chr1-1209220|chr1-1137210'
+inspect %>% 
+  rowwise() %>% 
+  filter(str_detect(left_discord, reads) | str_detect(right_discord, reads))
+```
+
+We find that the reads chr1-1137210 and chr1-1209220 are discordant about the left junction of integration 980 (chr1:2335156), chr1-685850 is discordant about the left junction of integration 480 (chr1:3814138), and chr1-5573666 is discordant about the right junction of integration 480.
+
+Next, check their output coordinates
+
+```{r include=FALSE}
+inspect <- read_tsv("../out/experiment1_OTC_chr1/easier-harder/AAV-easier_analysis0/ints/cond0.rep0.hg38.AAV2.integrations.post.txt")
+```
+
+```{r}
+inspect %>% 
+  filter(str_detect(ReadID, reads))
+```
+
+The read chr1-5573666 has output coordinates 2334960-2335163, (which are an estimate, since it was a discordant pair).  This is actually not too bad - the right end is close to the intetgration coordinate (2335156), and the output range does encompass this integration.  The other reads are similarly close: 
+
+- chr1-685850: output coordinates 2335125-2335325 encompass itegration (2335156)
+- chr1-1209220: output coordinates 3814104-3814304 encompass integration (3814138)
+- chr1-1137210: output coordinates 3814108-3814308 encompass integration (3814138)
+
+The output coordinates for the reads from the integration at 2335156 overlap each other (2334960:2335163 and 2335125:2335325), but they do not overlap in the virus because they come from the left and right junctions.  Similarly, the two reads for the other integration overlap each other.
+
+
+Next, check how these reads were merged:
+
+```{r include=FALSE}
+inspect <- read_tsv("../out/experiment1_OTC_chr1/easier-harder/AAV-easier_analysis0/ints/cond0.rep0.hg38.AAV2.integrations.post.merged.txt")
+```
+```{r}
+inspect %>% 
+  filter(str_detect(ReadIDs, reads))
+```
+ 
+So the merging reagarding just these reads seems to be correct, but these weren't merged with the other reads for this integration.  Check for other reads overlapping these two integration sites.
+
+```{r}
+inspect %>% 
+  filter((IntStart <= 2335156 & IntStop >= 2335156) | (IntStart <= 3814138 & IntStop >= 3814138))
+```
+
+So the integration site for the read chr1-5573666 should have been merged - why was it not?  There must be some bugs in the merging script/
+
+
+
+```{r}
+sessionInfo()
+```
+

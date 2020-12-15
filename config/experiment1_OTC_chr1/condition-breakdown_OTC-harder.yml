@@ -15,36 +15,36 @@ global:
    int_num: 
        - 1000
    epi_num:
-       - 0
+       - 1000
    p_whole:
-       - 1
+       - 0.3
    p_rearrange:
-       - 0
+       - 0.1
    p_delete:
-       - 0
+       - 0.1
    lambda_split:
        - 1
    p_overlap:
-       - 0
+       - 0.3
    p_gap:
-       - 0
+       - 0.3
    lambda_junction:
-       - 5
+       - 1
    p_host_deletion:
-       - 0
+       - 0.5
    lambda_host_deletion:
        - 500
    min_sep:
-       - 500
+       - 100
    min_len:
-       - 500
+       - 20
    # read simulation
    read_len: 
        - 150
    fcov: 
-       - 5 
+       - 1.5
    frag_len: 
-       - 500 
+       - 250
    frag_std: 
        - 30
    seq_sys: 
@@ -86,7 +86,6 @@ global:
    score_merged_ints: True
    score_ints_window: 
     - 5
-    - 20
     - 120
    score_ints_type: 
     - "coords_min"
@@ -113,26 +112,6 @@ global:
          segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
      trim:
        - True
-         
-   # run verse
-   # https://bioinfo.uth.edu/VirusFinder/VirusFinder-manual.pdf?csrt=2093584511125027598
-#   verse_params:
-#     detection_mode:
-#      - sensitive
-#     flank_region_size:
-#      - 4000
-#     sensitivity_level:
-#      - 1
-#     min_contig_length:
-#      - 300
-#     blastn_evalue_thrd:
-#      - 0.05
-#     similarity_thrd:
-#      - 0.8
-#     chop_read_length:
-#      - 25
-#     minIdentity:
-#      - 80 
 
    seeksv_params:
      trim:
@@ -196,16 +175,14 @@ OTC-overlap:
        - 0
        - 0.25
        - 0.5
-       - 0.75
-       - 1
+       - 0.7
 
 OTC-gap:
    p_gap:
        - 0
        - 0.25
        - 0.5
-       - 0.75
-       - 1
+       - 0.7
        
 OTC-juncs:
    p_overlap:
@@ -279,3 +256,5 @@ chromosomes:
       chr8 : "../../data/references/chrs/chr8.fa"
       chr14: "../../data/references/chrs/chr14.fa"
       chrX : "../../data/references/chrs/chrX.fa"
+      
+      

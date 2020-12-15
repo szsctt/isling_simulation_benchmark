@@ -15,8 +15,8 @@ NAME="chromosomes"
 
 bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
 
-CONFIG="../../config/experiment1_OTC_chr1/condition-breakdown_smaller.yml"
-NAME="condition-breakdown-smaller"
+CONFIG="../../config/experiment1_OTC_chr1/condition-breakdown_OTC-harder.yml"
+NAME="condition-breakdown_OTC-harder"
 
 bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
 

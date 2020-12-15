@@ -1,0 +1,434 @@
+---
+title: "Viral integration tools"
+author: "Suzanne Scott"
+date: "18 November 2020"
+output: 
+  ioslides_presentation:
+    widescreen: true
+#  html_notebook:
+#    code_folding: hide
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(gganimate)
+library(kableExtra)
+source("sim_functions.R")
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+
+exp_dir <- "../out/experiment1_OTC_chr1/2020-11-17_easier-harder"
+```
+
+
+## Detecting viral integratoin
+- Goal: write software to identify integrated DNA in a host genome
+    - location within host
+    - portion of integrated genome
+- Chimeric reads and discordant pairs are evidence of host/virus junction
+- Wild-type viral integration is different to vector integration
+    - Most integration site tools focus on viral integration
+
+## Wild-type vs vector integration
+<div class="columns-2">
+### *Viral integration*
+
+  - Integrated viral genome possibly dissimilar to reference
+  - Potentially only looking for clonally expanded sites
+  - Potentially very few integration sites in any given host
+  - Usually human data only
+  - Mechanism of integration (eg rep-mediated integration)
+
+### *Vector integration*
+  - Known reference
+  - Usually homology beteween host and vector
+  - Potentially low levesl of strucural variation 
+  - Potentally large numbers of widely dispersed sites
+  - Non-human models common
+</div>
+
+## Goals
+- Characterise pipeline performance, compare with other tools
+    - Polyidus (Karimzadeh et al, 2020)
+    - ViFi (Nguyen et al, 2018)
+    - seeksv (Liang et al, 2016)
+    - VERSE/VirusFinder2 (Wang et al, 2015)
+- Compare on simulated data
+    - 'Viral' integration
+    - 'Vector' integration
+- (later) compare on real data
+
+## Simulation parameters
+
+- Simulated integration into hg38 chr1
+- Four situations: viral and vector integration, 'easier' and 'harder'
+- Viral integration: AAV2
+    - <font size="5">No Structural variation, higher coverage (5x)</font>
+    - <font size="5">easier: Always whole virus integrated</font>
+    - <font size="5">harder: Possibly short viral fragments, possibly close together</font>
+ 
+- Vector integration: OTC vector
+    - <font size="5">Lower coverage (1.5x) mimics sparse hetrogenous integration</font>
+    - <font size="5">easier: Always whole virus, no structural variation</font>
+    - <font size="5">harder: Short fragments, structural variation, close together</font>
+
+
+```{css, include=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+```{bash class.output="scroll-100", include=FALSE}
+cat ../config/experiment1_OTC_chr1/easier-harder.yml
+```
+
+
+
+## Scoring integrations
+
+- Based on position in host (viral location not output)
+- Score individual integrations
+    - tp: sim integrations with at least one output integration
+    - fp: output integrations not near sim integration
+    - fn: sim integrations without output integration
+- Score as in output or merged within host
+    - Polyidus and ViFi merge integrations that are within ~300bp in host
+    - As in output: higher fp rate beacause each off-target read is a fp
+    - Merge for consistency between tools (set merging threshold and minimum reads)  
+
+## Scoring metrics
+
+```{r include=FALSE}
+int_scores <- importIntScoresFromSummaries(exp_dir) %>% 
+  mutate(experiment = str_split(analysis_condition, "_", simplify = TRUE)[,1]) 
+```
+
+- True positive rate (sensitivity, recall):
+$$TPR = \frac{TP}{P} = \frac{TP}{TP+FN}$$
+
+- Positive predictive value:
+
+$$PPV = \frac{TP}{TP+FP}$$
+
+<!-- ## Results -->
+
+```{r include=FALSE}
+int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) %>% 
+  filter(`merged-ints`) %>% 
+  select( experiment, replicate,  analysis_tool, `merged-ints`, TPR, PPV, tp:fn) %>% 
+  arrange(experiment, analysis_tool, replicate) %>% 
+  filter(analysis_tool == "pipeline")
+```
+
+## Pipeline improvements
+- Filter reads based on [mapping quality](https://davetang.org/muse/2011/09/14/mapping-qualities/) (fewer false positives)
+$$!p = 10^{-q/10}$$
+- Merging to facilliate scoring
+- Adding additional tools to comparison
+
+## Results
+
+`TRUE` and `FALSE` refer to if scores are based on merged integrations or not
+
+```{r}
+int_scores %>% 
+  filter(analysis_tool == "pipeline") %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) %>% 
+  ggplot(aes(x = PPV, y = TPR)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab('positive predictive value') +
+  ylab('true positive rate') +
+  facet_grid(vars(experiment), vars(`merged-ints`))
+
+```
+
+## False positives
+
+Are the reads involved in false positives not junction fragments, or are they just in the wrong place?
+
+```{r include=FALSE}
+exps <- unique(int_scores$experiment)
+filenames = c()
+
+for (exp in exps) {
+  scored_ints_folder <- file.path(exp_dir, exp, "scored_ints")
+  files <- list.files(scored_ints_folder, pattern = "tsv")
+  
+  # exclude summary files
+  files <- files[!str_detect(files, "summary")]
+  
+  filenames <- append(filenames, file.path(scored_ints_folder, files))
+  
+}
+
+filenames <- filenames[!str_detect(filenames, "merged")]
+
+column_types <- cols(
+  id = col_double(),
+  score = col_character(),
+  chr = col_character(),
+  pos = col_character(),
+  hv_count = col_double(),
+  vh_count = col_double(),
+  total_count = col_double(),
+  hv_reads = col_logical(),
+  vh_reads = col_logical(),
+  total_reads = col_character()
+)
+
+scored_ints <-tibble(
+  filename = filenames,
+  data = map(filename, ~read_tsv(., col_types = column_types))
+) %>% 
+  unnest(data)
+
+scored_ints <- scored_ints %>% 
+  filter(score == 'fp') %>%
+  mutate(junc = n_junc_reads > 0) %>% 
+  mutate(results_file = basename(filename)) %>% 
+  mutate(analysis_condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+  mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
+  mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
+  mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+  mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>%
+  mutate(post = str_detect(results_file, "post")) %>% 
+  mutate(experiment = str_split(analysis_condition, "_", simplify = TRUE)[,1]) %>% 
+  mutate(start = str_split(pos, "/", simplify=TRUE)[,1]) %>% 
+   mutate(stop = str_split(pos, "/", simplify=TRUE)[,2])  
+
+scored_ints <- scored_ints %>% 
+  filter(str_detect(analysis_condition, "analysis")) %>% 
+  filter(post)
+```
+
+```{r text=FALSE, warn=FALSE, message=FALSE}
+scored_ints %>% 
+  group_by(condition, analysis_host, post, analysis_condition, experiment) %>% 
+  summarise(wrong_location = sum(junc),
+            not_junc = sum(!junc),
+            n_group = n()) %>% 
+  pivot_longer(wrong_location:not_junc, names_to = "type", values_to = "count") %>% 
+  ggplot(aes(x = experiment, y = count, fill = type)) +
+  geom_bar(stat = "identity") +
+  xlab("read count") +
+  ylab("condition") +
+  theme(axis.text.x = element_text(angle = 90, hjust=1)) 
+```
+
+## Locations of false positives
+
+```{r include=FALSE}
+exps <- unique(int_scores$experiment)
+
+for (exp in exps) {
+  scored_ints_folder <- file.path(exp_dir, exp, "scored_ints")
+  int_info_folder <- file.path(exp_dir, exp, "sim_ints")
+  files <- list.files(scored_ints_folder, pattern = "tsv")
+  # exclude summary files
+  files <- files[!str_detect(files, "summary")]
+  # exclude merged files
+  files <- files[!str_detect(files, "merged")]  
+  
+  # for now, filter only for files from our pipeline
+  files <- files[str_detect(files, "analysis")]
+  # for now, filter oly for postproccessed files
+  files <- files[str_detect(files, "post")]  
+  
+  awk1 <- "awk -F\"\t\" 'BEGIN {OFS=\"\t\"}{if ($2 ~ /fp/) { split($4,arr,\"/\" ); print $3,arr[1],arr[2] }}'"
+  awk2 <- "awk 'BEGIN {OFS=\"\t\"}{if (NR!=1) {print $2, $3, $3}}'"
+  
+  for (file in files) {
+    cat("processing file", file, "\n")
+    
+    # construct filenames for fp scored ints bed file
+    split_filename <- str_split(file, "\\.", simplify=TRUE)
+    n_terms_keep <- dim(split_filename)[2] - 1
+    filename_base <- paste0(split_filename[1,1:n_terms_keep], collapse=".")
+    new_filename <- paste0(filename_base, ".sorted.bed")
+    infile <- file.path(scored_ints_folder, file)
+    result <- file.path(scored_ints_folder, new_filename)
+    
+    # generate bed file
+    command <- paste0(awk1, " ", infile, " | sort -k1,1 -k2,2n > ", result)
+    return_value <- system(command)
+    if (return_value != 0) {
+      cat("error with file", file, "\n")
+    }
+    
+    # construct filenames for ground truth integrations bed file
+    sample <- paste0(split_filename[1,2:3], collapse=".")
+    infile <- file.path(int_info_folder, paste0(sample, ".int-info.annotated.tsv"))
+    expected <- file.path(int_info_folder, paste0(sample, ".int-info.bed"))
+    
+    # generate bed file
+    command <- paste0(awk2, " ", infile, " | sort -k1,1 -k2,2n > ", expected)
+    return_value <- system(command)
+    if (return_value != 0) {
+      cat("error with file", file, "\n")
+    }  
+    
+    # construct filename for closest
+    closest <- paste0(filename_base, ".closest.bed")
+    closest_file <- file.path(scored_ints_folder, closest)
+    
+    # do closest
+    command <- paste0("module load bedtools/2.29.2; bedtools closest -d -a ", result, " -b ", expected, " > ", closest_file)
+    return_value <- system(command)
+    if (return_value != 0) {
+      cat("error with file", file, "\n")
+    } 
+    
+  }
+}
+
+column_names <- c("found_chr", "found_start", "found_stop", "int_chr", "int_start", "int_stop", "distance")
+fp_dists <- int_scores %>% 
+  filter(!`merged-ints`) %>% 
+  filter(analysis_tool == "pipeline") %>% 
+  filter(post) %>% 
+  rowwise() %>% 
+  mutate(fp_closest_file = paste0(
+    analysis_condition, ".",
+    condition,  ".",
+    replicate, ".",
+    analysis_host, ".",
+    analysis_virus, ".",
+    ifelse(post, "post.", ""),
+    "closest.bed"
+  )) %>% 
+  mutate(fp_closest_file_path = file.path(exp_dir, experiment, "scored_ints", fp_closest_file)) %>% 
+  mutate(data = map(fp_closest_file_path, ~read_tsv(., col_names = column_names)))  %>% 
+  unnest(data)
+
+far_dist <- 1000
+
+fp_dists <- fp_dists %>% 
+  mutate(class = case_when(
+    distance < 0 ~ "wrong_chr",
+    distance < far_dist ~ "close",
+    distance > far_dist ~ "far"
+  ))
+
+```
+
+How many false positives are close to the nearest integration (within `r far_dist`bp), and how many are far?
+
+```{r}
+fp_dists %>% 
+  group_by(analysis_condition) %>% 
+  ggplot(aes(x = analysis_condition, fill = class)) +
+  geom_bar(stat = 'count') +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) 
+```
+
+## Locations of false positives
+
+How far are integrations in each class from the closest integration?
+
+```{r}
+fp_dists %>% 
+  filter(class != "wrong_chr") %>% 
+  ggplot(aes(x=distance, color=experiment)) +
+  geom_freqpoly(binwidth = 10) +
+  facet_grid(cols = vars(analysis_tool), rows= vars(analysis_host), scales="free") +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  facet_wrap(vars(class), scales="free")
+
+```
+
+## Locations of false positives
+
+Where in chr1 are false positives located?
+
+```{r}
+fp_dists %>% 
+  filter(class != "wrong_chr") %>% 
+  ggplot(aes(x = found_start, color = experiment)) +
+  geom_freqpoly(binwidth = 1000) +
+  xlab("chr1 coordinate") +
+  facet_wrap(vars(class))
+
+```
+
+## Locations of false negatives
+
+Where in chr1 are false negatives located?
+```{r include=FALSE}
+exps <- unique(int_scores$experiment)
+filenames = c()
+
+for (exp in exps) {
+  scored_ints_folder <- file.path(exp_dir, exp, "scored_ints")
+  files <- list.files(scored_ints_folder, pattern = "tsv")
+  
+  # exclude summary files
+  files <- files[!str_detect(files, "summary")]
+  
+  filenames <- append(filenames, file.path(scored_ints_folder, files))
+  
+}
+
+filenames <- filenames[!str_detect(filenames, "merged")]
+
+column_types <- cols(
+  id = col_double(),
+  score = col_character(),
+  chr = col_character(),
+  pos = col_character(),
+  hv_count = col_double(),
+  vh_count = col_double(),
+  total_count = col_double(),
+  hv_reads = col_logical(),
+  vh_reads = col_logical(),
+  total_reads = col_character()
+)
+
+scored_ints <-tibble(
+  filename = filenames,
+  data = map(filename, ~read_tsv(., col_types = column_types))
+) %>% 
+  unnest(data)
+
+scored_ints <- scored_ints %>% 
+  filter(score == 'fn') %>%
+  mutate(junc = n_junc_reads > 0) %>% 
+  mutate(results_file = basename(filename)) %>% 
+  mutate(analysis_condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+  mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
+  mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
+  mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+  mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>%
+  mutate(post = str_detect(results_file, "post")) %>% 
+  mutate(experiment = str_split(analysis_condition, "_", simplify = TRUE)[,1]) %>% 
+  mutate(pos = as.double(pos))  
+
+scored_ints <- scored_ints %>% 
+  filter(str_detect(analysis_condition, "analysis")) %>% 
+  filter(post)
+```
+
+
+```{r}
+scored_ints %>% 
+  ggplot(aes(x = pos, color = experiment)) +
+  geom_freqpoly(binwidth = 1000) +
+  xlab("chr1 coordinate") 
+```
+
+## Next steps
+
+- Add results from other tools
+- Break down 'easier' and 'harder' conditions to identify issues
+- Are our data closer to 'easier' or 'harder' condition?
+- Compare tools on real data

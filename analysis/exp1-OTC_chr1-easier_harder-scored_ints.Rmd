@@ -51,29 +51,23 @@ There are a few different ways of scoring the results from these experiments.  O
 
 
 ```{r include=FALSE}
-int_scores <- importIntScoreExperiment(exp_dir) %>% 
-  distinct() %>% 
-  filter(!str_detect(experiment, "OTC-vect-easier")) 
+int_scores <- importIntScoreExperiment(exp_dir) 
 
-
+# only use postprocessed data from our pipeline
 int_scores <- int_scores %>% 
   filter(case_when((analysis_tool != "pipeline") ~ TRUE,
                     post ~ TRUE,
                     TRUE ~ FALSE
-    )) %>% 
-  mutate(experient = case_when(
-    experiment == "OTC_vect-harder" ~ "OTC-harder",
-    TRUE ~ experiment
-  ))
-
+    )) 
 ```
 
 ## Scoring integrations
 
 ```{r}
 int_scores %>% 
-  select(experiment, replicate, analysis_host, post, analysis_tool, `merged-ints`, TPR, PPV, tp:fn) %>% 
-  arrange(experiment, analysis_tool, replicate, analysis_host) 
+  select(experiment, replicate, window, coords_score_type, analysis_condition, TPR, PPV, tp:fn, results_file) %>% 
+  arrange(experiment, analysis_condition, replicate, window) 
+
 ```
 
 For each replicate, we can calulate the positive predictive value (how many of the predicted positves are true positves - high means few false positves), and the true positve rate (how many of the real positves are detected - high means few false negatives).
@@ -86,22 +80,20 @@ And the positive predictive value as
 $$PPV = \frac{TP}{TP+FP}$$
 
 
-```{r include=FALSE}
+```{r}
 p <- int_scores %>% 
-  filter(experiment == exp) %>% 
-  ggplot(aes(x = PPV, y = TPR, color = analysis_tool)) +
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape = coords_score_type)) +
   geom_point() +
   xlim(0, 1) +
   ylim(0, 1) +
-  facet_grid(vars(`merged-ints`),vars(experiment))
+  facet_grid(vars(experiment), vars(coords_score_type)) +
+  theme_bw()
 print(p)
 ```
 
-So the three different pipelines seem to have quite different performances.  
+So the different pipelines seem to have quite different performances, and the performance of our pipeline and vifi seem to be very dependent on distance metric.
 
-Of the three tools, Polyidus has the best positive predictive value for both conditions.  However, this comes at the cost of missing most of the integrations - the true positive rate for this tool is around 25%.  
 
-The performance of ViFi varies a lot between the two conditions.  In the easier condition, the true positive rate isn't too bad (around 75%), but the positive predictive value around 50%, so it doesn't miss too many integations, but there are quite a few false positives.  In the harder condition, the true positive rate goes way down (so a lot of integrations are missed), but the positive predictive value doesn't change too much.
 
 ## False positives
 
@@ -113,7 +105,6 @@ First, check all the false positives that were identified, and see if the reads 
 
 ```{r include=FALSE}
 exps <- unique(int_scores$experiment)
-folder <- "../out/experiment1_OTC_chr1/easier_harder"
 filenames = c()
 
 for (exp in exps) {
@@ -264,9 +255,16 @@ fp_dists <- int_scores %>%
     analysis_virus, ".",
     "closest.bed"
   )) %>% 
-  mutate(data = map(fp_closest_file, ~read_tsv(file.path(folder, exp, "scored_ints", .),
+  mutate(data = map(fp_closest_file, ~read_tsv(file.path(exp_dir, exp, "scored_ints", .),
                                                col_names = column_names)) ) %>% 
   unnest(data)
+
+fp_dists <- fp_dists %>% 
+  filter(!`merged-ints`) %>% 
+  filter(case_when((tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) 
 
 ```
 
@@ -329,7 +327,7 @@ fp_dists %>%
   )) %>% 
   filter(class != "wrong_chr") %>% 
   ggplot(aes(x = found_start, color = class)) +
-  geom_density(bw = 1e4) +
+  geom_freqpoly(binwidth = 1e4) +
   facet_grid(rows = vars(class), scales = "free")
 
 ```

@@ -1,0 +1,704 @@
+---
+title: "Results for publication"
+output: 
+  html_notebook:
+    code_folding: hide
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggpubr)
+library(kableExtra)
+library(cowplot)
+
+source("sim_functions.R")
+
+results_dir <- "../out/experiment1_OTC_chr1"
+
+score_window <- 5
+score_type_coords <- "coords_mean"
+dist_plot_offset <- 0.5
+```
+
+```{css, include=FALSE}
+.scroll_100 {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+
+# Overview
+I conducted several experiments in order to investigate the performatce of the pipeline, and compare it to similar tools.
+
+## 'Easier' and 'harder'
+
+The first experiment simulated some 'easier' and some 'harder' conditions.  I also tried out some wild-type virus (AAV2) and vector (OTC vector).
+
+### Data
+The only data required for simulation experiments are host and virus references.  
+
+For the host, I used chromosome 1 from hg38.   
+
+For the virus I used the OTC vector genome (the subsequence of the plasmid from ITR to ITR)
+
+###  Easier and harder
+
+I simulated two different situations using this data: one that I thought would be 'easier' for the pipeline to handle, and one that is 'harder'.
+
+These conditions are summarised in the config file:
+
+```{bash attr.output='style="max-height: 300px;"'}
+cat ../config/experiment1_OTC_chr1/easier-harder.yml
+```
+
+
+#### Comparison with other tools
+
+We can compare the performance of our pipeline with other tools
+
+For each replicate, we can calulate the positive predictive value (how many of the predicted positves are true positves - high means few false positves), and the true positve rate (how many of the real positves are detected - high means few false negatives).
+
+
+We can calculate the true positive rate (sensitivity, recall) as
+$$TPR = \frac{TP}{P} = \frac{TP}{TP+FN}$$
+
+And the positive predictive value as
+$$PPV = \frac{TP}{TP+FP}$$
+
+```{r include=FALSE}
+exp_dir <- file.path(results_dir, "easier-harder")
+int_scores <- importIntScoreExperiment(exp_dir) 
+
+# only use postprocessed data from our pipeline
+int_scores <- int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, 'analysis', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling'))
+```
+
+First, a table of results:
+```{r}
+int_scores %>% 
+  select(experiment, replicate, window, coords_score_type, analysis_condition, TPR, PPV, tp:fn, results_file) %>% 
+  arrange(experiment, analysis_condition, replicate, window) 
+```
+
+And also, a plot:
+```{r}
+for (i in unique(int_scores$window)) {
+p <- int_scores %>% 
+  filter(window == i) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape = score_type_coords)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_grid(vars(experiment), vars(coords_score_type)) +
+  theme_bw() +
+  ggtitle(i)
+print(p)
+}
+```
+
+If we just pick the score_type 'coords_mean' and distance 5, then we get:
+```{r}
+p <- int_scores %>% 
+  filter(coords_score_type == score_type_coords) %>% 
+  filter(window == score_window) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(vars(experiment)) +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL
+    )
+  )
+print(p)
+```
+
+```{r}
+int_scores %>% 
+  select(analysis_condition, merge, merge_dist, merge_n_min) %>% 
+  distinct()
+```
+
+If we stick with analysis condition 2 (unmerged reads) for isling, and only show the 'harder' conditions:
+
+```{r}
+p <- int_scores %>% 
+  filter(coords_score_type == score_type_coords) %>% 
+  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, "isling2"), TRUE)) %>% 
+  filter(str_detect(experiment, "harder")) %>% 
+  mutate(experiment = str_match("AAV|OTC", experiment)[,1]) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(vars(experiment)) +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL
+        )
+      ) +
+  theme(legend.position="bottom")
+print(p)
+```
+
+
+
+
+#### Distances from each found integration to the nearest simulated integration
+
+We can also look at each output integration and check the distance to the nearest simulated integration.  
+
+```{r include=FALSE}
+found_scores <- importNearestSimToFound(exp_dir) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling'))
+```
+
+We expect all integrations to be on chromosomes 1, since this was the only chromosome used for simulation.  Plot the number of integrations on chromosome 1 and other chromosomes, in each condition.
+
+
+```{r}
+found_scores %>% 
+  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, "isling2"), TRUE)) %>% 
+  mutate(dist = dist+1) %>% 
+  ggplot(aes(x = dist, color = analysis_condition)) +
+  geom_freqpoly(bins = 1000) +
+  facet_grid(vars(experiment), vars(score_type), scales = 'free') +
+  scale_x_log10()  +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL
+        )
+      ) +
+  theme(legend.position="bottom")
+```
+
+Plotting only the 'coords_mean' score type:
+
+```{r}
+found_scores %>% 
+  filter(score_type == 'coords_mean') %>% 
+  mutate(dist = dist+0.01) %>% 
+  ggplot(aes(x = dist, color = analysis_condition)) +
+  geom_freqpoly(bins = 1000) +
+  facet_grid(vars(experiment), vars(analysis_condition), scales = 'free_y') +
+  scale_x_log10() +
+  theme(axis.text.x = element_text(angle = 90))  +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL
+        )
+      ) +
+  theme(legend.position="bottom")
+```
+
+Plotting only 'isling2' condition
+
+
+
+
+#### Distances from each found integration to the nearest simulated integration
+
+We can also look at each output integration and check the distance to the nearest simulated integration.  
+
+```{r include=FALSE}
+sim_scores <- importNearestFoundToSim(exp_dir) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling'))
+```
+
+
+
+```{r}
+sim_scores %>% 
+  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, "isling2"), TRUE)) %>% 
+  mutate(case_when(
+    str_detect(analysis_condition, "isling") ~ "isling",
+    TRUE ~ analysis_condition
+  )) %>% 
+  filter(score_type == "coords_mean") %>% 
+  filter(score_dist == score_window) %>% 
+  mutate(dist = dist+1) %>% 
+  ggplot(aes(x = dist, color = analysis_condition)) +
+  geom_freqpoly(bins = 1000) +
+  facet_grid(vars(experiment), vars(score_type), scales = 'free') +
+  scale_x_log10()  +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(color = 'white', fill = "#f2f2f2", linetype = NULL)
+      ) +
+  theme(legend.position="bottom")
+```
+
+
+
+
+# Figure 1
+
+```{r include=FALSE}
+# import scored integrations
+exp_dir <- file.path(results_dir, "easier-harder")
+int_scores <- importIntScoreExperiment(exp_dir) 
+
+# only use postprocessed data from our pipeline
+int_scores <- int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, 'analysis', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling'))
+
+#import distances from each found integration to nearest simulated integration
+found_scores <- importNearestSimToFound(exp_dir) 
+
+# only use postprocessed data from our pipeline
+found_scores <- found_scores %>% 
+  filter(case_when(
+      !str_detect(analysis_condition, "pipeline") ~ TRUE,
+      post ~ TRUE,
+      TRUE ~ FALSE
+    )) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling'))
+
+# import distances from each simulated integration to the nearest found integration
+sim_scores <- importNearestFoundToSim(exp_dir) 
+
+sim_scores <- sim_scores%>% 
+  filter(case_when(
+      !str_detect(analysis_condition, "pipeline") ~ TRUE,
+      post ~ TRUE,
+      TRUE ~ FALSE
+    )) %>%  
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling'))
+
+```
+
+Note that each integration has a left and right junction, so when scoring purely on host coordinates, each integration appears twice.  If there is a deletion from the host at the integration site, these two junctions will not be the in the same place in the host, otherwise they will be in the same place.
+
+
+Note that when considering each found integration and looking for the nearest simulated integration, eac
+
+```{r}
+# filter data for plotting
+isling_to_keep <- "isling2"
+
+plot_found_scores <- found_scores %>% 
+  filter(score_type == "coords_mean") %>% 
+  filter(experiment == "OTC-harder" | experiment == "AAV-harder") %>% 
+  filter(score_dist == score_window) %>% 
+  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE)) %>%  # keep isling2 only
+  mutate(tool = str_match(analysis_condition, "(.+)\\d+")[,2])
+  
+
+ 
+# double check filtering
+plot_found_scores %>% 
+  group_by(experiment, tool, score_dist, score_type, condition, replicate) %>% 
+  summarise(tp = sum(score == "tp"),
+            fp = sum(score == "fp"))
+
+plot_sim_scores <- sim_scores %>% 
+  filter(score_type == "coords_mean") %>% 
+  filter(experiment == "OTC-harder" | experiment == "AAV-harder") %>% 
+  filter(score_dist == score_window) %>% 
+  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE)) %>%   # keep isling2 only
+  mutate(tool = str_match(analysis_condition, "(.+)\\d+")[,2])
+
+# double check filtering
+plot_sim_scores %>% 
+  group_by(experiment, tool, score_dist, score_type, condition, replicate) %>% 
+  summarise(tp = sum(score == "tp"),
+            fn = sum(score == "fn"),
+            total_with_reads = n())
+
+# scored integrations
+plot_int_scores <- int_scores %>% 
+  filter(coords_score_type == score_type_coords) %>% 
+  filter(experiment == "OTC-harder" | experiment == "AAV-harder") %>% 
+  filter(window == score_window) %>% 
+  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE))
+  
+plot_int_scores %>% 
+  select(experiment, analysis_tool, window, coords_score_type, condition, replicate, tp, fp, fn, PPV, TPR)
+
+```
+
+
+```{r}
+# https://stackoverflow.com/questions/11335836/increase-number-of-axis-ticks
+offset <- 0.5
+num_y_breaks <- 2
+
+OTC_found <- plot_found_scores %>% 
+  filter(experiment == "OTC-harder") %>% 
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = tool)) +
+  geom_freqpoly(bins = 20, show.legend = FALSE) +
+  scale_x_log10() +
+  facet_grid(rows = vars(tool), scales = "free_y") +
+  xlab("Distance") +
+  ylab("Count") +
+  theme_classic()  + 
+theme(
+  strip.text.x = element_blank(),
+  strip.text.y = element_blank(),
+  strip.background = element_blank()
+) +
+scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks))
+
+
+OTC_sim <- plot_sim_scores %>% 
+  filter(experiment == "OTC-harder") %>% 
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = tool)) +
+  geom_freqpoly(bins = 100, show.legend = FALSE) +
+  scale_x_log10() +
+  facet_grid(rows = vars(tool), scales = "free_y") +
+  xlab("Distance") +
+  ylab("Count") +
+  theme_classic()  + 
+theme(
+  strip.background = element_blank(),
+  strip.text.x = element_blank(),
+  strip.text.y = element_blank(),
+) +
+scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks))
+
+
+OTC_scores <- plot_int_scores %>% 
+  filter(experiment == "OTC-harder") %>% 
+  ggplot(aes(x = PPV, y = TPR, colour = analysis_tool)) +
+  geom_point(show.legend = FALSE, alpha = 0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab("Positive predictive value") +
+  ylab("True positive rate") +
+  theme_classic()
+
+
+AAV_found <- plot_found_scores %>% 
+  filter(experiment == "AAV-harder") %>% 
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = tool)) +
+  geom_freqpoly(bins = 30, show.legend = FALSE) +
+  scale_x_log10() +
+  facet_grid(rows = vars(tool), scales = "free_y") +
+  xlab("Distance") +
+  ylab("Count") +
+  theme_classic()  + 
+theme(
+  strip.background = element_blank(),
+  strip.text.y = element_blank()
+)  +
+scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) 
+
+
+AAV_sim <- plot_sim_scores %>% 
+  filter(experiment == "AAV-harder") %>% 
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = tool)) +
+  geom_freqpoly(bins = 100, show.legend = FALSE) +
+  scale_x_log10() +
+  facet_grid(rows = vars(tool), scales = "free_y") +
+  xlab("Distance") +
+  ylab("Count") +
+  theme_classic() + 
+theme(
+  strip.background = element_blank(),
+  strip.text.y = element_blank(),
+)  +
+scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks))
+
+AAV_scores <- plot_int_scores %>% 
+  filter(experiment == "AAV-harder") %>% 
+  ggplot(aes(x = PPV, y = TPR, colour = analysis_tool)) +
+  geom_point(show.legend = FALSE, alpha = 0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab("Positive predictive value") +
+  ylab("True positive rate") +
+  theme_classic()
+
+dir.create("plots")
+figure_1 <- cowplot::plot_grid(AAV_found, AAV_sim, AAV_scores, OTC_found, OTC_sim, OTC_scores, labels = "AUTO")
+print(figure_1)
+cowplot::save_plot("plots/figure_1.pdf", figure_1)
+
+
+```
+a, b, c : AAV_harder
+d, e, f: OTC_harder
+a, d: distance from each output integration to nearest simulated integration
+b, e: distance from each simulated integration to nearest output integration
+c, f: PPV and TPR with cutoff for distance = 5 (n = 3)
+red - isling, green - polyidus, blue - seeksv, purple - vifi
+
+###  Chromosomes
+
+I also explored the effect of using different chromosomes as references for integraion.  I always used hg38 for analysis: see config file below:
+
+```{bash attr.output='style="max-height: 300px;"'}
+cat ../config/experiment1_OTC_chr1/chromosomes.yml
+```
+
+```{r include=FALSE}
+exp_dir <- file.path(results_dir, "chromosomes")
+int_scores <- importIntScoreExperiment(exp_dir) 
+
+
+# only use postprocessed data from our pipeline
+int_scores <- int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    )) 
+```
+
+#### Scores
+
+The results for these experiments:
+```{r}
+int_scores %>% 
+  select(experiment, replicate, host_name, coords_score_type, analysis_tool, window, TPR, PPV, tp:fn) %>% 
+  arrange(experiment, analysis_tool, replicate, host_name, window) 
+```
+Using window == 5:
+```{r}
+for (chr in unique(int_scores$host_name)) {
+p <- int_scores %>% 
+  filter(window == score_window) %>% 
+  filter(host_name == chr) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_tool)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_grid(vars(experiment), vars(coords_score_type)) + 
+  ggtitle(chr)
+print(p)
+}
+```
+```{r include=FALSE}
+#import distances from each found integration to nearest simulated integration
+found_scores <- importNearestSimToFound(exp_dir) 
+
+# only use postprocessed data from our pipeline
+found_scores <- found_scores %>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, '0', ''))   %>% 
+  filter(score_dist == score_window) %>% 
+  filter(score_type == "coords_mean")
+
+
+# add analysis conditions
+conds <- importSimulationConditions(exp_dir)
+
+found_scores <- found_scores %>% 
+  left_join(conds, by=c("experiment", "condition", "replicate"))
+
+
+```
+
+Also looking at the distance from each output integration to each simulated integration
+
+```{r}
+found_scores %>% 
+  filter(str_detect(experiment, "harder")) %>% 
+  mutate(dist = dist+dist_plot_offset) %>% 
+  ggplot(aes(x = dist, colour = analysis_condition, linetype = host_name)) +
+  geom_freqpoly(bins = 100) +
+  scale_x_log10() +
+  facet_grid(rows = vars(analysis_condition), cols = vars(experiment), scales = "free_y")
+
+found_scores %>% 
+  filter(str_detect(experiment, "harder")) %>% 
+  mutate(dist = dist+dist_plot_offset) %>% 
+  ggplot(aes(x = dist, colour = analysis_condition)) +
+  geom_freqpoly(bins = 100) +
+  scale_x_log10() +
+  facet_grid(rows = vars(experiment), cols = vars(host_name), scales = "free_y")
+```
+
+
+
+
+
+
+### Simulation parameters - integration properties
+
+I also explored the effect kinds of integrations: see config file below:
+
+```{bash attr.output='style="max-height: 300px;"'}
+cat ../config/experiment1_OTC_chr1/condition-breakdown.yml
+```
+
+
+
+```{r include=FALSE}
+exp_dir <- file.path(results_dir, "condition-breakdown")
+int_scores <- importIntScoreExperiment(exp_dir) 
+
+
+# only use postprocessed data from our pipeline
+int_scores <- int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    ))  
+```
+
+
+```{r}
+int_scores %>% 
+  select(experiment, condition, replicate, post, analysis_tool, window, TPR, PPV, tp:fn) %>% 
+  arrange(experiment, analysis_tool, condition, replicate,  window) 
+```
+
+The experiments completed so far are:
+```{r}
+unique(int_scores$experiment)
+```
+
+
+```{r}
+exps <- list("AAV"="virus_name", "OTC-deletion"="p_delete", "OTC-fcov"="fcov", 
+             "OTC-min_len"="min_len", "OTC-rearrange"="p_rearrange", "OTC-whole"="p_whole")
+exps_continuous <- list("OTC-deletion"="p_delete", "OTC-fcov"="fcov", 
+             "OTC-min_len"="min_len", "OTC-rearrange"="p_rearrange", "OTC-whole"="p_whole")
+
+for (i in names(exps)) {
+  var_name <- exps[[i]]
+  p <- int_scores %>% 
+    mutate(!!var_name := as.factor(int_scores[[var_name]])) %>% 
+    filter(experiment == i) %>% 
+    ggplot(aes(x = PPV, y = TPR, color = tool, shape = !!sym(var_name))) +
+    geom_point(alpha = 0.5) +
+    facet_grid(vars(window), vars(coords_score_type)) +
+    ggtitle(i)
+  print(p)
+}
+```
+
+These are kind of horrendous
+
+### Proportion of integrations with deletions
+```{r}
+exps_continuous <- list("OTC-deletion"="p_delete", "OTC-fcov"="fcov", 
+             "OTC-min_len"="min_len", "OTC-rearrange"="p_rearrange", "OTC-whole"="p_whole")
+
+plotlist <- vector("list", length(exps_continuous))
+li <- 1
+for (i in names(exps_continuous)) {
+
+  var_name <- exps[[i]]
+  plotlist[[li]] <- int_scores %>% 
+    filter(experiment == i) %>% 
+    group_by(condition, experiment, tool, window, !!sym(var_name), coords_score_type) %>% 
+    summarise(TPR = mean(TPR),
+              TPR_sd = sd(TPR),
+              PPV = mean(PPV),
+              PPV_sd = sd(PPV),
+              n= n()) %>% 
+    ggplot(aes(x = !!sym(var_name), y = PPV, color = tool)) +
+    geom_point(alpha = 0.5, show.legend = FALSE) +
+    geom_line(show.legend = FALSE) +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    facet_grid(vars(window), vars(coords_score_type))
+  li <- li + 1
+  
+  plotlist[[li]] <- int_scores %>% 
+    filter(experiment == i) %>% 
+    group_by(condition, experiment, tool, window, !!sym(var_name), coords_score_type) %>% 
+    summarise(TPR = mean(TPR),
+              TPR_sd = sd(TPR),
+              PPV = mean(PPV),
+              PPV_sd = sd(PPV),
+              n= n()) %>% 
+    ggplot(aes(x = !!sym(var_name), y = TPR, color = tool)) +
+    geom_point(alpha = 0.5, show.legend = FALSE) +
+    geom_line(show.legend = FALSE) +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    facet_grid(vars(window), vars(coords_score_type))
+  li <- li + 1
+  
+  f <- cowplot::plot_grid(plotlist[[li-2]], plotlist[[li-1]], ncol = 2)
+  print(f)
+  
+}
+#  f <- cowplot::plot_grid(plotlist = plotlist, ncol = 2)
+#  print(f)
+```
+
+```{r}
+exps_continuous <- list("OTC-deletion"="p_delete", "OTC-rearrange"="p_rearrange", "OTC-whole"="p_whole")
+
+plotlist <- vector("list", length(exps_continuous))
+li <- 1
+for (i in names(exps_continuous)) {
+
+  var_name <- exps[[i]]
+  plotlist[[li]] <- int_scores %>% 
+    filter(experiment == i) %>% 
+    filter(window == score_window) %>% 
+    filter(coords_score_type == score_type_coords) %>% 
+    group_by(condition, experiment, tool, window, !!sym(var_name), coords_score_type) %>% 
+    summarise(TPR = mean(TPR),
+              TPR_sd = sd(TPR),
+              PPV = mean(PPV),
+              PPV_sd = sd(PPV),
+              n= n()) %>% 
+    ggplot(aes(x = !!sym(var_name), y = PPV, color = tool)) +
+    geom_point(alpha = 0.5, show.legend = FALSE) +
+    geom_line(show.legend = FALSE) +
+    xlim(0, 1) +
+    ylim(0, 1) 
+  li <- li + 1
+  
+  plotlist[[li]] <- int_scores %>% 
+    filter(experiment == i) %>% 
+    filter(window == score_window) %>% 
+    filter(coords_score_type == score_type_coords) %>% 
+    group_by(condition, experiment, tool, window, !!sym(var_name), coords_score_type) %>% 
+    summarise(TPR = mean(TPR),
+              TPR_sd = sd(TPR),
+              PPV = mean(PPV),
+              PPV_sd = sd(PPV),
+              n= n()) %>% 
+    ggplot(aes(x = !!sym(var_name), y = TPR, color = tool)) +
+    geom_point(alpha = 0.5, show.legend = FALSE) +
+    geom_line(show.legend = FALSE) +
+    xlim(0, 1) +
+    ylim(0, 1) 
+    li <- li + 1
+  
+
+}
+  f <- cowplot::plot_grid(plotlist = plotlist, ncol = 2)
+  print(f)
+
+```
+
+
+```{r}
+sessionInfo()
+```
+

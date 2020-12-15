@@ -436,34 +436,54 @@ fp_reads_explained_by_wrong_location <- function(read_scores_path, score_type = 
 
 importIntScoreExperiment <- function(exp_path) {
   
-  scored_ints_file <- "scored_ints_summary.tsv"
-  analysis_condtions_file <- "analysis_conditions.tsv"
-  
   # import scored integrations
-  int_scores <- tibble(
-    file = list.files(exp_dir, pattern = scored_ints_file, recursive = TRUE)
-  ) %>% 
-    mutate(data = map(file, ~read_tsv(paste0(exp_dir, "/", .)))) %>% 
-    unnest(data)
+  int_scores <- importIntScoresFromSummaries(exp_path)
   
-  # add extra info to scored integrations
-  int_scores <- int_scores %>% 
-    mutate(results_file = basename(found_info)) %>% 
-    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>% 
-    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
-    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
-    mutate(post = str_detect(results_file, "post")) %>% 
-    mutate(analysis_condition = basename(dirname(dirname(found_info)))) %>%
-    rowwise() %>% 
-    mutate(TPR = tp/(tp+fn)) %>% 
-    mutate(PPV = tp/(tp+fp)) %>% 
-    ungroup()
+  # import analysis conditions
+  analysis_conditions <- importAnalysisConditions(exp_path)
+  
+  # add analysis condition info to int scores
+  int_scores <- int_scores %>% left_join(analysis_conditions, by="unique") %>% 
+    mutate(merge = case_when(
+      merge == 1 ~ "merged",
+      merge == 0 ~ "unmerged",
+      TRUE ~ "unmerged"
+    ))
+  
+  # import simulation conditions
+  sim_conditions <- importSimulationConditions(exp_path)
+
+  return(left_join(int_scores, sim_conditions, by=c("experiment", "condition", "replicate")))
+  
+}
+
+importSimulationConditions <- function(exp_path) {
+  
+  sim_conditions_file <- "simulation_summary.tsv"
+  
+  # get files with simulation condtions
+  cond_files <- list.files(exp_dir, pattern = sim_conditions_file, recursive = TRUE)
+  
+  # import analysis conditions
+  sim_conditions <- tibble(
+    file = file.path(exp_dir, cond_files),
+    conds = map(file, ~read_tsv(.))
+  ) %>% 
+    unnest(conds) %>% 
+    select(-file) %>% 
+    distinct()   
+  
+  return(sim_conditions)
+}
+
+importAnalysisConditions <- function(exp_path) {
+  analysis_condtions_file <- "analysis_conditions.tsv" 
   
   # get files with analysis conditions
   cond_files <- list.files(exp_dir, pattern = analysis_condtions_file, recursive = TRUE)
+  cond_files <- cond_files[!str_detect(cond_files, "pipeline_analysis_conditions.tsv")]
   
-  # import analysis conditions
+   # import analysis conditions
   analysis_conditions <- tibble(
     file = file.path(exp_dir, cond_files),
     conds = map(file, ~read_tsv(.))
@@ -472,14 +492,140 @@ importIntScoreExperiment <- function(exp_path) {
     select(-file) %>% 
     distinct() 
   
-  # add analysis condition info to int scores
-  int_scores <- int_scores %>% left_join(analysis_conditions, by="analysis_condition") %>% 
-    mutate(merge = case_when(
-      merge == 1 ~ "merged",
-      merge == 0 ~ "unmerged",
-      TRUE ~ "unmerged"
-    ))
+  return(analysis_conditions)
+  }
+
+importIntScoresFromSummaries <- function(exp_path) {
+  
+  # list files
+  scored_ints_folder <- "scored_ints"
+  summary_suffix <- "_summary.tsv"
+  
+  folders <- list.dirs(exp_dir)
+  folders <- folders[str_detect(folders, scored_ints_folder)]
+  
+  # get files for each folder
+  filenames <- c()
+  for (dir in folders) {
+    files <- list.files(dir, pattern = summary_suffix)
+    files <- file.path(dir, files)
+    filenames <- c(filenames, files)
+  }
+  
+  # import each file
+  int_scores <- tibble(
+    filename = filenames,
+    scores = map(filenames, ~read_tsv(.))
+  ) %>% 
+    unnest(scores)
+  
+  # add extra info to scored integrations
+  int_scores <- int_scores %>% 
+    mutate(results_file = basename(filename)) %>% 
+    mutate(unique = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>%   
+    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
+    mutate(replicate = as.double(str_extract(replicate, "\\d+"))) %>% 
+    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>% 
+    mutate(post = str_detect(results_file, "post")) %>% 
+    rowwise() %>% 
+    mutate(TPR = tp/(tp+fn)) %>% 
+    mutate(PPV = tp/(tp+fp)) %>% 
+    ungroup()
   
   return(int_scores)
+}
+
+
+importNearestSimToFound <- function(exp_path) {
   
+  # list files
+  scored_ints_folder <- "scored_ints"
+  summary_suffix <- "_found-results.tsv"
+  
+  folders <- list.dirs(exp_dir)
+  folders <- folders[str_detect(folders, scored_ints_folder)]
+  
+  # get files for each folder
+  filenames <- c()
+  for (dir in folders) {
+    files <- list.files(dir, pattern = summary_suffix)
+    files <- file.path(dir, files)
+    filenames <- c(filenames, files)
+  }
+  
+  # import each file
+  int_scores <- tibble(
+    filename = filenames,
+    scores = map(filenames, ~read_tsv(.))
+  ) %>% 
+    unnest(scores)
+  
+  # add extra info to scored integrations
+  int_scores <- int_scores %>% 
+    mutate(results_file = basename(filename)) %>% 
+    mutate(unique = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+    mutate(experiment = str_split(unique, "_", simplify = TRUE)[,1]) %>% 
+    mutate(analysis_condition = str_split(unique, "_", simplify = TRUE)[,2]) %>% 
+    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>%   
+    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
+    mutate(replicate = as.double(str_extract(replicate, "\\d+"))) %>% 
+    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>% 
+    mutate(score_dist = str_split(results_file, "\\.", simplify=TRUE)[,6]) %>% 
+    mutate(score_type = str_split(results_file, "\\.", simplify=TRUE)[,7]) %>%  
+    mutate(score_type = sub('_found-results', '', score_type)) %>% 
+    mutate(post = str_detect(results_file, "post"))
+  
+  
+  # add information about simulation and analysis conditions
+  
+  return(int_scores)
+}
+
+importNearestFoundToSim <- function(exp_path) {
+  
+  # list files
+  scored_ints_folder <- "scored_ints"
+  summary_suffix <- "_sim-results.tsv"
+  
+  folders <- list.dirs(exp_dir)
+  folders <- folders[str_detect(folders, scored_ints_folder)]
+  
+  # get files for each folder
+  filenames <- c()
+  for (dir in folders) {
+    files <- list.files(dir, pattern = summary_suffix)
+    files <- file.path(dir, files)
+    filenames <- c(filenames, files)
+  }
+  
+  # import each file
+  int_scores <- tibble(
+    filename = filenames,
+    scores = map(filenames, ~read_tsv(.))
+  ) %>% 
+    unnest(scores)
+  
+  # add extra info to scored integrations
+  int_scores <- int_scores %>% 
+    mutate(results_file = basename(filename)) %>% 
+    mutate(unique = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
+    mutate(experiment = str_split(unique, "_", simplify = TRUE)[,1]) %>% 
+    mutate(analysis_condition = str_split(unique, "_", simplify = TRUE)[,2]) %>% 
+    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>%   
+    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
+    mutate(replicate = as.double(str_extract(replicate, "\\d+"))) %>% 
+    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
+    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>% 
+    mutate(score_dist = str_split(results_file, "\\.", simplify=TRUE)[,6]) %>% 
+    mutate(score_type = str_split(results_file, "\\.", simplify=TRUE)[,7]) %>%  
+    mutate(score_type = sub('_sim-results', '', score_type)) %>% 
+    mutate(post = str_detect(results_file, "post"))
+  
+  
+  # add information about simulation and analysis conditions
+  
+  return(int_scores)
 }

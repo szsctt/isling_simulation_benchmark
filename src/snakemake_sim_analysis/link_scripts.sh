@@ -23,6 +23,7 @@ find $ANALYSIS/scripts -name "*.pl" -exec ln $LNK $(realpath {}) $(realpath scri
 find $ANALYSIS/scripts -name "*.pm" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;
 find $ANALYSIS/scripts -name "*.R" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;
 find $ANALYSIS/scripts -name "*.sh" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;
+find $ANALYSIS/scripts -name "*.py" -exec ln $LNK $(realpath {}) $(realpath scripts/) \;
 find $ANALYSIS/scripts/post -name "*.R" -exec ln $LNK $(realpath {}) $(realpath scripts/post/) \;
 
 # other tools stuff

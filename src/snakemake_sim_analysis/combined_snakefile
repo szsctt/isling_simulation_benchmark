@@ -15,6 +15,7 @@ from python_scripts.make_df import make_df, make_post_args, make_reference_dict
 from python_scripts.make_df import check_dataset_sample_unique, make_reference_dict, make_post_args, check_fastas_unique
 
 from scripts.parse_analysis_config import parse_analysis_config, get_bool_value_from_config
+from scripts.input_functions import get_reads, get_vifi_resource, resources_list_with_min_and_max
 
 
 # https://sapac.support.illumina.com/bulletins/2016/12/what-sequences-do-i-use-for-adapter-trimming.html
@@ -26,7 +27,9 @@ adapter_seqs = {'HS25':HS25, 'MSv3':HS25, 'MS': HS25}
 verse_threads = 8
 
 #defaults for scoring
-default_scoring = {'score_ints' : 0, 'score_merged_ints' : 1, 'score_reads' : 0}
+default_scoring = {'score_ints' : 1, 'score_reads' : 0}
+score_types = {'overlap', 'coords_min', 'coords_mean'}
+
 
 #####################################################
 ############### global parameters ###################
@@ -44,17 +47,21 @@ if 'global' in config:
 		for key in default:
 			if key not in config[dataset]:
 				config[dataset][key] = default[key]
-			
-
 
 #####################################################
 ############# simulation parameters #################
 #####################################################
 
-
 # make dataframe with parameters for simulation
 config, sim_df, ref_dict = parse_config(config)
 
+# add read_directory key for each dataset (expected by parse_analysis_config function)
+for i, row in sim_df.iterrows():
+	config[row['experiment']]['read_directory'] = os.path.join(row['out_directory'], row['experiment'], 'sim_reads')
+	config[row['experiment']]['out_directory'] = os.path.normpath(row['out_directory'])
+	config[row['experiment']]['R1_suffix'] = "1.fq"
+	config[row['experiment']]['R2_suffix'] = "2.fq"
+	config[row['experiment']]['bam_suffix'] = ".sam"
 
 #####################################################
 ############## analysis parameters ##################
@@ -85,22 +92,28 @@ for dataset in config:
 	#### parameters for our pipeline ####
 	# paramters for our pipeline should be lists, so that we can do combinations
 	# of each 
+	# adding the sequencing system and fragment length in here isn't ideal, because the pipeline will analyse all data in the dataset
+	# which may have different fragment lengths, with the same value (and will do this for every sample in the dataset)
 	assert hasattr(config[dataset]['merge'], '__iter__')
 	assert hasattr(config[dataset]['dedup'], '__iter__')
 	assert hasattr(config[dataset]['trim'], '__iter__')
 	assert hasattr(config[dataset]['post'], '__iter__')
 	assert hasattr(config[dataset]['bwa_mem'], '__iter__')	
 	assert hasattr(config[dataset]['seq_sys'], '__iter__')
+	assert hasattr(config[dataset]['frag_len'], '__iter__')
 	assert hasattr(config[dataset]['merge-dist'], '__iter__')
 	assert hasattr(config[dataset]['merge-n-min'], '__iter__')
 	assert hasattr(config[dataset]['clip-cutoff'], '__iter__')
 	assert hasattr(config[dataset]['cigar-tol'], '__iter__')
 	assert hasattr(config[dataset]['min-mapq'], '__iter__')
 	
+	if len(config[dataset]['seq_sys']) > 1:
+		print(f"WARNING: there was more than one sequencing system requested for experiment {dataset}. Each sample in this dataset will be analysed with the appropriate set of adapters for each sequencing system, regardless of whether or not those adapters are appropriate for each sample.  Take care to only use results with matching sequencing systems for analysis and simulation.")
+	
 	scoring = {}
 	for score_type, default in default_scoring.items():
 		scoring[score_type] = get_bool_value_from_config(config, dataset, score_type, default)
-	if scoring['score_ints'] == 1 or scoring['score_merged_ints'] == 1:
+	if scoring['score_ints'] == 1:
 		score_ints_window = config[dataset]['score_ints_window']
 	else:
 		score_ints_window = 0
@@ -112,8 +125,8 @@ for dataset in config:
 																		config[dataset]['trim'], 
 																		config[dataset]['dedup'],
 																		config[dataset]['post'],
-																		config[dataset]['bwa_mem'],
-																		config[dataset]['seq_sys'],
+																		config[dataset]['bwa_mem'],		
+																		config[dataset]['seq_sys'],																
 																		config[dataset]['analysis_hosts'].keys(),
 																		config[dataset]['analysis_viruses'].keys(),
 																		config[dataset]['merge-dist'],
@@ -123,14 +136,14 @@ for dataset in config:
 																		config[dataset]['min-mapq'],
 																		):
 		
-		condition = f"{dataset}_analysis{i}"
+		condition = f"analysis{i}"
+
+		# get adapters
+		read1_adapt = adapter_seqs[seq_sys]['read1-adapt']
+		read2_adapt = adapter_seqs[seq_sys]['read2-adapt']
 
 		# format parameters required for this condition
 		post_args = make_post_args({dataset: {'post':post}})[0][dataset]
-		
-		# figure out which adapters to use, based on which sequencing system used for art
-		read1_adapt = adapter_seqs[seq_sys]['read1-adapt']
-		read2_adapt = adapter_seqs[seq_sys]['read2-adapt']
 		
 		# convert merge and dedup to 1 or 0			
 		merge = convert_bool_to_int(merge, dataset, 'merge')
@@ -168,8 +181,9 @@ for dataset in config:
 extra = pd.DataFrame(extra_rows)
 analysis_df = pd.concat((extra, analysis_df), axis=0, ignore_index=True)
 
-# 	##### parameters that are common to each experiment ####
 
+
+###### parameters that are common to each experiment ####
 analysis_df['bam_suffix'] = ['.sam' for i in range(analysis_df.shape[0])]
 analysis_df['R1_suffix'] = ['1.fq' for i in range(analysis_df.shape[0])]
 analysis_df['R2_suffix'] = ['2.fq' for i in range(analysis_df.shape[0])]
@@ -177,7 +191,11 @@ analysis_df['R2_suffix'] = ['2.fq' for i in range(analysis_df.shape[0])]
 analysis_df['read_folder'] = [os.path.join(config[dataset]['out_directory'], dataset, "sim_reads") for dataset in analysis_df['experiment']]
 
 analysis_df['outdir'] = [config[dataset]['out_directory'] for dataset in analysis_df['experiment']]
+
 analysis_df['exp'] = analysis_df['experiment']	
+
+# add extra column to analysis_df with a unique identifier for each experiment/analysis condition combo
+analysis_df['unique'] = [f"{exp}_{cond}" for exp, cond in zip(analysis_df['experiment'], analysis_df['analysis_condition'])]
 
 # also add columns indicating if we want to score integrations, merged integrations, and reads
 
@@ -186,8 +204,8 @@ analysis_df['exp'] = analysis_df['experiment']
 
 score_reads = []
 score_ints = []
-score_merged_ints = []
 score_ints_window = []
+score_ints_type = []
 for i, row in analysis_df.iterrows():
 	# only score reads from our pipeline
 	if row['tool'] != 'pipeline':
@@ -195,26 +213,27 @@ for i, row in analysis_df.iterrows():
 	else:
 		score_reads.append(get_bool_value_from_config(config, row['experiment'], 'score_reads', default_scoring['score_reads']))
 	
-	# scoring ints, merged_ints
+	# scoring ints
 	score_ints.append(get_bool_value_from_config(config, row['experiment'], 
 																							'score_ints', default_scoring['score_ints']))
-	score_merged_ints.append(get_bool_value_from_config(config, row['experiment'], 
-																							'score_merged_ints', default_scoring['score_merged_ints']))
 																							
 	# get score_ints_window if appropriate
 	if score_ints[i] == 1 or score_merged_ints[i] == 1:
 		score_ints_window.append(config[row['experiment']]['score_ints_window'])
+		score_ints_type.append(config[row['experiment']]['score_ints_type'])
 	else:
 		score_ints_window.append(None)
+		score_ints_type.append(None)
 		
 analysis_df['score_reads'] = score_reads
 analysis_df['score_ints'] = score_ints
-analysis_df['score_merged_ints'] = score_merged_ints
+analysis_df['score_ints_window'] = analysis_df['score_ints_window'].astype('object')
 analysis_df['score_ints_window'] = score_ints_window
+analysis_df['score_ints_type'] = score_ints_type
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
 
-column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq']
+column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len']
 
 rows = []
 
@@ -227,7 +246,7 @@ for i, row in analysis_df.iterrows():
 
 	# get samples for this simulated dataset
 	experiment = row['experiment']
-	dataset = row['analysis_condition']
+	dataset = row['unique']
 	samples = sim_df[sim_df['experiment'] == experiment]['sample']
 	
 	# make a row for each sample in this dataset
@@ -241,6 +260,15 @@ for i, row in analysis_df.iterrows():
 		# add sample name
 		todo_row['sample'] = sample
 		todo_row['unique'] = f"{dataset}+++{sample}"
+		
+		# get the correct adapters and fragment length for this sample
+		exp_df = sim_df[sim_df['experiment'] == experiment]
+		seq_sys = exp_df[exp_df['sample'] == sample]['seq_sys'].tolist()[0]
+		todo_row['adapter_1'] = adapter_seqs[seq_sys]['read1-adapt']
+		todo_row['adapter_2'] = adapter_seqs[seq_sys]['read2-adapt']
+		
+		# get the mean fragment length used for simulation
+		todo_row['mean_frag_len'] = exp_df[exp_df['sample'] == sample]['frag_len'].tolist()[0]
 		
 		# read file names
 		read_prefix = os.path.join(row['outdir'], experiment, 'sim_reads', sample)
@@ -267,16 +295,17 @@ wildcard_constraints:
 	cond = "|".join(set(sim_df.loc[:, 'condition'])),
 	exp = "|".join(set(sim_df.loc[:, 'experiment'])),
 	rep = "|".join(set([str(i) for i in sim_df.loc[:, 'replicate']])),
-	dset = "|".join(set(analysis_df.loc[:, 'analysis_condition'])),
+	dset = "|".join(set(analysis_df.loc[:, 'unique'])),
 	samp = "|".join(set(toDo.loc[:, 'sample'])),
 	host = "|".join(set(analysis_df.loc[:, 'host'])),
 	virus = "|".join(set(analysis_df.loc[:, 'virus'])),
 	post = "|\.post",
 	merged = "|\.merged",
-	analysis_condition = "|".join(analysis_df['analysis_condition']),
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
-	
-localrules: write_summary, write_analysis_summary, write_analysis_summary_all_tools#, combine_int_scores, combine_read_scores
+	dist = "\d+",
+	score_type = "|".join(score_types)
+
+localrules: write_summary, write_analysis_summary, write_analysis_summary_all_tools
 
 #####################################################
 ################## ruleorder ########################
@@ -318,18 +347,18 @@ merged_targets = set()
 for i, row in analysis_df.iterrows():
 	if row['tool'] != 'pipeline':
 		continue
-		
-	outpath = row['outdir']
-	exp = row['experiment']
-	dset = row['analysis_condition']
-		
-	samples = sim_df[sim_df['experiment'] == exp]['sample']
+	
 	host = row['host']
-	virus = row['virus']
+	virus = row['virus']		
+	outpath = row['outdir']
+	dset = row['unique']
+		
+	samples = sim_df[sim_df['experiment'] == row['experiment']]['sample']
+
 		
 	for samp, post in itertools.product(samples, (".post", "")):
 		merged_targets.add(
-			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
+			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.txt"
 		)
 
 # targets for other tools
@@ -337,21 +366,31 @@ other_tool_targets = set()
 for i, row in analysis_df.iterrows():
 	outpath = row['outdir']
 	exp = row['experiment']
-	dset = row['analysis_condition']
+	dset = row['unique']
 	host = row['host']
 	virus = row['virus']
 		
 	samples = sim_df[sim_df['experiment'] == exp]['sample']
 		
 	for samp in samples:
-		other_tool_targets.add(
-			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
-		)
+		if row['tool'] == 'vifi':
+			other_tool_targets.add(
+				f"{outpath}/{dset}/vifi/{samp}.{host}.{virus}/output.clusters.txt"
+			)
+		elif row['tool'] == 'polyidus':
+			other_tool_targets.add(
+				f"{outpath}/{dset}/polyidus/{host}.{virus}.{samp}/results/exactHpvIntegrations.tsv"
+			)
+		elif row['tool'] == 'seeksv':
+			other_tool_targets.add(
+				f"{outpath}/{dset}/seeksv/ints/{samp}.{host}.{virus}.integrations.txt"
+			)			
+
 
 # scored reads
 scored_summaries = set()
 for i, row in analysis_df.iterrows():
-	if row['score_ints'] == 1 or row['score_merged_ints'] == 1:
+	if row['score_ints'] == 1:
 		scored_summaries.add(f"{row['outdir']}/{row['experiment']}/{row['experiment']}.scored_ints_summary.tsv")
 	if 'score_reads' in row:
 		if row['score_reads'] == 1:
@@ -362,15 +401,14 @@ rule all:
 		set(sim_targets),
 		set(sim_summaries),
 		set(analysis_summaries),
-		merged_targets,
+#		merged_targets,
 		scored_summaries,
 		other_tool_targets
-		
-		
+
+
 #####################################################
 ############### simulate integrations ###############
 #####################################################
-
 
 include: "snakemake_rules/simulate_integrations.smk"
 include: "snakemake_rules/art.smk"
@@ -385,7 +423,6 @@ include: "snakemake_rules/alignment.smk"
 include: "snakemake_rules/find_ints.smk"
 include: "snakemake_rules/postprocessing.smk"
 
-
 #####################################################
 ##################### polyidus ######################
 #####################################################
@@ -394,11 +431,59 @@ include: "snakemake_rules/polyidus.smk"
 
 # overwrite input function to get simulated reads (which are in a different location to other pipeline)
 def get_input_reads(wildcards, read_num):
-	assert read_num in (1, 2)
+	assert read_num in {1, 2}
+	
 	if read_num == 1:
-		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R1_suffix')}"
+		return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R1_suffix')}"
 	if read_num == 2:
-		return f"{wildcards.outpath}/{analysis_df_value(wildcards, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, 'R2_suffix')}"	
+		return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R2_suffix')}"	
+
+#####################################################
+##################### trimming ######################
+#####################################################
+
+# we need a different rule for trimming than the one in preprocessing.smk
+# because that one gets adapters from toDo, which for now only has 
+# parameters for our pipeline in it
+
+def get_adapters(wildcards, num):
+	# get adapters depending on sequencing system used for this 'sample'
+	assert num in (1, 2)
+	
+	# get sequencing system for this experiment/sample
+	experiment = "_".join(wildcards.dset.split("_")[:-1])
+	unique = f"{experiment}__{wildcards.samp}"
+	seq_sys = sim_df.loc[(sim_df['unique'] == unique).idxmax(), 'seq_sys']
+	
+	# get adapter for this sequencing system
+	if num == 1:
+		return adapter_seqs[seq_sys]['read1-adapt']
+	else:
+		return adapter_seqs[seq_sys]['read2-adapt']		
+
+rule trim:
+	input:
+		r1 = lambda wildcards: get_input_reads(wildcards, 1),
+		r2 = lambda wildcards: get_input_reads(wildcards, 2)
+	output:
+		proc_r1 = temp("{outpath}/{dset}/trimmed_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/trimmed_reads/{samp}.2.fastq.gz")
+	resources:
+		mem_mb= lambda wildcards, attempt: int(attempt * 5000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	conda:	
+		"../envs/seqprep.yml"
+	container:
+		"docker://szsctt/seqprep:1"
+	params:
+		A = lambda wildcards: get_adapters(wildcards, 1),
+		B = lambda wildcards: get_adapters(wildcards, 2)
+	shell:
+		"""
+		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2}
+		"""
+
 
 #####################################################
 ####################### vifi ########################
@@ -423,7 +508,6 @@ include: "snakemake_rules/seeksv.smk"
 ############ compare sim with analysis ##############
 #####################################################
 
-
 rule write_analysis_summary_all_tools:
 	output:
 		pipeline_conditions = "{outpath}/{experiment}/pipeline_analysis_conditions.tsv",
@@ -432,9 +516,13 @@ rule write_analysis_summary_all_tools:
 		toDo.to_csv(output.pipeline_conditions, sep='\t', index=False)
 		analysis_df.to_csv(output.analysis_conditions, sep='\t', index=False)
 
+# need to redefine this function to refer to 'unique' column
+def analysis_df_value(wildcards, analysis_df, column_name):
+	return analysis_df.loc[(analysis_df['unique'] == wildcards.dset).idxmax(), column_name]	
+
 def get_merged_reads(wildcards):
-	# for our pipeline, return result depending on if we merged or not
-	if re.search("analysis", wildcards.dset):
+	# for our pipeline, return result depending on if we merged R1 and R2 or not
+	if analysis_df_value(wildcards,  analysis_df, 'tool') == 'pipeline':
 		return get_for_align(wildcards, "merged")
 	# other pipelines - no merged reads
 	else:
@@ -450,8 +538,7 @@ rule merged_list:
 			shell("touch {output.merged_reads}")
 		else:
 			shell("zcat {input.merged} | awk '{{if (NR%4==1) print substr($0, 2)}}' > {output.merged_reads}")
-
-		
+	
 rule score_reads:
 	input:
 		sim_info = rules.annotate_reads.output.annotated_info,
@@ -493,7 +580,7 @@ rule read_score_summary:
 		summary = "{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 50000,
-		time = lambda wildcards, attempt: ('24:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	shell:
 		"""	
@@ -559,58 +646,36 @@ rule combine_read_scores:
 		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
 		"""
 
+def get_result(wildcards):
+	if analysis_df_value(wildcards, analysis_df, 'tool') == 'pipeline':
+		return rules.merged_bed.output.merged
+	elif analysis_df_value(wildcards, analysis_df, 'tool') == 'vifi':
+		return rules.vifi.output.clusters
+	elif analysis_df_value(wildcards, analysis_df, 'tool') == 'verse':
+		return rules.verse.output.output
+	elif analysis_df_value(wildcards, analysis_df, 'tool') == 'seeksv':
+		return rules.seeksv.output.ints
+	elif analysis_df_value(wildcards, analysis_df, 'tool') == 'polyidus':
+		return rules.polyidus.output.ints
+
 rule score_integrations:
 	input:
 		sim_info = rules.annotate_reads.output.annotated_info,
-		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt",
+		analysis_info = lambda wildcards: get_result(wildcards),
 		merged_reads = rules.merged_list.output.merged_reads
 	output:
-		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}_summary.tsv",
-		temp = temp("{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.tmp.tsv"),
-		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.tsv"
+		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_summary.tsv",
+		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}.tsv",
+		sim_results = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_sim-results.tsv",
+		found_results = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_found-results.tsv"
 	resources:
 		mem_mb= lambda wildcards, attempt: attempt * 5000,
 		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	params:
-		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'tool')}",
-		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}",
-	threads: 1
-	container:
-		"docker://szsctt/simvi:2"
-	conda:
-		"envs/simvi.yml"
-	shell:
-		"""
-		python3 scripts/score_integrations.py \
-		--sim-info {input.sim_info} \
-		--found-info {input.analysis_info} \
-		--output {output.temp} \
-		--summary {output.summary} \
-		{params.tool} {params.window}
-		
-		python3 scripts/int_fp_type.py \
-		--sim-info {input.sim_info} \
-		--merged {input.merged_reads} \
-		--scored-ints {output.temp} \
-		--output {output.scored_ints}
-		"""
-	
-rule score_merged_integrations:
-	input:
-		sim_info = rules.annotate_reads.output.annotated_info,
-		analysis_info = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
-	output:
-		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.merged_summary.tsv",
-		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.merged.tsv"
-	resources:
-		mem_mb= lambda wildcards, attempt: attempt * 5000,
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
-		nodes = 1
-	params:
-		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, 'tool')}",
-		window = lambda wildcards: f"--window {analysis_df_value(wildcards, 'score_ints_window')}",
-		merged = "--merged"
+		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, analysis_df, 'tool')}",
+		window = lambda wildcards: f"--window {wildcards.dist}",
+		score_type = lambda wildcards: f"--score-type {wildcards.score_type}"
 	threads: 1
 	container:
 		"docker://szsctt/simvi:2"
@@ -622,10 +687,14 @@ rule score_merged_integrations:
 		--sim-info {input.sim_info} \
 		--found-info {input.analysis_info} \
 		--output {output.scored_ints} \
+		--output-sim {output.sim_results} \
+		--output-found {output.found_results} \
 		--summary {output.summary} \
 		{params}
 		"""
-		
+
+
+
 rule combine_int_scores:
 	input:
 		lambda wildcards: scores_to_combine(wildcards, "ints")
@@ -646,34 +715,18 @@ rule combine_int_scores:
 def scores_to_combine(wildcards, score_type):
 
 	assert score_type in ("ints", "reads")
-	
-	if score_type == "ints":
-		folder = "scored_ints"
-	else:
-		folder = "scored_reads"
-	
+
 	scored_files = []
 	for i, row in analysis_df.iterrows():
 	
 		# check if we want to score reads or ints for this row
 		if score_type == 'reads':
-			if 'score_reads' not in row:
-				continue
 			if row['score_reads'] != 1:
 				continue
 		if score_type == 'ints':
-			if 'score_ints' not in row and 'score_merged_ints' not in row:
+			if row['score_ints'] != 1:
 				continue
-			if 'score_ints' in row and 'score_merged_ints' in row:
-				if row['score_ints'] != 1 and row['score_merged_ints'] != 1:
-					continue
-			if 'score_ints' in row and 'score_merged_ints' not in row:
-				if row['score_ints'] != 1:
-					continue
-			if 'score_merged_ints' in row and 'score_ints' not in row:
-				if row['score_merged_ints'] != 1:
-					continue
-					
+
 		# only scoring reads for our pipeline
 		if score_type == 'reads' and not re.search("analysis", row['analysis_condition']):
 			continue
@@ -684,31 +737,49 @@ def scores_to_combine(wildcards, score_type):
 		if exp !=  wildcards.exp:
 			continue
 		outpath = row['outdir']
-		analysis_condition = row['analysis_condition']
+		unique = row['unique']
 		host = row['host']
 		virus = row['virus']
+		dset = f"{row['experiment']}_{row['analysis_condition']}"
 	
 		# get samples for this experiment
 		samples = set(sim_df[sim_df['experiment'] == exp]['sample'])
 		
-		# we only have merged integrations for integration scoring
-		# only do this if the user requested merged integrations to be scored
-		merged = ['']
-		if score_type == 'ints' and 'score_merged_ints' in row:
-			if row['score_merged_ints'] == 1:
-				merged = ['.merged', '']
 		
 		# we only have postprocessed data for our pipeline
-		if re.search("analysis", analysis_condition):
-			post = ['.post', '']
+		if re.search("analysis", unique):
+			post = '.post'
 		else:
-			post = ['']
+			post = ''
+	
+		if score_type == "ints":
+			# get distances for this experiment
+			dists = analysis_df[analysis_df['experiment'] == wildcards.exp]['score_ints_window']
+			row_num = dists.index[0]
+			assert all([entry == dists[row_num] for entry in dists])
+			dists = dists[row_num]
+			if not hasattr(dists, '__iter__'):
+				dists = [dists]
 			
-		scored_files += [
-		f"{outpath}/{exp}/{folder}/{analysis_condition}.{samp}.{host}.{virus}{post}{merged}_summary.tsv"
-			for samp, post, merged
-			in itertools.product(samples, post, merged)
-		]
+			# get score types for this experiment
+			types = analysis_df[analysis_df['experiment'] == wildcards.exp]['score_ints_type']
+			row_num = types.index[0]
+			assert all([entry == types[row_num] for entry in types])
+			types = types[row_num]
+			if not hasattr(types, '__iter__'):
+				types = [types]	
+			
+			# add scored
+			scored_files += [
+			f"{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_summary.tsv"
+				for samp, dist, score_type
+				in itertools.product(samples, dists, types)
+			]
+		else:
+			scored_files += [
+			f"{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
+				for samp in samples
+			]	
+
 	
 	return scored_files
-

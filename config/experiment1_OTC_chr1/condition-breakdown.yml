@@ -70,7 +70,7 @@ global:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100 
+       - 1000
    merge-n-min:
        - 1
    cigar-tol:
@@ -84,12 +84,21 @@ global:
    score_reads: False
    score_ints: True
    score_merged_ints: True
-   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations  
+   score_ints_window: 
+    - 5
+    - 20
+    - 120
+   score_ints_type: 
+    - "coords_min"
+    - "coords_mean"
+    - "overlap"
    
    # other tools 
    polyidus_params:
      aligner:
       - "bowtie2"
+     trim:
+       - True
 
    vifi_params:
      host_info:
@@ -102,6 +111,8 @@ global:
          centromeres:  "../../data/references/data_repo/GRCh38/GRCh38_centromere.bed"
          conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
          segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
+     trim:
+       - True
          
    # run verse
    # https://bioinfo.uth.edu/VirusFinder/VirusFinder-manual.pdf?csrt=2093584511125027598
@@ -122,6 +133,16 @@ global:
 #      - 25
 #     minIdentity:
 #      - 80 
+
+   seeksv_params:
+     trim:
+      - True
+     dedup:
+      - False
+     min_reads:
+      - 1
+     merge_dist:
+      - 100
 
 # things that are different for each dataset
 OTC-whole:
@@ -156,6 +177,20 @@ OTC-deletion:
        - 0.75
        - 1
 
+OTC-rearrange-frags:
+   p_rearrange:
+       - 0
+       - 0.5
+       - 1
+   p_delete:
+       - 0
+       - 0.5
+       - 1
+   lambda_split:
+       - 1
+       - 2
+       - 3
+
 OTC-overlap:
    p_overlap:
        - 0
@@ -171,6 +206,21 @@ OTC-gap:
        - 0.5
        - 0.75
        - 1
+       
+OTC-juncs:
+   p_overlap:
+       - 0
+       - 0.25
+       - 0.5
+   p_gap:
+       - 0
+       - 0.25
+       - 0.5
+   lambda_junction:
+       - 1
+       - 4
+       - 10
+       
 OTC-host_deletion:
    p_host_deletion:
        - 0
@@ -178,9 +228,14 @@ OTC-host_deletion:
        - 0.5
        - 0.75
        - 1
+   lambda_host_deletion:
+       - 10
+       - 100
+       - 1000
+       - 10000
 
 OTC-fcov:
-   frag_len: 
+   fcov: 
        - 0.75
        - 1.5
        - 3
@@ -213,5 +268,14 @@ OTC-min_len:
 AAV:
    viruses:
       AAV2 :  "../../data/references/NC_001401.2.fa"
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    analysis_viruses:
       AAV2 :  "../../data/references/NC_001401.2.fa"
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+      
+chromosomes:
+   hosts: 
+      chr1 : "../../data/references/chrs/chr1.fa"
+      chr8 : "../../data/references/chrs/chr8.fa"
+      chr14: "../../data/references/chrs/chr14.fa"
+      chrX : "../../data/references/chrs/chrX.fa"

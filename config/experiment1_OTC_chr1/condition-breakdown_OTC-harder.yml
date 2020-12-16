@@ -1,6 +1,6 @@
 # things that are the same for all datasets
 global:
-   out_directory: "../../out/experiment1_OTC_chr1/condition-breakdown"
+   out_directory: "../../out/experiment1_OTC_chr1/condition-breakdown_OTC-harder"
    
    # integration simulation
    replicates: 3 

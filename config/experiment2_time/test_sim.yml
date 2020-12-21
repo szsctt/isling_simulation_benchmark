@@ -1,0 +1,57 @@
+global:
+   out_directory: "../out/experiment2_time/time"
+   
+   # integration simulation
+   replicates: 2
+   hosts: 
+      test_human : "../data/references/test_human.fa"
+   viruses: 
+      OTC : "../data/references/OTC-vec_rAAV-genome-only.fa"
+   
+   initial_seed: 12345
+   seed_increment: 123 
+   int_num: 
+       - 2
+   epi_num:
+       - 0
+   p_whole:
+       - 1
+   p_rearrange:
+       - 0
+   p_delete:
+       - 0
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0
+   p_gap:
+       - 0
+   lambda_junction:
+       - 5
+   p_host_deletion:
+       - 0
+   lambda_host_deletion:
+       - 500
+   min_sep:
+       - 500
+   min_len:
+       - 500
+   # read simulation
+   read_len: 
+       - 150
+   fcov: 
+       - 5 
+   frag_len: 
+       - 500 
+   frag_std: 
+       - 30
+   seq_sys: 
+       - "MSv3"
+
+test:
+   fcov: 
+       - 2
+
+test2:
+   fcov: 
+       - 1

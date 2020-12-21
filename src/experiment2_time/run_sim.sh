@@ -13,14 +13,14 @@ module load singularity
 
 cd ../../intvi_simulation
 
-
 snakemake \
+ --configfile ${CONFIG} \
  --jobs 100 \
  --use-singularity \
  --singularity-args "-B $(realpath ../)" \
  --profile slurm \
- --cluster-config ${CLUSTER} \
  --rerun-incomplete \
- --latency-wait 120
-
+ --latency-wait 120 \
+ --notemp \
+ --until art
 

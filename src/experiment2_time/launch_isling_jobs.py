@@ -33,6 +33,8 @@ import pdb
 import glob
 import csv
 import subprocess
+import multiprocessing as mp
+import functools
 
 replicates = 3
 
@@ -43,26 +45,45 @@ def main(argv):
 	
 	# import config file
 	sim_config = import_yaml(config_path)
-	
-	
-	results = []
+
 	# get sample in each dir in config file
-	for exp in sim_config:
-		samples = get_samples(exp, sim_config[exp])
+	run = functools.partial(run_experiment, sim_config=sim_config, config_path=config_path,
+													 config_script=config_script, container=container, reps=replicates)
+	procs = []
+	with mp.Pool(3) as pool:
+		for exp in sim_config:
+			# create callback function
+			write = functools.partial(write_output, sim_config=sim_config, exp=exp)
+			# start process
+			#procs.append(pool.apply_async(run, (exp, ), callback=write))
+			result = run(exp)
+			write(result)
 		
-		# run isling for each sample
-		for samp in samples:
-			results += run_isling(sim_config, exp, samp, config_path, config_script, container, replicates)
-			
-		# write output
-		write_output(sim_config, exp, results)	
+		#[p.get() for p in procs]
+
+def run_experiment(exp, sim_config, config_path, config_script, container, reps):
+	# get samples for this experiment
+	samples = get_samples(exp, sim_config[exp])
+	results = []
+	
+	# run isling for each sample
+	run = functools.partial(run_isling, sim_config=sim_config, sim_config_path=config_path, 			
+														config_script=config_script, container=container, reps=reps)
+	with mp.Pool(10) as pool:
+
+		procs = [pool.apply_async(run, (exp, samp), callback=results.extend) for samp in samples]
+		
+		# get all results
+		[p.get() for p in procs]
+		
+	return results	
 
 	
-def write_output(sim_config, exp, results):
+def write_output(results, sim_config, exp):
 	# write results
 	outfile = os.path.join(sim_config[exp]['out_directory'], exp, "isling", f"{exp}_runtime.tsv")
 	with open(outfile, 'w', newline='') as outhandle:
-		fieldnames = ['tool', 'dataset', 'sample', 'replicate', 
+		fieldnames = ['tool', 'dataset', 'sample', 'replicate', 'exit_value',
 									'user_time', 'system_time', 'elapsed_time', 'CPU', 'shared_text', 'unshared_data',
 									'max_rss', 'fs_inputs', 'fs_outputs', 'major_page_faults', 'minor_page_faults', 'swaps'
 		]
@@ -72,8 +93,9 @@ def write_output(sim_config, exp, results):
 		for r in results:
 			writer.writerow(r)
 			
+	print(f"saved output to {outfile}")
 			
-def run_isling(sim_config, exp, sample, sim_config_path, config_script, container, reps):
+def run_isling(exp, sample, sim_config, sim_config_path, config_script, container, reps):
 
 	isling_config = os.path.join(sim_config[exp]['out_directory'], exp, 
 																'isling', sample, f"{exp}_{sample}.yml")	
@@ -113,26 +135,26 @@ def run_isling(sim_config, exp, sample, sim_config_path, config_script, containe
 	args =  srun + time + sing + isling
 	results = []
 	for i in range(reps):
-		a = subprocess.run(args, capture_output=True, text=True)
-		a.check_returncode()
-	
-		res = collect_output(a.stderr)
-		res['tool'] = 'isling'
-		res['dataset'] = exp
-		res['sample'] = sample
-		res['replicate'] = i
-		results.append(res)
+
+		isling = subprocess.run(args, capture_output=True, text=True)
+		results.append(collect_output(isling, tool='isling', dataset=exp, sample=sample, rep=i))
 	
 	return results
 
 
 
-def collect_output(stdout):
+def collect_output(proc, tool, dataset, sample, rep):
 #   %Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata %Mmax)k
 #   %Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps
-		stdout = stdout.split('\n')
-		line1 = stdout[-3].split()
-		line2 = stdout[-2].split()
+		
+		if proc.returncode == 0:
+			stdout = proc.stderr.split('\n')
+			line1 = stdout[-3].split()
+			line2 = stdout[-2].split()
+		else:
+			line1 = [''] * 10
+			line2 = [''] * 10
+
 		results = {
 			'user_time' : line1[0][:-4],
 			'system_time': line1[1][:-6],
@@ -145,8 +167,15 @@ def collect_output(stdout):
 			'fs_outputs': line2[0].split('+')[1][:-7],			
 			'major_page_faults': line2[1].split('+')[0][1:-5],			
 			'minor_page_faults': line2[1].split('+')[1][:-16],			
-			'swaps': line2[2][:-5],		
+			'swaps': line2[2][:-5],
+			'tool' : tool,
+			'dataset': dataset,
+			'sample': sample,
+			'replicate': rep,
+			'exit_value': proc.returncode
+					
 		}
+		
 		
 		return results
 		

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-CONFIG="../config/experiment2_time/simulation.yml"
+CONFIG="../config/experiment2_time/test_sim.yml"
 CLUSTER="../config/experiment2_time/cluster.json"
 ISLING="docker://szsctt/isling:latest"
 
@@ -13,3 +13,6 @@ bash run_isling_index.sh ${CONFIG} ${CLUSTER}
 
 # run isling
 bash run_isling.sh ${CONFIG} ${ISLING}
+
+# run other tools
+

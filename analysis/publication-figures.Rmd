@@ -446,7 +446,7 @@ b, e: distance from each simulated integration to nearest output integration
 c, f: PPV and TPR with cutoff for distance = 5 (n = 3)
 red - isling, green - polyidus, blue - seeksv, purple - vifi
 
-###  Chromosomes
+###  Simulation parameters
 
 I also explored the effect of using different chromosomes as references for integraion.  I always used hg38 for analysis: see config file below:
 
@@ -546,13 +546,13 @@ found_scores %>%
 I also explored the effect kinds of integrations: see config file below:
 
 ```{bash attr.output='style="max-height: 300px;"'}
-cat ../config/experiment1_OTC_chr1/condition-breakdown.yml
+cat ../config/experiment1_OTC_chr1/condition-breakdown_1.yml
 ```
 
 
 
 ```{r include=FALSE}
-exp_dir <- file.path(results_dir, "condition-breakdown")
+exp_dir <- file.path(results_dir, "condition-breakdown-1")
 int_scores <- importIntScoreExperiment(exp_dir) 
 
 

@@ -538,12 +538,18 @@ importIntScoresFromSummaries <- function(exp_path) {
 }
 
 
-importNearestSimToFound <- function(exp_path) {
-  
-  # list files
+importDistScoreExperiment <- function(exp_path, type, keep_window = "all", keep_score_type = "all") {
+  if (type == "found") {
+    summary_suffix <- "_found-results.tsv"
+    score_type_sub <- '_found-results'
+  }
+  else {
+    summary_suffix <- "_sim-results.tsv"
+    score_type_sub <- '_sim-results'
+  }
   scored_ints_folder <- "scored_ints"
-  summary_suffix <- "_found-results.tsv"
   
+  # get folders to read files from
   folders <- list.dirs(exp_dir)
   folders <- folders[str_detect(folders, scored_ints_folder)]
   
@@ -555,77 +561,75 @@ importNearestSimToFound <- function(exp_path) {
     filenames <- c(filenames, files)
   }
   
-  # import each file
-  int_scores <- tibble(
-    filename = filenames,
-    scores = map(filenames, ~read_tsv(.))
-  ) %>% 
-    unnest(scores)
+  # make tibble
+  int_scores <- tibble(filename = filenames) 
   
   # add extra info to scored integrations
   int_scores <- int_scores %>% 
+    rowwise() %>% 
     mutate(results_file = basename(filename)) %>% 
     mutate(unique = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(experiment = str_split(unique, "_", simplify = TRUE)[,1]) %>% 
-    mutate(analysis_condition = str_split(unique, "_", simplify = TRUE)[,2]) %>% 
+    mutate(analysis_condition = str_match(unique(unique), "(analysis|seeksv|polyidus|vifi)\\d+")[,1] ) %>% 
+    mutate(r = paste0("(.+)_", analysis_condition)) %>% 
+    mutate(experiment = str_match(unique, r)[,2]) %>% 
+    select(-r) %>% 
     mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>%   
     mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
     mutate(replicate = as.double(str_extract(replicate, "\\d+"))) %>% 
     mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
     mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>% 
-    mutate(score_dist = str_split(results_file, "\\.", simplify=TRUE)[,6]) %>% 
+    mutate(score_dist = as.numeric(str_split(results_file, "\\.", simplify=TRUE)[,6])) %>% 
     mutate(score_type = str_split(results_file, "\\.", simplify=TRUE)[,7]) %>%  
-    mutate(score_type = sub('_found-results', '', score_type)) %>% 
-    mutate(post = str_detect(results_file, "post"))
+    mutate(score_type = sub(score_type_sub, '', score_type)) %>% 
+    mutate(post = str_detect(results_file, "post")) %>% 
+    ungroup()
   
+  if (keep_window != "all") {
+    int_scores <- int_scores %>% 
+      filter(score_dist == keep_window)
+  }
+  if (keep_score_type != "all") {
+    int_scores <- int_scores %>% 
+      filter(score_type == keep_score_type)
+  }
   
-  # add information about simulation and analysis conditions
+  # import data
+  int_scores <- int_scores %>% 
+    mutate(data =  map(filename, ~importDistFile(.))) %>% 
+    unnest(data)
   
   return(int_scores)
+  
 }
 
-importNearestFoundToSim <- function(exp_path) {
+importDistFile <- function(filename) {
+  colspec <- cols(
+    id = col_character(),
+    score = col_character(),
+    type = col_character(),
+    chr = col_character(),
+    pos = col_character(),
+    start = col_double(),
+    stop = col_double(),
+    dist = col_double(),
+    read_count = col_double(),
+    reads = col_character(),
+    left_read_count = col_double(),
+    right_read_count = col_double()
+  )
+  cat("importing file ", filename, "\n")
   
-  # list files
-  scored_ints_folder <- "scored_ints"
-  summary_suffix <- "_sim-results.tsv"
+  return(read_tsv(filename, col_types = colspec))
   
-  folders <- list.dirs(exp_dir)
-  folders <- folders[str_detect(folders, scored_ints_folder)]
-  
-  # get files for each folder
-  filenames <- c()
-  for (dir in folders) {
-    files <- list.files(dir, pattern = summary_suffix)
-    files <- file.path(dir, files)
-    filenames <- c(filenames, files)
-  }
-  
-  # import each file
-  int_scores <- tibble(
-    filename = filenames,
-    scores = map(filenames, ~read_tsv(.))
-  ) %>% 
-    unnest(scores)
-  
-  # add extra info to scored integrations
-  int_scores <- int_scores %>% 
-    mutate(results_file = basename(filename)) %>% 
-    mutate(unique = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(experiment = str_split(unique, "_", simplify = TRUE)[,1]) %>% 
-    mutate(analysis_condition = str_split(unique, "_", simplify = TRUE)[,2]) %>% 
-    mutate(condition = str_split(results_file, "\\.", simplify=TRUE)[,2]) %>%   
-    mutate(replicate = str_split(results_file, "\\.", simplify=TRUE)[,3]) %>% 
-    mutate(replicate = as.double(str_extract(replicate, "\\d+"))) %>% 
-    mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
-    mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>% 
-    mutate(score_dist = str_split(results_file, "\\.", simplify=TRUE)[,6]) %>% 
-    mutate(score_type = str_split(results_file, "\\.", simplify=TRUE)[,7]) %>%  
-    mutate(score_type = sub('_sim-results', '', score_type)) %>% 
-    mutate(post = str_detect(results_file, "post"))
-  
-  
-  # add information about simulation and analysis conditions
-  
-  return(int_scores)
 }
+
+
+importNearestSimToFound <- function(exp_path, keep_window, keep_score_type) {
+  return(importDistScoreExperiment(exp_path, "found", keep_window, keep_score_type))
+}
+
+importNearestFoundToSim <- function(exp_path, keep_window, keep_score_type) {
+  return(importDistScoreExperiment(exp_path, "sim", keep_window, keep_score_type))
+}
+
+

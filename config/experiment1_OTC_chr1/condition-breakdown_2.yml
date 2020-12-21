@@ -1,0 +1,220 @@
+# things that are the same for all datasets
+global:
+   out_directory: "../../out/experiment1_OTC_chr1/condition-breakdown-2"
+   
+   # integration simulation
+   replicates: 3 
+   hosts: 
+      chr1 : "../../data/references/chrs/chr1.fa"
+       
+   viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   
+   initial_seed: 12345
+   seed_increment: 123 
+   int_num: 
+       - 1000
+   epi_num:
+       - 0
+   p_whole:
+       - 1
+   p_rearrange:
+       - 0
+   p_delete:
+       - 0
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0
+   p_gap:
+       - 0
+   lambda_junction:
+       - 5
+   p_host_deletion:
+       - 0
+   lambda_host_deletion:
+       - 500
+   min_sep:
+       - 500
+   min_len:
+       - 500
+   # read simulation
+   read_len: 
+       - 150
+   fcov: 
+       - 5 
+   frag_len: 
+       - 500 
+   frag_std: 
+       - 30
+   seq_sys: 
+       - "MSv3"
+
+   # analysis
+   analysis_hosts: 
+      hg38: "../../data/references/GRCh38.fa"
+       
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   merge: 
+       - False
+   trim: 
+       - True
+   dedup: 
+       - False
+   post:
+       -
+         - filter
+         - mask-exclude:
+           - "../../data/references/hg38_homologoustoOTCvec.bed"
+   bwa_mem:
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   merge-dist:
+       - 1000
+   merge-n-min:
+       - 1
+   cigar-tol:
+       - 1
+   clip-cutoff:
+       - 20
+   min-mapq:
+       - 10
+       
+    # scoring
+   score_reads: False
+   score_ints: True
+   score_merged_ints: True
+   score_ints_window: 
+    - 5
+    - 20
+    - 120
+   score_ints_type: 
+    - "coords_min"
+    - "coords_mean"
+    - "overlap"
+   
+   # other tools 
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+     trim:
+       - True
+
+   vifi_params:
+     host_info:
+       hg38: 
+         mappability: "../../data/references/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
+         mappability_exclude: "../../data/references/data_repo/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
+         genes:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
+         exons:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
+         oncogenes:  "../../data/references/data_repo/GRCh38/cancer/oncogenes/Census_oncomerge_hg38.gff"
+         centromeres:  "../../data/references/data_repo/GRCh38/GRCh38_centromere.bed"
+         conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
+         segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
+     trim:
+       - True
+         
+   # run verse
+   # https://bioinfo.uth.edu/VirusFinder/VirusFinder-manual.pdf?csrt=2093584511125027598
+#   verse_params:
+#     detection_mode:
+#      - sensitive
+#     flank_region_size:
+#      - 4000
+#     sensitivity_level:
+#      - 1
+#     min_contig_length:
+#      - 300
+#     blastn_evalue_thrd:
+#      - 0.05
+#     similarity_thrd:
+#      - 0.8
+#     chop_read_length:
+#      - 25
+#     minIdentity:
+#      - 80 
+
+   seeksv_params:
+     trim:
+      - True
+     dedup:
+      - False
+     min_reads:
+      - 1
+     merge_dist:
+      - 100
+
+# things that are different for each dataset
+
+
+OTC-rearrange-frags:
+   p_rearrange:
+       - 0
+       - 0.5
+       - 1
+   p_delete:
+       - 0
+       - 0.5
+       - 1
+   lambda_split:
+       - 1
+       - 2
+       - 3
+
+OTC-rearrange-epi:
+   p_rearrange:
+       - 0
+       - 0.5
+       - 1
+   p_delete:
+       - 0
+       - 0.5
+       - 1
+   epi_num:
+       - 0
+       - 10
+       - 100
+       - 1000
+       - 10000
+       
+OTC-juncs:
+   p_overlap:
+       - 0
+       - 0.25
+       - 0.5
+   p_gap:
+       - 0
+       - 0.25
+       - 0.5
+   lambda_junction:
+       - 1
+       - 4
+       - 10
+       
+OTC-host_deletion:
+   p_host_deletion:
+       - 0
+       - 0.25
+       - 0.5
+       - 0.75
+       - 1
+   lambda_host_deletion:
+       - 10
+       - 100
+       - 1000
+       - 10000
+
+OTC-fcov:
+   fcov: 
+       - 0.75
+       - 1.5
+       - 3
+       - 5
+       - 10
+
+OTC-frag_len:
+   frag_len: 
+       - 250
+       - 300
+       - 500 
+       - 1000 

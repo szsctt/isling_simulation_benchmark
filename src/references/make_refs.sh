@@ -76,10 +76,16 @@ cut -f2- centromeres.txt > centromeres.bed
 # conserved regions in amplicon architect - not sure what this file is exactly...
 wget https://raw.githubusercontent.com/hall-lab/speedseq/master/annotations/exclude.cnvnator_100bp.GRCh38.20170403.bed
 
-
 cd ..
-mkdir AAV2 && cd AAV2
 # get AAV2 sequence (NCBI Reference Sequence: NC_001401.2)
 conda activate eutils
 esearch -db nucleotide -query NC_001401.2 | efetch -format fasta > NC_001401.2.fa
+
+
+# get HBV sequence (NCBI Refernece sequence: NC_003977.2)
+esearch -db nucleotide -query NC_003977.2 | efetch -format fasta > NC_003977.2.fa
+
+
+# get HBV sequence (NCBI Refernece sequence: NC_003977.2)
+esearch -db nucleotide -query NC_027779.1 | efetch -format fasta > NC_027779.1.fa
 

@@ -82,3 +82,12 @@ verse_test/refs/
 verse_test/test-chr1-cloud/
 verse_test/*sif
 config/*/*.cloud/yml
+data/references/NC_003977.2.fa
+data/references/NC_027779.1.fa
+config/experiment2_time/auto
+data/references/data_repo_hg38.tar.gz
+data/references/test_human_chrlist.txt
+analysis/plots/
+.RData
+.Rhistory
+src/snakemake_sim_analysis/results-summary.tsv

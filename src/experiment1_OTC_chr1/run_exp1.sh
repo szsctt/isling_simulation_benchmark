@@ -15,13 +15,22 @@ NAME="chromosomes"
 
 bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
 
+CONFIG="../../config/experiment1_OTC_chr1/condition-breakdown_2.yml"
+NAME="condition-breakdown-2"
+
+bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME &
+PID_2=$!
+
+CONFIG="../../config/experiment1_OTC_chr1/condition-breakdown_1.yml"
+NAME="condition-breakdown-1"
+
+bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME &
+PID_1=$!
+
+wait $PID_1 $PID_2
+
 CONFIG="../../config/experiment1_OTC_chr1/condition-breakdown_OTC-harder.yml"
 NAME="condition-breakdown_OTC-harder"
-
-bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
-
-CONFIG="../../config/experiment1_OTC_chr1/condition-breakdown.yml"
-NAME="condition-breakdown"
 
 bash ./run.sh $CONFIG $CLUSTER $OUTPATH $NAME
 

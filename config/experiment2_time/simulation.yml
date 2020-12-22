@@ -6,7 +6,7 @@ global:
    hosts: 
       chr1 : "../data/references/chrs/chr1.fa"
    viruses: 
-      chr1 : "../data/references/OTC-vec_rAAV-genome-only.fa"
+      OTC : "../data/references/OTC-vec_rAAV-genome-only.fa"
    
    initial_seed: 12345
    seed_increment: 123 

@@ -1,0 +1,96 @@
+{
+	"__default__":
+	{
+		"nodes" : "1",
+		"output" : "../../logs/{rule}.%j.log"
+	},
+	"extract_bam":
+	{	
+		"mem" : "20GB",
+		"time" : "2:00:00",
+		"job-name" : "simvi-convert"
+
+	},
+	"convert":
+	{	
+		"mem" : "20GB",
+		"time" : "2:00:00",
+		"job-name" : "simvi-convert"
+
+	},
+	"convert_to_bam":
+	{	
+		"mem" : "20GB",
+		"time" : "2:00:00",
+		"job-name" : "viInt-convert"
+
+	},
+	"rmdup":
+	{	
+		"mem" : "10GB",
+		"time" : "2:00:00",
+		"job-name" : "viInt-rmdup"
+	},
+	"seqprep":
+	{	
+		"time" : "2:00:00",
+		"mem" : "10GB",
+		"job-name" : "viInt-seqPrep"
+	},
+	"align_bwa_virus":
+	{	
+		"time" : "2:00:00",
+		"mem" : "10GB",
+		"job-name" : "viInt-bwa-virus"
+	},
+	"host_align":
+	{	
+		"time" : "2:00:00",
+		"mem" : "10GB",
+		"job-name" : "viInt-bwa-host"
+	},
+	"index":
+	{
+		"time" : "2:00:00",
+		"mem" : "20GB",
+		"job-name" : "viInt-bwa-index"
+	},
+	"ints":
+	{
+		"time" : "2:00:00",
+		"mem" : "20GB",
+		"job-name" : "viInt-ints"
+	},
+	"post":
+	{
+		"time" : "2:00:00",
+		"cpus-per-task" : "1",
+		"mem" : "20GB",
+		"job-name" : "summarise"
+	},
+	"score_reads":
+	{
+		"time" : "24:00:00",
+		"cpus-per-task" : "1",
+		"mem" : "40GB",
+		"job-name" : "score_reads"
+	},
+	"seeksv":
+	{	
+		"time" : "2:00:00",
+		"mem" : "50GB",
+		"job-name" : "viInt-seeksv"
+	},
+	"host_virus_index_seeksv":
+	{	
+		"time" : "2:00:00",
+		"mem" : "50GB",
+		"job-name" : "viInt-seeksv"
+	},
+	"trim":
+	{	
+		"time" : "2:00:00",
+		"mem" : "10GB",
+		"job-name" : "viInt-trim"
+	}
+}

@@ -35,6 +35,8 @@ import csv
 import subprocess
 import multiprocessing as mp
 import functools
+import time
+import random
 
 replicates = 3
 
@@ -55,11 +57,11 @@ def main(argv):
 			# create callback function
 			write = functools.partial(write_output, sim_config=sim_config, exp=exp)
 			# start process
-			#procs.append(pool.apply_async(run, (exp, ), callback=write))
-			result = run(exp)
-			write(result)
+			procs.append(pool.apply_async(run, (exp, ), callback=write))
+			#result = run(exp)
+			#write(result)
 		
-		#[p.get() for p in procs]
+		[p.get() for p in procs]
 
 def run_experiment(exp, sim_config, config_path, config_script, container, reps):
 	# get samples for this experiment
@@ -121,21 +123,22 @@ def run_isling(exp, sample, sim_config, sim_config_path, config_script, containe
 	# output dir
 	out_dir = os.path.realpath(config[exp]['out_dir'])
 	
-	srun = ['srun', '--exclusive', '-c20', '-n1', '--mem', '128gb']
-	time = ['/usr/bin/time']
-	sing = ['singularity', 'exec',
+	srun_args = ['srun', '--exclusive', '-c20', '-n1', '--mem', '128gb', '--time', '24:00:00']
+	time_args = ['/usr/bin/time']
+	sing_args = ['singularity', 'exec',
 					'-B', host_prefix,
 					'-B', virus_prefix,
 					'-B', read_dir,
 					'-B', out_dir,
 					container
 				]
-	isling = ['snakemake', '--jobs', '100', '--configfile', isling_config, '--forceall']
+	isling_args = ['snakemake', '--jobs', '100', '--configfile', isling_config, '--forceall']
 		
-	args =  srun + time + sing + isling
+	args =  srun_args + time_args + sing_args + isling_args
 	results = []
+	# this one can't be parallel because they have the same output files
 	for i in range(reps):
-
+		time.sleep(random.random())
 		isling = subprocess.run(args, capture_output=True, text=True)
 		results.append(collect_output(isling, tool='isling', dataset=exp, sample=sample, rep=i))
 	
@@ -152,8 +155,8 @@ def collect_output(proc, tool, dataset, sample, rep):
 			line1 = stdout[-3].split()
 			line2 = stdout[-2].split()
 		else:
-			line1 = [''] * 10
-			line2 = [''] * 10
+			line1 = ['user', 'system', 'elapsed', 'CPU', '(text+data', 'max)k']
+			line2 = ['inputs+outputs', '(major+minor)pagefaults', 'swaps'] * 10
 
 		results = {
 			'user_time' : line1[0][:-4],
@@ -175,7 +178,6 @@ def collect_output(proc, tool, dataset, sample, rep):
 			'exit_value': proc.returncode
 					
 		}
-		
 		
 		return results
 		

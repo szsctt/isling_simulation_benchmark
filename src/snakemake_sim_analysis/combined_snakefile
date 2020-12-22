@@ -430,13 +430,24 @@ include: "snakemake_rules/postprocessing.smk"
 include: "snakemake_rules/polyidus.smk"
 
 # overwrite input function to get simulated reads (which are in a different location to other pipeline)
-def get_input_reads(wildcards, read_num):
+def get_reads(wildcards, analysis_df, rules, read_num):
 	assert read_num in {1, 2}
 	
 	if read_num == 1:
 		return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R1_suffix')}"
 	if read_num == 2:
 		return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R2_suffix')}"	
+		
+def analysis_df_value(wildcards, analysis_df, column_name):
+	"""Get resources required for a dataset (but not tool-specific)"""
+	pdb.set_trace()
+	row = analysis_df[(analysis_df['unique'] == wildcards.dset)].index[0]
+	return analysis_df.loc[row, column_name]
+
+def analysis_df_tool_value(wildcards, analysis_df, tool, column_name):
+	"""Get resources required for a dataset (but not tool-specific"""
+	row = analysis_df[(analysis_df['unique'] == wildcards.dset) & (analysis_df['tool'] == tool)].index[0]
+	return analysis_df.loc[row, column_name]
 
 #####################################################
 ##################### trimming ######################

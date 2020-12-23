@@ -233,7 +233,7 @@ analysis_df['score_ints_type'] = score_ints_type
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
 
-column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len']
+column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len']
 
 rows = []
 
@@ -275,6 +275,10 @@ for i, row in analysis_df.iterrows():
 		todo_row['R1_file'] = read_prefix + row['R1_suffix']
 		todo_row['R2_file'] = read_prefix + row['R2_suffix']
 		todo_row['bam_file'] = read_prefix + row['bam_suffix']
+		
+		# host and virus prefixes
+		todo_row['host_prefix'] = os.path.join(row['outdir'], 'references', row['host'], row['host'])
+		todo_row['virus_prefix'] = os.path.join(row['outdir'], 'references', row['virus'], row['virus'])
 		
 		rows.append(todo_row)
 		

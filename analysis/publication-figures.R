@@ -1,4 +1,5 @@
 library(tidyverse)
+library(lubridate)
 library(cowplot)
 
 source("/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/analysis/sim_functions.R")
@@ -433,6 +434,13 @@ cowplot::save_plot("plots/figure_1_v6.pdf", figure_1, base_height = 4.2)
 exp_dir <- file.path(results_dir, "condition-breakdown-1")
 int_scores <- importIntScoreExperiment(exp_dir) 
 
+exp_dir <- file.path(results_dir, "condition-breakdown-2")
+int_scores2 <- importIntScoreExperiment(exp_dir) 
+
+int_scores <- bind_rows(int_scores, int_scores2) %>% 
+  filter(window == 5) %>% 
+  filter(coords_score_type == "coords_mean")
+
 # only use postprocessed data from our pipeline
 int_scores <- int_scores %>% 
   filter(case_when((analysis_tool != "pipeline") ~ TRUE,
@@ -440,6 +448,7 @@ int_scores <- int_scores %>%
                    TRUE ~ FALSE
   )) %>% 
   mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_tool, 'pipeline', 'isling')) %>% 
   mutate(analysis_condition = str_replace(analysis_condition, '\\d', ''))
   
 # for 'AAV' experiment, filter only for results where we used the correct viral reference
@@ -454,49 +463,108 @@ int_scores %>%
   select(virus_name, analysis_virus) %>% 
   distinct()
 
-# intial plot of scored ints for each condition
-unique(int_scores$experiment)
-exp_vars <- list(
-  "AAV" = "virus_name",
-  "chromosomes" = "host_name",
-  "OTC-deletion" = "p_delete",
-    "OTC-epi" = "epi_num",
-    "OTC-fcov" = "fcov",
-    "OTC-gap" = "p_gap",
-    "OTC-min_len" = "min_len",
-    "OTC-min_sep" = "min_sep",
-    "OTC-overlap" = "p_overlap",
-    "OTC-rearrange" = "p_rearrange",
-    "OTC-whole" = "p_whole"
-)
+# check that we've got three replicates for each condition in each experiment, for each tool
+n_per_cond <- int_scores %>% 
+  filter(window == 5) %>% 
+  filter(coords_score_type == "coords_mean") %>% 
+  mutate(batch = str_split(filename, "/", simplify = TRUE)[,10]) %>% 
+  select(window, coords_score_type, experiment, condition, replicate, tool, batch) %>% 
+  distinct() %>% 
+  group_by(batch, window, coords_score_type, experiment, condition, tool) %>% 
+  summarise(count = n())
+
+incomplete_exps <- n_per_cond %>% filter(count != 3) %>% pull(experiment)
+incomplete_conds <- n_per_cond %>% filter(count != 3) %>% pull(condition)
+incomplete_batches <- n_per_cond %>% filter(count != 3) %>% pull(batch)
+incomplete_tools <- n_per_cond %>% filter(count != 3) %>% pull(tool)
+
+# if we don't have three replicates for each tool, drop that condition
+int_scores <- int_scores %>% 
+  mutate(batch = str_split(filename, "/", simplify = TRUE)[,10]) %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  filter(!((experiment %in% incomplete_exps) & (batch %in% incomplete_batches) & (condition %in% incomplete_conds))) %>% 
+  ungroup()  
+
+# what's left after this
+int_scores %>% 
+  select(batch, experiment, condition, replicate) %>% 
+  distinct() %>% 
+  group_by(batch, experiment) %>% 
+  summarise(conditions = n_distinct(condition),
+            observations = n())
+
+
+# we had an OTC-fcov experiment in both -1 and -2, so only keep one
+int_scores %>% 
+  filter(experiment == "OTC-fcov") %>% 
+  select(batch, condition, fcov) %>% 
+  distinct()
+
+int_scores <- int_scores %>% 
+  rowwise() %>% 
+  filter(ifelse(experiment == "OTC-fcov", batch == "condition-breakdown-2", TRUE)) %>% 
+  ungroup()
+
+
+# initial plot with just conditions - no info about manipulated variables
 scoreplots <- list()
 for (e in unique(int_scores$experiment)) {
-scoreplots[[e]] <- int_scores %>% 
-  filter(experiment == e) %>% 
-    mutate(!!exp_vars[[e]] := as.factor(!!sym(exp_vars[[e]]))) %>% 
-    ggplot(aes(x = PPV, y = TPR, color = analysis_tool, shape = !!sym(exp_vars[[e]]))) +
+  scoreplots[[e]] <- int_scores %>% 
+    filter(experiment == e) %>% 
+    ggplot(aes(x = PPV, y = TPR, shape = analysis_tool, color = condition)) +
     geom_point() +
     xlim(0, 1) +
     ylim(0, 1) +
-    facet_grid(vars(window), vars(coords_score_type)) +
-  ggtitle(e)
+    theme(legend.position = "none") +
+    ggtitle(e)
 }
 
-print(scoreplots['AAV'])
-print(scoreplots['chromosomes'])
-print(scoreplots['OTC-deletion'])
-print(scoreplots['OTC-rearrange'])
-print(scoreplots['OTC-fcov'])
-print(scoreplots['OTC-min_len'])
-print(scoreplots['OTC-min_sep'])
-print(scoreplots['OTC-gap'])
-print(scoreplots['OTC-whole'])
-print(scoreplots['OTC-epi'])
+unique(int_scores$experiment)
+print(scoreplots[['AAV']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-deletion']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-epi']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-fcov']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-gap']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-min_len']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-min_sep']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-overlap']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-rearrange']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-whole']] + theme(legend.position = "right"))
+print(scoreplots[['chromosomes']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-frag_len']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-host_deletion']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-juncs']]) + theme(legend.position = "right")
+print(scoreplots[['OTC-rearrange-epi']] + theme(legend.position = "right"))
+print(scoreplots[['OTC-rearrange-frags']] + theme(legend.position = "right"))
 
+figure_2 <- cowplot::plot_grid(plotlist = scoreplots)
+print(figure_2)
+cowplot::save_plot("plots/condition-breakdown-1_scores_all.pdf", figure_2, base_height = 8)
 
-int_scores <- int_scores %>% 
-  filter(window == score_window) %>% 
-  filter(coords_score_type == coords_score_type_plot)
+#### figure 2 plots ####
+
+# list of experiments and which variables were manipulated in each
+unique(int_scores$experiment)
+exp_vars <- list(
+  "AAV" = c("virus_name"),
+  "chromosomes" = c("host_name"),
+  "OTC-deletion" = c("p_delete"),
+  "OTC-epi" = c("epi_num"),
+  "OTC-fcov" = c("fcov"),
+  "OTC-gap" = c("p_gap"),
+  "OTC-min_len" = c("min_len"),
+  "OTC-min_sep" = c("min_sep"),
+  "OTC-overlap" = c("p_overlap"),
+  "OTC-rearrange" = c("p_rearrange"),
+  "OTC-whole" = c("p_whole"),
+  "OTC-rearrange-frags" = c("p_rearrange", "p_delete", "lambda_split"),
+  "OTC-rearrange-epi" = c("p_rearrange", "p_delete", "epi_num"),
+  "OTC-juncs" = c("p_overlap", "p_gap", "lambda_junction"),
+  'OTC-host_deletion' = c("p_host_deletion", "lambda_host_deletion"),
+  "OTC-frag_len" = c("frag_len")
+)
+
 
 scoreplots <- list()
 for (e in unique(int_scores$experiment)) {
@@ -518,7 +586,18 @@ cowplot::save_plot("plots/condition-breakdown-1_scores_all.pdf", figure_2, base_
 
 
 #import distances from each found integration to nearest simulated integration
-found_scores <- importNearestSimToFound(exp_dir, score_window, coords_score_type_plot) 
+found_scores <- tibble(
+  batch = c("condition-breakdown-1","condition-breakdown-2"),
+  exp_dir = map(batch, ~file.path(results_dir, .))
+) %>% 
+  mutate(data = map(exp_dir, ~importNearestSimToFound(., score_window, coords_score_type_plot))) %>% 
+  unnest(data)
+
+unique(found_scores$experiment)
+found_scores %>% 
+  group_by(batch, experiment) %>% 
+  summarise(n_found = n())
+
 
 # only use postprocessed data from our pipeline
 found_scores <- found_scores %>% 
@@ -532,17 +611,53 @@ found_scores <- found_scores %>%
   mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
   mutate(analysis_condition = str_replace(analysis_condition, '\\d', ''))
 
+# remove any data from conditions in which all three replicates weren't completed
+found_scores <- found_scores %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  filter(!((experiment %in% incomplete_exps) & (batch %in% incomplete_batches) & (condition %in% incomplete_conds))) %>% 
+  ungroup()  
+
+# check filtering
+found_scores %>% 
+  mutate(batch = str_split(filename, "/", simplify = TRUE)[,10]) %>% 
+  select(experiment, condition, replicate, analysis_condition, batch) %>% 
+  distinct() %>% 
+  group_by(batch, experiment, condition, analysis_condition) %>% 
+  summarise(count = n()) %>% 
+  filter(count != 3)
+# there's only results from one replicate of seeksv in the OTC-fcov experiment, condition0 - 
+# but I checked the files and they're present, and it's because there weren't any found integrations for two replicates in this condition
 
 # add analysis conditions
-conds <- importSimulationConditions(exp_dir)
-
+conds  <- tibble(
+  batch = c("condition-breakdown-1","condition-breakdown-2"),
+  exp_dir = map(batch, ~file.path(results_dir, .))
+)  %>% 
+  mutate(conds = map(exp_dir, ~importSimulationConditions(.))) %>% 
+  unnest(conds)
+  
 found_scores <- found_scores %>% 
-  left_join(conds, by=c("experiment", "condition", "replicate"))
+  left_join(conds, by=c("experiment", "condition", "replicate", "batch"))
 
+# filter out any conditions were different virus was integrated and analysed
 found_scores <- found_scores %>% 
   rowwise() %>% 
   filter(ifelse(experiment == "AAV", virus_name == analysis_virus, TRUE)) %>% 
   ungroup()
+
+found_scores %>% 
+  filter(experiment == "AAV") %>% 
+  select(virus_name, analysis_virus) %>% 
+  distinct()
+
+# we had a fcov experiment in batch 1 and 2, so just keep batch 1
+found_scores <- found_scores %>% 
+  rowwise() %>% 
+  filter(ifelse(experiment == "OTC-fcov", batch == "condition-breakdown-2", TRUE)) %>% 
+  ungroup()
+
+
 
 
 found_scores %>% 
@@ -557,9 +672,8 @@ foundplots <- list()
 for (e in names(exp_vars)) {
   foundplots[[e]] <- found_scores %>% 
     filter(experiment == e) %>% 
-    mutate(!!exp_vars[[e]] := as.factor(!!sym(exp_vars[[e]]))) %>% 
     mutate(dist = dist+offset) %>% 
-    ggplot(aes(x = dist, color = analysis_condition, linetype = !!sym(exp_vars[[e]]))) +
+    ggplot(aes(x = dist, color = condition)) +
     geom_freqpoly(bins = 100) +
     scale_x_log10() +
     facet_grid(rows = vars(analysis_condition)) +
@@ -573,13 +687,11 @@ for (e in names(exp_vars)) {
     )  +
     scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
     labs(title = e, x="Distance", y="Count", color="tool", linetype=exp_vars[[e]])
-
 }
 foundplots[[names(exp_vars)[1]]]
 
 figure_2 <- cowplot::plot_grid(plotlist = foundplots)
 print(figure_2)
-
 cowplot::save_plot("plots/condition-breakdown-1_found-dist-all_coords-mean.pdf", figure_2, base_height = 8)
 
 chrplots <- list()
@@ -587,8 +699,7 @@ for (e in names(exp_vars)) {
   chrplots[[e]] <- found_scores %>% 
     filter(experiment == e) %>% 
     mutate(correct_chr = (chr == host_name)) %>% 
-    mutate(!!exp_vars[[e]] := as.factor(!!sym(exp_vars[[e]]))) %>% 
-    ggplot(aes(x = !!sym(exp_vars[[e]]), fill = correct_chr)) +
+    ggplot(aes(x = condition, fill = correct_chr)) +
     geom_bar() +
     ylab("Count") +
     theme_classic() + 
@@ -615,27 +726,69 @@ cowplot::save_plot("plots/condition-breakdown-1_found-chr-all_coords-mean.pdf", 
 
 
 # import distances from each simulated integration to the nearest found integration
-sim_scores <- importNearestFoundToSim(exp_dir, score_window, coords_score_type_plot) 
+#import distances from each found integration to nearest simulated integration
+sim_scores <- tibble(
+  batch = c("condition-breakdown-1","condition-breakdown-2"),
+  exp_dir = map(batch, ~file.path(results_dir, .))
+) %>% 
+  mutate(data = map(exp_dir, ~importNearestFoundToSim(., score_window, coords_score_type_plot))) %>% 
+  unnest(data)
 
+unique(sim_scores$experiment)
+sim_scores %>% 
+  group_by(batch, experiment) %>% 
+  summarise(n_sim = n())
+
+
+# only use postprocessed data from our pipeline
 sim_scores <- sim_scores %>% 
   filter(case_when(
     !str_detect(analysis_condition, "pipeline") ~ TRUE,
     post ~ TRUE,
     TRUE ~ FALSE
   )) %>% 
-  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
-  mutate(analysis_condition = str_replace(analysis_condition, '\\d', ''))  %>% 
   filter(score_dist == score_window) %>% 
-  filter(score_type == "coords_mean")
+  filter(score_type == coords_score_type_plot) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, '\\d', ''))
 
+# remove any data from conditions in which all three replicates weren't completed
 sim_scores <- sim_scores %>% 
-  left_join(conds, by=c("experiment", "condition", "replicate"))
+  ungroup() %>% 
+  rowwise() %>% 
+  filter(!((experiment %in% incomplete_exps) & (batch %in% incomplete_batches) & (condition %in% incomplete_conds))) %>% 
+  ungroup()  
 
+# check filtering
+sim_scores %>% 
+  mutate(batch = str_split(filename, "/", simplify = TRUE)[,10]) %>% 
+  select(experiment, condition, replicate, analysis_condition, batch) %>% 
+  distinct() %>% 
+  group_by(batch, experiment, condition, analysis_condition) %>% 
+  summarise(count = n()) %>% 
+  filter(count != 3)
 
+# add analysis conditions
+sim_scores <- sim_scores %>% 
+  left_join(conds, by=c("experiment", "condition", "replicate", "batch"))
+
+# filter out any conditions were different virus was integrated and analysed
 sim_scores <- sim_scores %>% 
   rowwise() %>% 
   filter(ifelse(experiment == "AAV", virus_name == analysis_virus, TRUE)) %>% 
   ungroup()
+
+sim_scores %>% 
+  filter(experiment == "AAV") %>% 
+  select(virus_name, analysis_virus) %>% 
+  distinct()
+
+# we had a fcov experiment in batch 1 and 2, so just keep batch 1
+sim_scores <- sim_scores %>% 
+  rowwise() %>% 
+  filter(ifelse(experiment == "OTC-fcov", batch == "condition-breakdown-2", TRUE)) %>% 
+  ungroup()
+
 
 sim_scores %>% 
   mutate(dist = dist+dist_plot_offset) %>% 
@@ -650,9 +803,8 @@ simplots <- list()
 for (e in names(exp_vars)) {
   simplots[[e]] <- sim_scores %>% 
     filter(experiment == e) %>% 
-    mutate(!!exp_vars[[e]] := as.factor(!!sym(exp_vars[[e]]))) %>% 
     mutate(dist = dist+offset) %>% 
-    ggplot(aes(x = dist, color = analysis_condition, linetype = !!sym(exp_vars[[e]]))) +
+    ggplot(aes(x = dist, color = condition)) +
     geom_freqpoly(bins = 100) +
     scale_x_log10() +
     facet_grid(rows = vars(analysis_condition)) +
@@ -675,6 +827,56 @@ print(figure_2)
 cowplot::save_plot("plots/condition-breakdown-1_sim-dist-all_coords-mean.pdf", figure_2, base_height = 8)
 
 
+
+
+
+#### figure 2 function - make a row of four panels ####
+figure2Row <- function(exp_name, exp_vars, combined_var_name) {
+  
+  
+  # first part
+  found <- found_scores %>% 
+    filter(experiment == exp_name) %>% 
+    rowwise() %>% 
+    mutate(!!combined_var_name:= )
+}
+
+exp_name <-"OTC-juncs"
+exp_vars <- c("p_overlap", "p_gap", "lambda_junction")
+combined_var_name <- "junction properties"
+
+names_df <- int_scores %>% 
+  filter(experiment == exp_name) %>% 
+  select(all_of(exp_vars))
+
+for (var in colnames(names_df)) {
+  names_df <- names_df %>% 
+    mutate(!!var := paste0(var, ": ", !!sym(var))) 
+}
+
+mutate(!!exp_vars[[e]] := as.factor(!!sym(exp_vars[[e]])))
+
+
+
+combineVarNames <- function(df, exp_name, exp_vars) {
+  names_df <- df %>% 
+    filter(experiment == exp_name) %>% 
+    select(all_of(exp_vars))
+  
+  # include variable names in each row of names_df
+  for (var in colnames(names_df)) {
+    names_df <- names_df %>% 
+      mutate(!!var := paste0(var, ": ", !!sym(var))) 
+  }
+  
+  names_df <- names_df %>% 
+    rowwise() %>% 
+    mutate(label = paste0(across(everything()), collapse=", "))
+  
+  return(names_df)
+}
+
+combineVarNames(int_scores, "OTC-juncs", c("p_overlap", "p_gap", "lambda_junction"))
 
 #### figure 2, version 0 ####
 # create new list with interleaved plots
@@ -732,3 +934,85 @@ figure_2 <- cowplot::plot_grid(figure_2, legend, ncol=1, rel_heights = c(1, 0.05
 #print(figure_2)
 
 cowplot::save_plot("plots/figure2_v1.pdf", figure_2, base_height = 12, base_width = 12)
+
+
+#### figure 3 ####
+# runtime stuff
+
+results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment2_time/time"
+files <- list.files(results_dir, recursive = TRUE, pattern="_runtime.tsv")
+
+coltypes <- cols(
+  tool = col_character(),
+  dataset = col_character(),
+  sample = col_character(),
+  replicate = col_double(),
+  exit_value = col_double(),
+  user_time = col_double(),
+  system_time = col_double(),
+  elapsed_time = col_character(),
+  CPU = col_character(),
+  shared_text = col_double(),
+  unshared_data = col_double(),
+  max_rss = col_double(),
+  fs_inputs = col_double(),
+  fs_outputs = col_double(),
+  major_page_faults = col_double(),
+  minor_page_faults = col_double(),
+  swaps = col_double(),
+  command = col_character()
+)
+
+times <- tibble(
+  filename = file.path(results_dir, files),
+  experiment = dirname(files),
+  data = map(filename, ~read_tsv(., col_types=coltypes))
+) %>% 
+  unnest(data) %>% 
+  mutate(elapsed_time = case_when(
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\.\\d{2}") ~ lubridate::ms(elapsed_time),
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\:\\d{2}") ~ lubridate::hms(elapsed_time),
+    TRUE ~ lubridate::as.period(NA)
+  )) %>% 
+  mutate(elapsed_time = as.duration(elapsed_time)) %>% 
+  rename(time_rep = replicate)
+
+conds <- importSimulationConditions(results_dir)
+
+times <- left_join(times, conds, by=c("experiment", "sample"))
+
+times %>% 
+  ggplot(aes(x = condition, y = elapsed_time, color=tool)) +
+  geom_point() +
+  facet_wrap(vars(experiment)) +
+  scale_y_log10() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+plots <- list()
+for (e in unique(times$experiment)) {
+  plots[[e]] <- times %>% 
+    filter(experiment == e) %>% 
+    ggplot(aes(x = condition, y = elapsed_time, color=tool)) +
+    geom_point() +
+    theme_classic() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "none"
+          )  
+}
+plots['coverage']
+
+p <- times %>% 
+  ggplot(aes(x = condition, y = elapsed_time, color=tool)) +
+  geom_point() +
+  theme_classic() +
+  theme(legend.position = "bottom")
+
+legend <- get_legend(p)
+
+figure_3 <- cowplot::plot_grid(plotlist = plots, labels="AUTO")
+figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
+print(figure_3)
+
+cowplot::save_plot("plots/figure3_v1.pdf", figure_3)
+

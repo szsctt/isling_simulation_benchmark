@@ -462,11 +462,15 @@ importSimulationConditions <- function(exp_path) {
   sim_conditions_file <- "simulation_summary.tsv"
   
   # get files with simulation condtions
-  cond_files <- list.files(exp_dir, pattern = sim_conditions_file, recursive = TRUE)
+  cond_files <- list.files(exp_path, pattern = sim_conditions_file, recursive = TRUE)
   
-  # import analysis conditions
+  if (length(cond_files) == 0) {
+    stop(glue("didn't find any files in {exp_path}"))
+  }
+  
+  # import simulation conditions
   sim_conditions <- tibble(
-    file = file.path(exp_dir, cond_files),
+    file = file.path(exp_path, cond_files),
     conds = map(file, ~read_tsv(.))
   ) %>% 
     unnest(conds) %>% 
@@ -480,12 +484,12 @@ importAnalysisConditions <- function(exp_path) {
   analysis_condtions_file <- "analysis_conditions.tsv" 
   
   # get files with analysis conditions
-  cond_files <- list.files(exp_dir, pattern = analysis_condtions_file, recursive = TRUE)
+  cond_files <- list.files(exp_path, pattern = analysis_condtions_file, recursive = TRUE)
   cond_files <- cond_files[!str_detect(cond_files, "pipeline_analysis_conditions.tsv")]
   
    # import analysis conditions
   analysis_conditions <- tibble(
-    file = file.path(exp_dir, cond_files),
+    file = file.path(exp_path, cond_files),
     conds = map(file, ~read_tsv(.))
   ) %>% 
     unnest(conds) %>% 
@@ -501,7 +505,7 @@ importIntScoresFromSummaries <- function(exp_path) {
   scored_ints_folder <- "scored_ints"
   summary_suffix <- "_summary.tsv"
   
-  folders <- list.dirs(exp_dir)
+  folders <- list.dirs(exp_path)
   folders <- folders[str_detect(folders, scored_ints_folder)]
   
   # get files for each folder
@@ -550,7 +554,7 @@ importDistScoreExperiment <- function(exp_path, type, keep_window = "all", keep_
   scored_ints_folder <- "scored_ints"
   
   # get folders to read files from
-  folders <- list.dirs(exp_dir)
+  folders <- list.dirs(exp_path)
   folders <- folders[str_detect(folders, scored_ints_folder)]
   
   # get files for each folder
@@ -632,4 +636,57 @@ importNearestFoundToSim <- function(exp_path, keep_window, keep_score_type) {
   return(importDistScoreExperiment(exp_path, "sim", keep_window, keep_score_type))
 }
 
+#### plotting functions ####
+
+# get the variables that are different in an experiment
+getExpVars <- function(conds, exp_name) {
+  disregard <- c("condition", "replicate", "random_seed", "sample", "unique", "batch", "exp_dir", "out_directory")
+  cols <- conds %>% 
+    filter(experiment == exp_name) 
+  
+  if (nrow(conds) == 0) {
+    stop(glue("no rows found for experiment {exp_name}"))
+  }
+  
+  cols <- cols %>% 
+    summarise(across(everything(), n_distinct),) %>% 
+    select(where(~sum(.) > 1)) %>% 
+    select(-contains("filename")) %>% 
+    select(-one_of(disregard)) %>% 
+    colnames()
+  
+  cols <- cols[!str_detect(cols, "fasta")]
+  
+  return(cols)
+}
+
+
+# combine varibles manipulated in an experiment into one variable
+combineVarNames <- function(df, conds_df, exp_name) {
+  exp_vars <- getExpVars(conds_df, exp_name)
+  
+  if (length(exp_vars) == 1) {
+    return(df[[exp_vars[1]]])
+  }
+
+  names_df <- df %>% 
+    filter(experiment == exp_name) %>% 
+    select(all_of(exp_vars))
+  
+  if (nrow(names_df) == 0) {
+    stop(glue("no rows found for experiment {exp_name}"))
+  } 
+  
+  # include variable names in each row of names_df
+  for (var in colnames(names_df)) {
+    names_df <- names_df %>% 
+      mutate(!!var := paste0(var, ": ", !!sym(var))) 
+  }
+  
+  names_df <- names_df %>% 
+    rowwise() %>% 
+    mutate(label = paste0(across(everything()), collapse=", "))
+  
+  return(names_df$label)
+}
 

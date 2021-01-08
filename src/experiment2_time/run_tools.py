@@ -288,7 +288,6 @@ def run_isling(exp, sample, sim_config, sim_config_path, config_script, containe
 	# output dir
 	out_dir = os.path.realpath(config[exp]['out_dir'])
 	
-
 	sing_args = ['singularity', 'exec',
 					'-B', host_prefix,
 					'-B', virus_prefix,
@@ -301,7 +300,7 @@ def run_isling(exp, sample, sim_config, sim_config_path, config_script, containe
 	# this one can't be parallel because they have the same output files
 	# and snakemake will chuck a hissy 
 	for i in range(reps):
-		if check_already_run(lock, outfile, 'seeksv', exp, sample, i):
+		if check_already_run(lock, outfile, 'isling', exp, sample, i):
 			continue
 		args =  srun_args + ['--job-name', f'isling.{exp}.{sample}.{i}'] + time_args + sing_args + isling_args
 		for j in range(retries):

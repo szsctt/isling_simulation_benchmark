@@ -23,4 +23,15 @@ snakemake \
  --latency-wait 120 \
  --notemp \
  --until art
+ 
+ snakemake \
+ --configfile ${CONFIG} \
+ --jobs 100 \
+ --use-singularity \
+ --singularity-args "-B $(realpath ../)" \
+ --profile slurm \
+ --rerun-incomplete \
+ --latency-wait 120 \
+ --notemp \
+ --until write_summary
 

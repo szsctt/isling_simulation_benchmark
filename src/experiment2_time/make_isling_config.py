@@ -107,6 +107,9 @@ def main(args):
 	# mean fragment length
 	out_config[exp]['mean-frag-len'] = in_config[exp]['frag_len'][0]
 	
+	# cpus for alignment
+	out_config[exp]['align-cpus'] = 20
+	
 	with open(out, 'w') as outfile:
 		yaml.dump(out_config, outfile)
 

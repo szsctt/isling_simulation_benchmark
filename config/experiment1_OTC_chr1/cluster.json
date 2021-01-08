@@ -75,12 +75,6 @@
 		"mem" : "40GB",
 		"job-name" : "score_reads"
 	},
-	"seeksv":
-	{	
-		"time" : "2:00:00",
-		"mem" : "50GB",
-		"job-name" : "viInt-seeksv"
-	},
 	"host_virus_index_seeksv":
 	{	
 		"time" : "2:00:00",

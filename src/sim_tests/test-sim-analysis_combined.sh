@@ -32,10 +32,10 @@ mkdir -p ../../out/test
 #srun -c5 --time 2:00:00 --mem 50gb \
 snakemake \
  --snakefile combined_snakefile \
- --configfile ../../config/test/sim_and_detect.yml\
+ --configfile ../../config/test/sim_and_detect.yml \
  --cores 1 \
  --jobs 1 \
  --use-singularity \
  --singularity-args '-B $(realpath ../..)' \
- --rerun-incomplete
+ --rerun-incomplete --until run_discordant --forceall -np
 

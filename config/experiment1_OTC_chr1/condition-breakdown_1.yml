@@ -86,12 +86,8 @@ global:
    score_merged_ints: True
    score_ints_window: 
     - 5
-    - 20
-    - 120
    score_ints_type: 
-    - "coords_min"
     - "coords_mean"
-    - "overlap"
    
    # other tools 
    polyidus_params:

@@ -127,7 +127,7 @@ global:
 OTC-whole:
    p_whole:
        - 0
-       - 0.25
+       - 0.3
        - 0.5
        - 0.75
        - 1
@@ -135,80 +135,63 @@ OTC-whole:
 OTC-epi:
    epi_num:
        - 0 
-       - 100
+       - 10
        - 1000
        - 100000
-       - 10000000
+       
+OTC-epi-rearrange:
+   epi_num:
+       - 0 
+       - 1000
+   p_rearrange:
+       - 0.1          
+       - 1
+   p_delete:
+       - 0.1          
+       - 1          
  
 OTC-rearrange:
    p_rearrange:
        - 0
-       - 0.25
-       - 0.5
-       - 0.75
-       - 1
-
-OTC-deletion:
-   p_delete:
-       - 0
-       - 0.25
-       - 0.5
-       - 0.75
+       - 0.1
+       - 0.6
        - 1
 
 OTC-rearrange-frags:
-   p_rearrange:
-       - 0
-       - 0.5
-       - 1
    p_delete:
        - 0
-       - 0.5
+       - 0.1
+       - 0.6
        - 1
-   lambda_split:
-       - 1
-       - 2
-       - 3
 
 OTC-overlap:
    p_overlap:
        - 0
-       - 0.25
+       - 0.3
        - 0.5
        - 0.7
+   lambda_junction:
+       - 1
+       - 10
 
 OTC-gap:
    p_gap:
        - 0
-       - 0.25
+       - 0.3
        - 0.5
        - 0.7
-       
-OTC-juncs:
-   p_overlap:
-       - 0
-       - 0.25
-       - 0.5
-   p_gap:
-       - 0
-       - 0.25
-       - 0.5
    lambda_junction:
        - 1
-       - 4
        - 10
+       
        
 OTC-host_deletion:
    p_host_deletion:
        - 0
-       - 0.25
        - 0.5
-       - 0.75
        - 1
    lambda_host_deletion:
        - 10
-       - 100
-       - 1000
        - 10000
 
 OTC-fcov:
@@ -217,6 +200,9 @@ OTC-fcov:
        - 1.5
        - 3
        - 6
+       - 10
+       - 30
+       - 100
 
 OTC-frag_len:
    frag_len: 
@@ -227,28 +213,19 @@ OTC-frag_len:
    
 OTC-min_sep:
    min_sep:
+       - 20
        - 100
        - 300
        - 500
-       - 800
        - 1000
 
 OTC-min_len:
    min_len:
        - 20
-       - 50
        - 100
        - 300
        - 500
-       - 1000
-       
-AAV:
-   viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
-   analysis_viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+       - 1000    
       
 chromosomes:
    hosts: 

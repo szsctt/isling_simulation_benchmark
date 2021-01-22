@@ -85,9 +85,20 @@ int_scores <- int_scores %>%
 First, a table of results:
 ```{r}
 int_scores %>% 
-  select(experiment, replicate, window, coords_score_type, analysis_condition, TPR, PPV, tp:fn, results_file) %>% 
-  arrange(experiment, analysis_condition, replicate, window) 
+  select(experiment, condition, replicate, window, coords_score_type, analysis_condition, TPR, PPV, tp:fn, results_file) %>% 
+  arrange(experiment, condition, analysis_condition, replicate, window) 
 ```
+There were several simulation conditions, with different fragment lengths and read sizes
+```{r}
+int_scores %>% 
+  select(condition, frag_len, read_len) %>% 
+  distinct()
+```
+
+
+
+
+
 
 And also, a plot:
 ```{r}
@@ -123,11 +134,40 @@ p <- int_scores %>%
   )
 print(p)
 ```
-
 ```{r}
 int_scores %>% 
-  select(analysis_condition, merge, merge_dist, merge_n_min) %>% 
+  select(condition, frag_len, read_len) %>% 
   distinct()
+```
+
+And also several analysis conditions, with different minimum mapqs and 
+```{r}
+int_scores %>% 
+  select(analysis_condition, min_mapq, merge) %>% 
+  distinct()
+```
+
+
+Plot the simulation conditions separately
+
+```{r fig.width=10, fig.height=10}
+p <- int_scores %>% 
+  filter(coords_score_type == score_type_coords) %>% 
+  filter(window == score_window) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(experiment~condition) +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL,
+      
+    ),
+    legend.position = "bottom"
+  )
+print(p)
 ```
 
 If we stick with analysis condition 2 (unmerged reads) for isling, and only show the 'harder' conditions:
@@ -697,6 +737,79 @@ for (i in names(exps_continuous)) {
 
 ```
 
+## Based on OTC-harder condition
+
+
+```{r include=FALSE}
+exp_dir <- file.path(results_dir, "condition-breakdown_OTC-harder-3")
+int_scores <- importIntScoreExperiment(exp_dir) 
+
+
+# only use postprocessed data from our pipeline
+int_scores <- int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                    post ~ TRUE,
+                    TRUE ~ FALSE
+    ))  
+```
+
+```{r}
+int_scores %>% 
+  select(experiment, condition, replicate, post, analysis_tool, window, min_mapq, TPR, PPV, tp:fn) %>% 
+  arrange(experiment, analysis_tool, condition, replicate,  window, min_mapq) 
+```
+
+For min_mapq 10
+```{r}
+int_scores %>% 
+  filter(ifelse(analysis_tool == "pipeline", min_mapq == 10, TRUE)) %>% 
+  filter(experiment == "chr-fcov") %>% 
+  ggplot(aes(x = fcov, y = TPR, color = analysis_tool))+
+  geom_point() +
+  facet_wrap(~host_name)
+
+int_scores %>% 
+  filter(ifelse(analysis_tool == "pipeline", min_mapq == 10, TRUE)) %>% 
+  filter(experiment == "chr-fcov") %>% 
+  ggplot(aes(x = fcov, y = PPV, color = analysis_tool))+
+  geom_point() +
+  facet_wrap(~host_name)
+```
+
+```{r}
+int_scores %>% 
+  filter(ifelse(analysis_tool == "pipeline", min_mapq == 15, TRUE)) %>% 
+  filter(experiment == "chr-fcov") %>% 
+  ggplot(aes(x = fcov, y = TPR, color = analysis_tool))+
+  geom_point() +
+  facet_wrap(~host_name)
+
+int_scores %>% 
+  filter(ifelse(analysis_tool == "pipeline", min_mapq == 15, TRUE)) %>% 
+  filter(experiment == "chr-fcov") %>% 
+  ggplot(aes(x = fcov, y = PPV, color = analysis_tool))+
+  geom_point() +
+  facet_wrap(~host_name)
+```
+
+
+
+
+```{r}
+int_scores %>% 
+  filter(ifelse(analysis_tool == "pipeline", min_mapq == 20, TRUE)) %>% 
+  filter(experiment == "chr-fcov") %>% 
+  ggplot(aes(x = fcov, y = TPR, color = analysis_tool))+
+  geom_point() +
+  facet_wrap(~host_name)
+
+int_scores %>% 
+  filter(ifelse(analysis_tool == "pipeline", min_mapq == 20, TRUE)) %>% 
+  filter(experiment == "chr-fcov") %>% 
+  ggplot(aes(x = fcov, y = PPV, color = analysis_tool))+
+  geom_point() +
+  facet_wrap(~host_name)
+```
 
 ```{r}
 sessionInfo()

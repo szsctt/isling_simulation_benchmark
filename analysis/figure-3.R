@@ -95,7 +95,7 @@ cowplot::save_plot("plots/figure3_v1.pdf", figure_3)
 coverage <- times %>% 
   filter(experiment == "coverage") %>% 
   ggplot(aes(x = fcov, y = elapsed_time, color=tool)) +
-  geom_point(alpha = 0.5)  +
+  geom_boxplot()  +
   theme_classic() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
@@ -112,7 +112,7 @@ viral_load <- times %>%
   filter(experiment == "viral_load") %>% 
   mutate(int_num = int_num + 1) %>% 
   ggplot(aes(x = int_num, y = elapsed_time, color=tool)) +
-  geom_point(alpha = 0.5)  +
+  geom_boxplot()  +
   facet_wrap(vars(epi_num)) +
   theme_classic()  + 
   theme(

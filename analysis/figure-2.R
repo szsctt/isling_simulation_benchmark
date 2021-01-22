@@ -101,9 +101,10 @@ int_scores %>%
   distinct()
 
 # for consistency with other data frames, add virus_name and host_name columns
-int_scores <- int_scores %>% 
-  mutate(virus_name = analysis_virus) %>% 
-  mutate(host_name = analysis_host)
+#int_scores <- int_scores %>% 
+#  mutate(virus_name = analysis_virus) %>% 
+#  mutate(host_name = analysis_host)
+
 
 #### import found scores ####
 #import distances from each found integration to nearest simulated integration
@@ -178,6 +179,7 @@ found_scores <- found_scores %>%
   filter(ifelse(experiment == "OTC-fcov", batch == "condition-breakdown-2", TRUE)) %>% 
   ungroup()
 
+
 #### import sim scores ####
 sim_scores <- tibble(
   batch = folders,
@@ -241,211 +243,13 @@ sim_scores <- sim_scores %>%
   filter(ifelse(experiment == "OTC-fcov", batch == "condition-breakdown-2", TRUE)) %>% 
   ungroup()
 
-#### plotting functions ####
-
-getExpVars <- function(conds, exp_name) {
-  disregard <- c("condition", "replicate", "random_seed", "sample", "unique", "batch", "exp_dir", "out_directory")
-  cols <- conds %>% 
-    filter(experiment == exp_name) 
-  
-  if (nrow(conds) == 0) {
-    stop(glue("no rows found for experiment {exp_name}"))
-  }
-  
-  cols <- cols %>% 
-    summarise(across(everything(), n_distinct),) %>% 
-    select(where(~sum(.) > 1)) %>% 
-    select(-contains("filename")) %>% 
-    select(-one_of(disregard)) %>% 
-    colnames()
-  
-  cols <- cols[!str_detect(cols, "fasta")]
-  
-  return(cols)
-}
-
-getExpVars(conds, "OTC-juncs")
-getExpVars(conds, "OTC-epi")
-getExpVars(conds, "OTC-fcov")
-getExpVars(conds, "AAV")
-
-#function to combine variables manipulated in an experiment to give a label for each condition
-combineVarNames <- function(df, conds_df, exp_name) {
-  exp_vars <- getExpVars(conds_df, exp_name)
-  
-  if (length(exp_vars) == 1) {
-    return(df[[exp_vars[1]]])
-  }
-
-  names_df <- df %>% 
-    filter(experiment == exp_name) %>% 
-    select(all_of(exp_vars))
-  
-  if (nrow(names_df) == 0) {
-    stop(glue("no rows found for experiment {exp_name}"))
-  } 
-  
-  # include variable names in each row of names_df
-  for (var in colnames(names_df)) {
-    names_df <- names_df %>% 
-      mutate(!!var := paste0(var, ": ", !!sym(var))) 
-  }
-  
-  names_df <- names_df %>% 
-    rowwise() %>% 
-    mutate(label = paste0(across(everything()), collapse=", "))
-  
-  return(names_df$label)
-}
-
-combineVarNames(int_scores, conds, "OTC-juncs")
-combineVarNames(int_scores, conds, "OTC-epi")
-combineVarNames(sim_scores, conds, "OTC-epi")
-combineVarNames(found_scores, conds, "OTC-epi")
-combineVarNames(found_scores, conds, "AAV")
-combineVarNames(found_scores, conds, "OTC-fcov")
-combineVarNames(int_scores, conds, "OTC-fcov")
-
-# function to make plot of found scores
-distPlot <- function(df, conds_df, exp_name, combined_var_name){
-  filt_df <- df  %>% 
-    filter(experiment == exp_name) %>% 
-    mutate(dist = dist+offset) 
-  
-  if (nrow(filt_df) == 0) {
-    stop(glue("no rows found for experiment {exp_name}"))
-  }
-
-  filt_df <- filt_df %>% 
-    mutate(!!combined_var_name := combineVarNames(filt_df, conds_df, exp_name)) 
-  
-  p <- filt_df %>% 
-    mutate(!!combined_var_name := as.factor(!!sym(combined_var_name))) %>% 
-    ggplot(aes(x = dist, color = analysis_condition)) +
-    geom_freqpoly(bins = 100) +
-    scale_x_log10() +
-    facet_grid(rows = vars(!!sym(combined_var_name))) +
-    theme_classic() + 
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
-      strip.background = element_blank(),
-      strip.text.y = element_blank(),
-      legend.position = "none"
-    )  +
-    scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
-    labs(x="Distance", y="Count", color="tool", linetype=combined_var_name)
-  
-  return(p)
-}
-
-
-print(distPlot(found_scores, conds, "OTC-juncs", "junction_properties"))
-print(distPlot(sim_scores, conds, "OTC-juncs", "junction_properties"))
-print(distPlot(found_scores, conds, "AAV", "virus"))
-print(distPlot(sim_scores, conds, "AAV", "virus"))
-
-
-scorePlot <- function(int_score_df, conds_df, exp_name,combined_var_name) {
-  filt_df <- int_score_df  %>% 
-    filter(experiment == exp_name)
-  
-  if (nrow(filt_df) == 0) {
-    stop(glue("no rows found for experiment {exp_name}"))
-  }
-
-  filt_df <- filt_df %>% 
-    mutate(!!combined_var_name := combineVarNames(filt_df, conds_df, exp_name)) 
-  
-  p <- filt_df %>% 
-      mutate(!!combined_var_name := as.factor(!!sym(combined_var_name))) %>% 
-      ggplot(aes(x = PPV, y = TPR, shape = !!sym(combined_var_name), color = analysis_tool)) +
-      geom_point(alpha = 0.5) +
-      xlim(0, 1) +
-      ylim(0, 1) +
-      theme(legend.position = "none") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-}
-
-print(scorePlot(int_scores, conds, "OTC-juncs", "junction properties"))
-print(scorePlot(int_scores, conds, "AAV", "viruses"))
-
-chrPlot <- function(found_score_df, conds_df, exp_name, combined_var_name){
-  filt_df <- found_score_df  %>% 
-    filter(experiment == exp_name)
-  if (nrow(filt_df) == 0) {
-    stop(glue("no rows found for experiment {exp_name}"))
-  }
-  
-  filt_df <- filt_df %>% 
-    mutate(!!combined_var_name := combineVarNames(filt_df, conds_df, exp_name)) 
-  
-  p <- filt_df %>% 
-    mutate(correct_chr = (chr == host_name)) %>% 
-    mutate(!!combined_var_name := as.factor(!!sym(combined_var_name))) %>% 
-    ggplot(aes(x = !!sym(combined_var_name), fill = correct_chr)) +
-    geom_bar() +
-    ylab("Count") +
-    theme_classic() + 
-    theme(
-      axis.title.x = element_blank(),
-      strip.background = element_blank(),
-      strip.text.y = element_blank(),
-      legend.position = "none"
-    )  +
-    scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
-    scale_fill_grey()  +
-    guides(fill=guide_legend("correct chr")) +
-    facet_grid(cols = vars(analysis_condition)) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  
-} 
-
-print(chrPlot(found_scores, conds, "OTC-juncs", "junction properties"))
-
-figureRow <- function(found_df, sim_df, int_df, cond_df, exp_name, combined_var_name) {
-  
-  # make individual plots
-  found <- distPlot(found_df, cond_df, exp_name,  combined_var_name)
-  sim <- distPlot(found_df, cond_df, exp_name,  combined_var_name)
-  
-  # make legend for found and sim
-  
-  chr <- chrPlot(found_df, cond_df, exp_name,  combined_var_name)
-  scores <- scorePlot(int_df, cond_df, exp_name,  combined_var_name)
-  
-  p <- cowplot::plot_grid(sim, found, chr, scores, ncol=2)
-  
-  # add title
-  title <- ggdraw() +
-    draw_label(combined_var_name, fontface = "bold", x = 0, hjust = 0) +
-    theme(plot.margin = margin(0, 0, 0, 7))
-  
-  return(p)
-  #return(plot_grid(title, p, ncol = 1, rel_heights = 0.01, 1))
-  
-}
-
-row <- figureRow(found_scores, sim_scores, int_scores, conds, "OTC-juncs", "junction properties")
-print(row)
-cowplot::save_plot(glue("plots/2_OTC-juncs.pdf"), row)
-
-
-row <- figureRow(found_scores, sim_scores, int_scores, conds, "AAV", "viruses")
-print(row)
-cowplot::save_plot(glue("plots/2_viruses.pdf"), row)
-
-for (e in unique(int_scores$experiment)) {
-  row <- figureRow(found_scores, sim_scores, int_scores, conds, e, e)
-  cowplot::save_plot(glue("plots/2_{e}.pdf"), row)
-}
-
 #### filtering data for display ####
 
 # our initial plots (one per experiment) show that some experiments have 
 # too many conditions for an informative plot
 
 for (e in unique(int_scores$experiment)) {
-  vars <- getExpVars(conds, e)
+  vars <- getExpVars(int_scores, e)
   print(glue("experiment: {e}, variables: {vars}"))
 }
 
@@ -586,8 +390,129 @@ plot_sim_scores <- label_OTC_rearrange_frags(plot_sim_scores)
 plot_found_scores <- label_OTC_rearrange_frags(plot_found_scores)
 
 
-# re-plot to see how data looks now
-for (e in unique(plot_int_scores$experiment)) {
-  row <- figureRow(plot_found_scores, plot_sim_scores, plot_int_scores, conds, e, e)
-  cowplot::save_plot(glue("plots/2_{e}.pdf"), row)
+nrow(plot_sim_scores)
+plot_sim_scores %>% 
+  pull(experiment) %>% 
+  unique()
+
+plot_sim_scores %>% 
+  filter(experiment == "OTC-rearrange-epi_100") %>% 
+  select(experiment, condition, epi_num, p_rearrange, p_delete) %>% 
+  distinct()
+
+getExpVars(plot_sim_scores, "OTC-rearrange-epi_100")
+
+
+#### plotting functions ####
+
+
+
+#getExpVars(int_scores, "OTC-juncs")
+#getExpVars(sim_scores, "OTC-juncs")
+#getExpVars(found_scores, "OTC-juncs")
+
+
+#combineVarNames(int_scores, "OTC-juncs")
+#combineVarNames(int_scores, "OTC-epi")
+#combineVarNames(sim_scores, "OTC-epi")
+#combineVarNames(found_scores, "OTC-epi")
+
+#shortCombinedVarNames(int_scores, "OTC-juncs")
+
+
+combineVarNames(int_scores, "chromosomes")
+shortCombinedVarNames(int_scores, "chromosomes")
+
+conds %>% 
+  filter(experiment == "chromosomes") %>% 
+  distinct()
+
+
+int_scores %>% 
+  pull(host) %>% 
+  unique()
+
+int_scores %>% 
+  pull(host_name) %>% 
+  unique()
+
+
+
+#print(distPlot(found_scores,"OTC-juncs", "junction_properties"))
+#print(distPlot(sim_scores,"OTC-juncs", "junction_properties"))
+#print(distPlot(found_scores, "AAV", "virus"))
+#print(distPlot(sim_scores, "AAV", "virus"))
+
+
+
+
+#print(scorePlot(int_scores, "OTC-juncs", "junction properties"))
+#print(scorePlot(int_scores,"AAV", "viruses"))
+#print(scorePlot(int_scores,"chromosomes", "chromosome"))
+
+
+
+#print(chrPlot(found_scores, "OTC-juncs", "junction properties"))
+
+figureRow <- function(found_df, sim_df, int_df, exp_name, combined_var_name) {
+  
+  # make individual plots
+  found <- distPlot(found_df,  exp_name,  combined_var_name)
+  sim <- distPlot(found_df, exp_name,  combined_var_name)
+  
+  # make legend for found and sim
+  
+  chr <- chrPlot(found_df,  exp_name,  combined_var_name)
+  scores <- scorePlot(int_df,  exp_name,  combined_var_name)
+  
+  p <- cowplot::plot_grid(sim, found, chr, scores, nrow=2)
+  
+  return(p)
+  
+  # add title
+  title <- ggdraw() +
+    draw_label(combined_var_name, fontface = "bold", x = 0, hjust = 0) +
+    theme(plot.margin = margin(0, 0, 0, 7))
+  
+  return(p)
+  #return(plot_grid(title, p, ncol = 1, rel_heights = 0.01, 1))
+  
 }
+
+
+row <- figureRow(found_scores, sim_scores, int_scores, "AAV", "viruses")
+#print(row)
+cowplot::save_plot(glue("plots/2_viruses.pdf"), row, base_width = 7, base_height=7)
+
+
+# re-plot to see how data looks now
+allplots <- list()
+for (e in unique(plot_int_scores$experiment)) {
+  print(glue("plotting {e}"))
+  row <- figureRow(plot_found_scores, plot_sim_scores, plot_int_scores,  e, e)
+  cowplot::save_plot(glue("plots/2_{e}.pdf"), row, base_width = 7, base_height=7)
+  allplots[[e]] <- row
+}
+
+
+df_list <- list(
+  'sim' = sim_scores,
+  'found' = found_scores,
+  'scores' = int_scores
+)
+to_plot <- list("chromosomes" = "chromosome",
+                "OTC-fcov" = "fold coverage",
+                "OTC-whole" = "p(whole)",
+                "OTC-rearrange-epi_100"= 'p(rearrange)/p(delete)',
+                "OTC-juncs_4" = "p(overlap)/p(gap)"
+)
+makeFigure2(to_plot, df_list, "plots/figure2_v1.pdf", 12, 12)
+
+# we still have too many conditions in OTC-rearrange-epi_100 and OTC-juncs_4
+to_plot <- list("chromosomes" = "chromosome",
+                "OTC-fcov" = "fold coverage",
+                "OTC-whole" = "p(whole)",
+                "OTC-rearrange"= 'p(rearrange)'
+)
+p <- makeFigure2(to_plot, df_list, "plots/figure2_v2.pdf", 12, 12)
+

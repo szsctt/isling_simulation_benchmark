@@ -640,7 +640,11 @@ importNearestFoundToSim <- function(exp_path, keep_window, keep_score_type) {
 
 # get the variables that are different in an experiment
 getExpVars <- function(conds, exp_name) {
-  disregard <- c("condition", "replicate", "random_seed", "sample", "unique", "batch", "exp_dir", "out_directory")
+  select_cols <- c("host_name", "virus_name", "int_num", "epi_num", "min_sep", "min_len",
+              "p_whole", "p_rearrange", "p_delete", "lambda_split", "p_overlap", "p_gap",
+              "lambda_junction", "p_host_deletion", "lambda_host_deletion", "read_len", "fcov", 
+              "frag_len", "frag_std", "seq_sys")
+
   cols <- conds %>% 
     filter(experiment == exp_name) 
   
@@ -649,10 +653,10 @@ getExpVars <- function(conds, exp_name) {
   }
   
   cols <- cols %>% 
+    select(one_of(select_cols)) %>% 
     summarise(across(everything(), n_distinct),) %>% 
     select(where(~sum(.) > 1)) %>% 
-    select(-contains("filename")) %>% 
-    select(-one_of(disregard)) %>% 
+    select(one_of(select_cols)) %>% 
     colnames()
   
   cols <- cols[!str_detect(cols, "fasta")]
@@ -660,15 +664,14 @@ getExpVars <- function(conds, exp_name) {
   return(cols)
 }
 
-
-# combine varibles manipulated in an experiment into one variable
-combineVarNames <- function(df, conds_df, exp_name) {
-  exp_vars <- getExpVars(conds_df, exp_name)
+#function to combine variables manipulated in an experiment to give a label for each condition
+combineVarNames <- function(df, exp_name) {
+  exp_vars <- getExpVars(df, exp_name)
   
   if (length(exp_vars) == 1) {
     return(df[[exp_vars[1]]])
   }
-
+  
   names_df <- df %>% 
     filter(experiment == exp_name) %>% 
     select(all_of(exp_vars))
@@ -690,3 +693,21 @@ combineVarNames <- function(df, conds_df, exp_name) {
   return(names_df$label)
 }
 
+shortCombinedVarNames <- function(df, exp_name) {
+  exp_vars <- getExpVars(df, exp_name)
+  
+  if (length(exp_vars) == 1) {
+    return(df[[exp_vars[1]]])
+  }
+  
+  names_df <- df %>% 
+    filter(experiment == exp_name) %>% 
+    select(all_of(exp_vars))
+  
+  names_df <- names_df %>% 
+    rowwise() %>% 
+    mutate(short_label = paste0(across(everything()), collapse = "/"))
+  
+  
+  return(names_df$short_label)
+}

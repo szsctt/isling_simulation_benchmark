@@ -27,8 +27,8 @@ int_scores <- int_scores %>%
                    post ~ TRUE,
                    TRUE ~ FALSE
   )) %>% 
-  mutate(analysis_tool = str_replace(analysis_tool, 'analysis', 'isling')) %>% 
-  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling'))
+  mutate(analysis_tool = str_replace(analysis_tool, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) 
 
 #import distances from each found integration to nearest simulated integration
 found_scores <- importNearestSimToFound(exp_dir, score_window, coords_score_type_plot) 
@@ -54,14 +54,115 @@ sim_scores <- sim_scores%>%
   mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling'))
 
 
+# we had some different analysis and simulation conditions - figure out which ones to keep
+isling_conditions <- int_scores 
+
+
+
+int_scores %>% 
+  filter(coords_score_type == coords_score_type_plot) %>% 
+  filter(window == score_window) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(experiment~condition) +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL,
+    ),
+    legend.position = "bottom"
+  )
+
+
+
+found_scores %>% 
+  filter(score_type == coords_score_type_plot) %>% 
+  filter(score_dist == score_window) %>%  
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = analysis_condition)) +
+  geom_freqpoly(bins = 20) +
+  scale_x_log10() +
+  xlab("Distance") +
+  ylab("Count") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+  facet_wrap(experiment~condition)  +
+  theme(legend.position = "bottom")
+
+
+found_scores %>% 
+  filter(score_type == coords_score_type_plot) %>% 
+  filter(score_dist == score_window) %>% 
+  filter(str_detect(analysis_condition, "isling")) %>% 
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = analysis_condition)) +
+  geom_freqpoly(bins = 20) +
+  scale_x_log10() +
+  xlab("Distance") +
+  ylab("Count") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+  facet_wrap(experiment~condition)  +
+  theme(legend.position = "bottom")
+
+sim_scores %>% 
+  filter(score_type == coords_score_type_plot) %>% 
+  filter(score_dist == score_window) %>%  
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = analysis_condition)) +
+  geom_freqpoly(bins = 20) +
+  scale_x_log10() +
+  xlab("Distance") +
+  ylab("Count") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+  facet_wrap(experiment~condition)  +
+  theme(legend.position = "bottom")
+
+sim_scores %>% 
+  filter(score_type == coords_score_type_plot) %>% 
+  filter(score_dist == score_window) %>% 
+  filter(str_detect(analysis_condition, "isling")) %>% 
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = analysis_condition)) +
+  geom_freqpoly(bins = 20) +
+  scale_x_log10() +
+  xlab("Distance") +
+  ylab("Count") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+  facet_wrap(experiment~condition)  +
+  theme(legend.position = "bottom")
+
+
+found_scores %>% 
+  mutate(correct_chr = (chr == "chr1")) %>% 
+  ggplot(aes(x = analysis_condition, fill = correct_chr)) +
+  geom_bar() +
+  ylab("Count") +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 90)
+  )  +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+  scale_fill_grey()  +
+  guides(fill=guide_legend("correct chr"))  +
+  facet_wrap(experiment~condition) 
+
+
+
+
 # filter data for plotting
 isling_to_keep <- "isling2"
+condition_to_keep <- "cond5"
 
 plot_found_scores <- found_scores %>% 
   filter(score_type == coords_score_type_plot) %>% 
   filter(score_dist == score_window) %>% 
   filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE)) %>%  # keep isling2 only
-  mutate(tool = str_match(analysis_condition, "(.+)\\d+")[,2])
+  filter(condition == condition_to_keep) %>% 
+  mutate(tool = str_match(analysis_condition, "(.+)\\d+")[,2]) %>% 
+  mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
+  mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
+  mutate(tool = str_replace(tool, "vifi", "ViFi"))
 
 
 # double check filtering
@@ -73,8 +174,12 @@ plot_found_scores %>%
 plot_sim_scores <- sim_scores %>% 
   filter(score_type == coords_score_type_plot) %>% 
   filter(score_dist == score_window) %>% 
+  filter(condition == condition_to_keep) %>% 
   filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE)) %>%   # keep isling2 only
-  mutate(tool = str_match(analysis_condition, "(.+)\\d+")[,2])
+  mutate(tool = str_match(analysis_condition, "(.+)\\d+")[,2])  %>% 
+  mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
+  mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
+  mutate(tool = str_replace(tool , "vifi", "ViFi"))
 
 # double check filtering
 plot_sim_scores %>% 
@@ -85,14 +190,16 @@ plot_sim_scores %>%
 
 # scored integrations
 plot_int_scores <- int_scores %>% 
+  filter(condition == condition_to_keep) %>% 
   filter(coords_score_type == coords_score_type_plot) %>% 
   filter(window == score_window) %>% 
-  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE))
+  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE))  
 
-plot_int_scores %>% 
-  select(experiment, analysis_tool, window, coords_score_type, condition, replicate, tp, fp, fn, PPV, TPR)
-
-
+plot_int_scores <- plot_int_scores %>% 
+  select(experiment, analysis_tool, window, coords_score_type, condition, replicate, tp, fp, fn, PPV, TPR)  %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, "polyidus", "Polyidus")) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, "seeksv", "Seeksv")) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, "vifi", "ViFi")) 
 
 
 OTC_found <- plot_found_scores %>% 
@@ -176,6 +283,7 @@ AAV_sim <- plot_sim_scores %>%
   theme(
     strip.background = element_blank(),
     strip.text.y = element_blank(),
+    legend.position = "bottom"
   )  +
   scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks))
 print(AAV_sim)
@@ -210,6 +318,7 @@ foundplots <- list()
 for (e in unique(int_scores$experiment)) {
   foundplots[[e]]  <- plot_found_scores %>% 
     filter(experiment == e) %>% 
+    mutate(tool = forcats::fct_reorder(tool, desc(tool))) %>% 
     mutate(dist = dist+offset) %>% 
     ggplot(aes(x = dist, colour = tool)) +
     geom_freqpoly(bins = 50) +
@@ -226,15 +335,14 @@ for (e in unique(int_scores$experiment)) {
     ) +
     scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks))
 }
-print(foundplots[['OTC-easier']])
-print(foundplots[['OTC-harder']])
-print(foundplots[['AAV-easier']])
-print(foundplots[['AAV-harder']])
+print(foundplots[['OTC-harder']] + theme(legend.position = "bottom"))
+print(foundplots[['AAV-harder']] + theme(legend.position = "bottom"))
 
 simplots <- list()
 for (e in unique(int_scores$experiment)) {
   simplots[[e]] <- plot_sim_scores  %>% 
     filter(experiment == e) %>% 
+    mutate(tool = forcats::fct_reorder(tool, desc(tool))) %>% 
     mutate(dist = dist+offset) %>% 
     ggplot(aes(x = dist, colour = tool)) +
     geom_freqpoly(bins = 100) +
@@ -250,16 +358,17 @@ for (e in unique(int_scores$experiment)) {
     )  +
     scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks))
 }
-print(simplots[['OTC-easier']])
-print(simplots[['OTC-harder']])
-print(simplots[['AAV-easier']])
-print(simplots[['AAV-harder']])
+
+print(simplots[['OTC-harder']] + theme(legend.position = "bottom"))
+
+print(simplots[['AAV-harder']] + theme(legend.position = "bottom"))
 
 chrplots <- list()
 for (e in unique(int_scores$experiment)) {
   chrplots[[e]] <- plot_found_scores %>% 
     filter(experiment == e) %>% 
     mutate(correct_chr = (chr == "chr1")) %>% 
+    mutate(tool = forcats::fct_reorder(tool, desc(tool))) %>% 
     ggplot(aes(x = tool, fill = correct_chr)) +
     geom_bar() +
     ylab("Count") +
@@ -275,9 +384,8 @@ for (e in unique(int_scores$experiment)) {
     guides(fill=guide_legend("correct chr")) 
 } 
 chrplots[['OTC-easier']] <- chrplots[['OTC-easier']] + theme(legend.position = c(0.8, 0.8))
-print(chrplots[['OTC-easier']])
+
 print(chrplots[['OTC-harder']])
-print(chrplots[['AAV-easier']])
 print(chrplots[['AAV-harder']])
 
 
@@ -285,6 +393,7 @@ scoreplots <- list()
 for (e in unique(int_scores$experiment)) {
   scoreplots[[e]] <- plot_int_scores %>% 
     filter(experiment == e) %>% 
+    mutate(analysis_tool = forcats::fct_reorder(analysis_tool, desc(analysis_tool))) %>% 
     ggplot(aes(x = PPV, y = TPR, colour = analysis_tool)) +
     geom_point(alpha = 0.7) +
     xlim(0, 1) +
@@ -295,23 +404,17 @@ for (e in unique(int_scores$experiment)) {
     theme(legend.position = "none") +
     guides(color=guide_legend("tool")) 
 } 
-scoreplots[['OTC-easier']] <- scoreplots[['OTC-easier']] + theme(legend.position = c(0.2, 0.8))
-print(scoreplots[['OTC-easier']])
-print(scoreplots[['OTC-harder']])
-print(scoreplots[['AAV-easier']])
-print(scoreplots[['AAV-harder']])
+
+print(scoreplots[['OTC-harder']] + theme(legend.position = "bottom"))
+print(scoreplots[['AAV-harder']] + theme(legend.position = "bottom"))
 
 
 
-figure_1 <- cowplot::plot_grid(simplots[['OTC-easier']], foundplots[['OTC-easier']], 
-                               chrplots[['OTC-easier']], scoreplots[['OTC-easier']],
-                               simplots[['OTC-harder']], foundplots[['OTC-harder']], 
+figure_1 <- cowplot::plot_grid(simplots[['OTC-harder']], foundplots[['OTC-harder']], 
                                chrplots[['OTC-harder']], scoreplots[['OTC-harder']],
-                               simplots[['AAV-easier']], foundplots[['AAV-easier']], 
-                               chrplots[['AAV-easier']], scoreplots[['AAV-easier']],
                                simplots[['AAV-harder']], foundplots[['AAV-harder']], 
                                chrplots[['AAV-harder']], scoreplots[['AAV-harder']],
-                               labels = "AUTO")
+                               labels = "AUTO",  ncol=4)
 print(figure_1)
 cowplot::save_plot("plots/figure_1_v2.pdf", figure_1, base_height = 8)
 
@@ -337,9 +440,9 @@ for (e in unique(int_scores$experiment)) {
     guides(fill=guide_legend("correct chr")) 
 } 
 simchrplots[['OTC-easier']] <- simchrplots[['OTC-easier']] + theme(legend.position = c(0.8, 0.8))
-print(simchrplots[['OTC-easier']])
+
 print(simchrplots[['OTC-harder']])
-print(simchrplots[['AAV-easier']])
+
 print(simchrplots[['AAV-harder']])
 
 cowplotlist <- list()
@@ -350,7 +453,7 @@ for (e in unique(int_scores$experiment)) {
   cowplotlist[[paste0(e, "_", "foundchr")]] <- (chrplots[[e]])   
 }
 
-figure_1 <- cowplot::plot_grid(plotlist = cowplotlist, labels = "AUTO")
+figure_1 <- cowplot::plot_grid(plotlist = cowplotlist, labels = "AUTO", ncol = 4)
 print(figure_1)
 cowplot::save_plot("plots/figure_1_v3.pdf", figure_1, base_height = 8)
 
@@ -390,7 +493,7 @@ for (e in plotexps) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 legend <- get_legend(
-  cowplotlist[[paste0(e, "_", "score")]] + theme(legend.position = "bottom")
+  cowplotlist[[paste0(e, "_", "sim")]] + theme(legend.position = "bottom")
 )
 
 figure_1 <- cowplot::plot_grid(plotlist = cowplotlist, labels = "AUTO", ncol=4)

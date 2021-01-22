@@ -37,10 +37,14 @@ global:
    # read simulation
    read_len: 
        - 150
+       - 250
    fcov: 
        - 5 
    frag_len: 
-       - 500 
+       - 300  
+       - 500
+       - 600
+       - 1000
    frag_std: 
        - 30
    seq_sys: 
@@ -65,8 +69,6 @@ global:
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
    merge-dist:
-       - 100 
-       - 200 
        - 1000
    merge-n-min:
        - 1
@@ -76,6 +78,8 @@ global:
        - 20
    min-mapq:
        - 10
+       - 15
+       - 20
        
     # scoring
    score_reads: False
@@ -83,12 +87,9 @@ global:
    score_merged_ints: True
    score_ints_window: 
     - 5
-    - 20
-    - 120
+
    score_ints_type: 
-    - "coords_min"
     - "coords_mean"
-    - "overlap"
    
    # other tools 
    polyidus_params:
@@ -141,18 +142,6 @@ global:
      merge_dist:
       - 100
 
-AAV-easier:
-   viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
-   analysis_viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
-
-OTC-easier:
-   viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
-   analysis_viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
-
 AAV-harder:
    viruses:
       AAV2 :  "../../data/references/NC_001401.2.fa"
@@ -183,8 +172,6 @@ AAV-harder:
    # read simulation
    fcov: 
        - 5
-   frag_len: 
-       - 250
    analysis_viruses:
       AAV2 :  "../../data/references/NC_001401.2.fa"
    
@@ -218,7 +205,5 @@ OTC-harder:
    # read simulation
    fcov: 
        - 1.5
-   frag_len: 
-       - 250
    analysis_viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"

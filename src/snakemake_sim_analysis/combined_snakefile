@@ -235,6 +235,7 @@ analysis_df['score_ints_type'] = score_ints_type
 
 column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len', 'align_cpus']
 
+
 rows = []
 
 # build rows of toDo
@@ -282,6 +283,7 @@ for i, row in analysis_df.iterrows():
 		
 		# number of cpus for alignments
 		todo_row['align_cpus'] = verse_threads
+
 		
 		rows.append(todo_row)
 		
@@ -322,7 +324,7 @@ localrules: write_summary, write_analysis_summary, write_analysis_summary_all_to
 # rule polyidus has a wildcard contstraint so it can't be used for our pipeline
 # so make it higher in the priority
 
-ruleorder: polyidus > vifi > verse > combine_ints >  trim > seqPrep_unmerged 
+ruleorder: vifi > polyidus > verse > seeksv > combine_ints > merged_bed > trim > seqPrep_unmerged
 
 #####################################################
 ################### target files ####################

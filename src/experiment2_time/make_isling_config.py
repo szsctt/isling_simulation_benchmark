@@ -31,6 +31,7 @@
 #    - dedup
 #  merge-dist: 1000
 #  min-n-merge: 1
+#  split: 5
 
 # assume that there was only one host, virus and mean fragment length specified in the simulation config file
 
@@ -109,6 +110,13 @@ def main(args):
 	
 	# cpus for alignment
 	out_config[exp]['align-cpus'] = 20
+	
+	# number of parts for splitting - make this approximatley the fold coverage
+	# but no more than 20 and no less than 1
+	out_config[exp]['split'] = int(in_config[exp]['fcov']
+	out_config[exp]['split'] = min(out_config[exp]['split'], 20)
+	out_config[exp]['split'] = max(out_config[exp]['split'], 1)
+	
 	
 	with open(out, 'w') as outfile:
 		yaml.dump(out_config, outfile)

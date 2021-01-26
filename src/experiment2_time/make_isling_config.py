@@ -39,6 +39,7 @@ import sys
 import yaml
 import pdb
 import os
+import pandas as pd
 
 def main(args):
 
@@ -63,6 +64,11 @@ def main(args):
 			for key in default:
 				if key not in in_config[dataset]:
 					in_config[dataset][key] = default[key]
+					
+	# import simulation dataframe from results dir
+	df_dir = os.path.join(in_config['coverage']['out_directory'], exp, "simulation_summary.tsv")
+	in_df = pd.read_csv(df_dir, delimiter='\t')
+	row_idx = in_df.index[in_df['unique'] == f"{exp}__{name}"][0]
 	
 	# construct output yaml for isling
 	out_config = {'snakedir': '.', exp: {}}
@@ -94,32 +100,34 @@ def main(args):
 	out_config[exp]['samples'] = [name]
 	
 	# host
-	host = list(in_config[exp]['hosts'].keys())[0]
+	host = str(in_df.loc[row_idx, 'host_name'])
 	out_config[exp]['host_name'] = host
 	out_config[exp]['host_prefix'] = os.path.join(in_config[exp]['out_directory'], "references", host, host)
 	out_config[exp]['host_prefix'] = os.path.normpath(out_config[exp]['host_prefix'])
 	
 	# virus
-	virus = list(in_config[exp]['viruses'].keys())[0]
+	virus = str(in_df.loc[row_idx, 'virus_name'])
 	out_config[exp]['virus_name'] = virus
 	out_config[exp]['virus_prefix'] = os.path.join(in_config[exp]['out_directory'], "references", virus, virus)
 	out_config[exp]['virus_prefix'] = os.path.normpath(out_config[exp]['virus_prefix'])
 	
 	# mean fragment length
-	out_config[exp]['mean-frag-len'] = in_config[exp]['frag_len'][0]
+	out_config[exp]['mean-frag-len'] = float(in_df.loc[row_idx,'frag_len'])
 	
 	# cpus for alignment
 	out_config[exp]['align-cpus'] = 20
 	
 	# number of parts for splitting - make this approximatley the fold coverage
 	# but no more than 20 and no less than 1
-	out_config[exp]['split'] = int(in_config[exp]['fcov']
+	out_config[exp]['split'] = int(in_df.loc[row_idx,'fcov'])
 	out_config[exp]['split'] = min(out_config[exp]['split'], 20)
 	out_config[exp]['split'] = max(out_config[exp]['split'], 1)
 	
 	
 	with open(out, 'w') as outfile:
 		yaml.dump(out_config, outfile)
+		
+	print(f"saved output config to {outfile}")
 
 
 if __name__ == "__main__":

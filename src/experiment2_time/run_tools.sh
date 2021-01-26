@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-# ./run_isling.sh <sim config yml> <isling docker string> <seeksv docker string>
+# ./run_tools.sh <sim config yml> <isling docker string> <seeksv docker string> <polyidus docker string> 
+#   <vifi docker string> <vifi data repo>
 
 CONFIG=$1
 ISDOCK=$2

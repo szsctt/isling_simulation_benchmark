@@ -118,8 +118,8 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 			procs.append(pool.apply_async(run_polyidus_partial, (exp, samp)))
 			procs.append(pool.apply_async(run_vifi_partial, (exp, samp)))					
 			
-			#run_vifi_partial(exp, samp)
-		# get all results
+			#run_isling_partial(exp, samp)
+		#get all results
 		[p.get() for p in procs]
 		
 

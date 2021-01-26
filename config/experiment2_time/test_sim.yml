@@ -1,5 +1,5 @@
 global:
-   out_directory: "../out/experiment2_time/time"
+   out_directory: "../out/experiment2_time/"
    
    # integration simulation
    replicates: 2

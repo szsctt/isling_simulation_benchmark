@@ -233,8 +233,7 @@ analysis_df['score_ints_type'] = score_ints_type
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
 
-column_names = ['dataset', 'config_dataset', 'experiment', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len', 'align_cpus']
-
+column_names = ['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'split_lines']
 
 rows = []
 
@@ -284,6 +283,9 @@ for i, row in analysis_df.iterrows():
 		# number of cpus for alignments
 		todo_row['align_cpus'] = verse_threads
 
+		todo_row['cat'] = 'cat'
+		todo_row['split'] = 1
+		todo_row['split_lines'] = ''
 		
 		rows.append(todo_row)
 		
@@ -312,7 +314,10 @@ wildcard_constraints:
 	merged = "|\.merged",
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
 	dist = "\d+",
-	score_type = "|".join(score_types)
+	score_type = "|".join(score_types),
+	part = "\d+"
+
+dset_non_isling = ".+_((vifi)|(seeksv)|(polyidus))\d+"
 
 localrules: write_summary, write_analysis_summary, write_analysis_summary_all_tools
 
@@ -324,7 +329,7 @@ localrules: write_summary, write_analysis_summary, write_analysis_summary_all_to
 # rule polyidus has a wildcard contstraint so it can't be used for our pipeline
 # so make it higher in the priority
 
-ruleorder: vifi > polyidus > verse > seeksv > combine_ints > merged_bed > trim > seqPrep_unmerged
+ruleorder: vifi > polyidus > verse > seeksv > combine_ints > merged_bed 
 
 #####################################################
 ################### target files ####################
@@ -405,6 +410,7 @@ for i, row in analysis_df.iterrows():
 		if row['score_reads'] == 1:
 			scored_summaries.add(f"{row['outdir']}/{row['experiment']}/{row['experiment']}.scored_reads_summary.tsv")
 
+
 rule all:
 	input: 
 		set(sim_targets),
@@ -441,20 +447,28 @@ include: "snakemake_rules/polyidus.smk"
 # overwrite input function to get simulated reads (which are in a different location to other pipeline)
 def get_reads(wildcards, analysis_df, rules, read_num):
 	assert read_num in {1, 2}
-	
+	trim = bool(analysis_df_value(wildcards, analysis_df, 'trim'))
+
 	if read_num == 1:
-		return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R1_suffix')}"
+		if trim is True:
+			return f"{wildcards.outpath}/{dset}/trimmed_reads/{wildcards.samp}.1.fastq.gz"
+		else:
+			return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R1_suffix')}"
+		
 	if read_num == 2:
-		return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R2_suffix')}"	
+		if trim is True:
+			return f"{wildcards.outpath}/{dset}/trimmed_reads/{wildcards.samp}.2.fastq.gz"
+		else:
+			return f"{wildcards.outpath}/{analysis_df_value(wildcards, analysis_df, 'experiment')}/sim_reads/{wildcards.samp}{analysis_df_value(wildcards, analysis_df, 'R2_suffix')}"	
 		
 def analysis_df_value(wildcards, analysis_df, column_name):
 	"""Get resources required for a dataset (but not tool-specific)"""
-	pdb.set_trace()
+
 	row = analysis_df[(analysis_df['unique'] == wildcards.dset)].index[0]
 	return analysis_df.loc[row, column_name]
 
 def analysis_df_tool_value(wildcards, analysis_df, tool, column_name):
-	"""Get resources required for a dataset (but not tool-specific"""
+	"""Get resources required for a dataset"""
 	row = analysis_df[(analysis_df['unique'] == wildcards.dset) & (analysis_df['tool'] == tool)].index[0]
 	return analysis_df.loc[row, column_name]
 
@@ -469,7 +483,7 @@ def analysis_df_tool_value(wildcards, analysis_df, tool, column_name):
 def get_adapters(wildcards, num):
 	# get adapters depending on sequencing system used for this 'sample'
 	assert num in (1, 2)
-	
+
 	# get sequencing system for this experiment/sample
 	experiment = "_".join(wildcards.dset.split("_")[:-1])
 	unique = f"{experiment}__{wildcards.samp}"
@@ -480,6 +494,16 @@ def get_adapters(wildcards, num):
 		return adapter_seqs[seq_sys]['read1-adapt']
 	else:
 		return adapter_seqs[seq_sys]['read2-adapt']		
+
+def get_input_reads(wildcards, read_num):
+	assert read_num in (1, 2)
+	readdir = analysis_df_value(wildcards, analysis_df, 'read_folder')
+	if read_num == 1:
+		suffix = analysis_df_value(wildcards, analysis_df, 'R1_suffix')
+	else:
+		suffix = analysis_df_value(wildcards, analysis_df, 'R2_suffix')		
+	return os.path.join(readdir, f"{wildcards.samp}{suffix}")
+		
 
 rule trim:
 	input:
@@ -492,10 +516,13 @@ rule trim:
 		mem_mb= lambda wildcards, attempt: int(attempt * 5000),
 		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
+	wildcard_constraints:
+		dset = dset_non_isling
 	conda:	
 		"../envs/seqprep.yml"
 	container:
 		"docker://szsctt/seqprep:1"
+
 	params:
 		A = lambda wildcards: get_adapters(wildcards, 1),
 		B = lambda wildcards: get_adapters(wildcards, 2)
@@ -504,6 +531,15 @@ rule trim:
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2}
 		"""
 
+rule touch_merged_reads_other_tools:
+	output:
+		"{outpath}/{dset}/merged_reads/{samp}.merged_reads.txt"
+	wildcard_constraints:
+		dset = dset_non_isling
+	shell:
+		"""
+		touch {output}
+		"""	
 
 #####################################################
 ####################### vifi ########################
@@ -536,23 +572,30 @@ rule write_analysis_summary_all_tools:
 		toDo.to_csv(output.pipeline_conditions, sep='\t', index=False)
 		analysis_df.to_csv(output.analysis_conditions, sep='\t', index=False)
 
+
+
 # need to redefine this function to refer to 'unique' column
 def analysis_df_value(wildcards, analysis_df, column_name):
 	return analysis_df.loc[(analysis_df['unique'] == wildcards.dset).idxmax(), column_name]	
 
 def get_merged_reads(wildcards):
+	n_parts = toDo.loc[(toDo['unique'] == f"{wildcards.dset}+++{wildcards.samp}").idxmax(), 'split']	
+	
 	# for our pipeline, return result depending on if we merged R1 and R2 or not
-	if analysis_df_value(wildcards,  analysis_df, 'tool') == 'pipeline':
-		return get_for_align(wildcards, "merged")
-	# other pipelines - no merged reads
-	else:
-		return rules.touch_merged.output.merged
+	files = []
+	for n in range(n_parts):
+		files.append(get_for_align(wildcards, "merged").replace('{part}', str(n)))
+	
+	return files
+
 		
 rule merged_list:
 	input:
 		merged = lambda wildcards: get_merged_reads(wildcards)
 	output:
 		merged_reads = "{outpath}/{dset}/merged_reads/{samp}.merged_reads.txt"
+	wildcard_constraints:
+		dset = ".+_analysis\d+"	
 	run:
 		if os.path.basename(os.path.dirname(input.merged)) == "combined_reads":
 			shell("touch {output.merged_reads}")

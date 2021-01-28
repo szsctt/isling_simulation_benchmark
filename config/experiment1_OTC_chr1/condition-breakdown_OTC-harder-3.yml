@@ -78,9 +78,9 @@ global:
    clip-cutoff:
        - 20
    min-mapq:
-       - 10
-       - 15
        - 20
+       - 25
+       - 30
        
     # scoring
    score_reads: False
@@ -92,11 +92,11 @@ global:
     - "coords_mean"
    
    # other tools 
-#   polyidus_params:
-#     aligner:
-#      - "bowtie2"
-#     trim:
-#       - True
+   polyidus_params:
+     aligner:
+      - "bowtie2"
+     trim:
+       - True
 
    vifi_params:
      host_info:
@@ -124,12 +124,12 @@ global:
 
 # things that are different for each dataset
 
-OTC-frag_len:
-   frag_len: 
-       - 250
-       - 300
-       - 500 
-       - 1000  
+#OTC-frag_len:
+#   frag_len: 
+#       - 250
+#       - 300
+#       - 500 
+#       - 1000  
 
 chr-fcov:
    hosts: 
@@ -146,16 +146,16 @@ chr-fcov:
        - 30
        - 100   
        
-episomes:
-   p_rearrange:
-       - 0.1
-       - 0.7
-   p_delete:
-       - 0.7  
-       - 0.1
-   lambda_split:
-       - 2
-   epi_num:
-       - 0
-       - 1000      
-       - 1000000
+#episomes:
+#   p_rearrange:
+#       - 0.1
+#       - 0.7
+#   p_delete:
+#       - 0.7  
+#       - 0.1
+#   lambda_split:
+#       - 2
+#   epi_num:
+#       - 0
+#       - 1000      
+#       - 1000000

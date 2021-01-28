@@ -409,7 +409,8 @@ for i, row in analysis_df.iterrows():
 	if 'score_reads' in row:
 		if row['score_reads'] == 1:
 			scored_summaries.add(f"{row['outdir']}/{row['experiment']}/{row['experiment']}.scored_reads_summary.tsv")
-
+	if row['tool'] == 'pipeline':
+		scored_summaries.add(f"{row['outdir']}/{row['experiment']}/{row['experiment']}.jaccard_summary.tsv")
 
 rule all:
 	input: 
@@ -597,7 +598,7 @@ rule merged_list:
 	wildcard_constraints:
 		dset = ".+_analysis\d+"	
 	run:
-		if os.path.basename(os.path.dirname(input.merged)) == "combined_reads":
+		if os.path.basename(os.path.dirname(input.merged[0])) == "combined_reads":
 			shell("touch {output.merged_reads}")
 		else:
 			shell("zcat {input.merged} | awk '{{if (NR%4==1) print substr($0, 2)}}' > {output.merged_reads}")
@@ -755,29 +756,11 @@ rule score_integrations:
 		--summary {output.summary} \
 		{params}
 		"""
-
-
-
-rule combine_int_scores:
-	input:
-		lambda wildcards: scores_to_combine(wildcards, "ints")
-	output:
-		"{outpath}/{exp}/{exp}.scored_ints_summary.tsv"
-	container:
-		"docker://ubuntu:18.04"	
-	resources:
-		mem_mb= lambda wildcards, attempt, input: attempt * len(input) * 10,
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
-		nodes = 1
-	shell:
-		"""
-		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
-		"""
 		
 # target files for per-read or per-integration comparison of analysis with simulation
 def scores_to_combine(wildcards, score_type):
 
-	assert score_type in ("ints", "reads")
+	assert score_type in ("ints", "reads", "jaccard")
 
 	scored_files = []
 	for i, row in analysis_df.iterrows():
@@ -793,6 +776,7 @@ def scores_to_combine(wildcards, score_type):
 		# only scoring reads for our pipeline
 		if score_type == 'reads' and not re.search("analysis", row['analysis_condition']):
 			continue
+
 		
 		# get information for this row
 		exp = row['experiment']
@@ -838,11 +822,151 @@ def scores_to_combine(wildcards, score_type):
 				for samp, dist, score_type
 				in itertools.product(samples, dists, types)
 			]
-		else:
+		elif score_type == 'reads':
 			scored_files += [
 			f"{outpath}/{exp}/scored_reads/{dset}.{samp}.{host}.{virus}{post}_summary.tsv"
 				for samp in samples
 			]	
+		else:
+			scored_files += [
+			f"{outpath}/{exp}/jaccard/{dset}.{samp}.{host}.{virus}{post}.txt"
+				for samp in samples
+			]
 
 	
 	return scored_files
+
+rule combine_int_scores:
+	input:
+		lambda wildcards: scores_to_combine(wildcards, "ints")
+	output:
+		"{outpath}/{exp}/{exp}.scored_ints_summary.tsv"
+	container:
+		"docker://ubuntu:18.04"	
+	resources:
+		mem_mb= lambda wildcards, attempt, input: attempt * len(input) * 10,
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	shell:
+		"""
+		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
+		"""	
+
+
+
+# jaccard
+rule make_isling_bed:
+	input:
+		merged = rules.merged_bed.output.merged
+	output:
+		bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
+	container:
+		"docker://ubuntu:18.04"	
+	resources:
+		mem_mb= lambda wildcards, attempt, input: 100,
+		time = lambda wildcards, attempt: ('10:00', '30:00', '2:00:00', '24:00:00')[attempt - 1],
+		nodes = 1
+	shell:
+		"""
+		awk '(NR != 1) {{print $1"\t"$2"\t"$3}}' {input.merged} | sort -k1,1 -k2,2n > {output.bed}
+		"""
+
+rule make_vifi_bed:
+	input:
+		range = rules.vifi.output.range
+	output:
+		bed = "{outpath}/{dset}/vifi/{samp}.{host}.{virus}/output.clusters.txt.range.bed"
+	container:
+		"docker://ubuntu:18.04"	
+	resources:
+		mem_mb= lambda wildcards, attempt, input: 100,
+		time = lambda wildcards, attempt: ('10:00', '30:00', '2:00:00', '24:00:00')[attempt - 1],
+		nodes = 1
+	shell:
+		"""
+		awk -F, '(NR != 1) {{print $1"\t"$2"\t"$3}}' {input.range} | sort -k1,1 -k2,2n > {output.bed}
+		"""		
+
+rule make_polyidus_bed:
+	input:
+		in_bed = rules.polyidus.output.bed	
+	output:
+		out_bed = "{outpath}/{dset}/polyidus/{host}.{virus}.{samp}/results/exactHpvIntegrations.simple.bed"
+	container:
+		"docker://ubuntu:18.04"	
+	resources:
+		mem_mb= lambda wildcards, attempt, input: 100,
+		time = lambda wildcards, attempt: ('10:00', '30:00', '2:00:00', '24:00:00')[attempt - 1],
+		nodes = 1
+	shell:
+		"""
+		awk '(NR != 1) {{print $1"\t"$2"\t"$3}}' {input.in_bed} | sort -k1,1 -k2,2n > {output.out_bed}
+		"""	
+
+rule make_seeksv_bed:
+	input:
+		ints = rules.seeksv.output.ints,
+		fai = rules.vifi_faidx.output.fai
+	output:
+		tmp = temp("{outpath}/{dset}/seeksv/ints/{samp}.{host}.{virus}.integrations.bed.tmp"),
+		bed = "{outpath}/{dset}/seeksv/ints/{samp}.{host}.{virus}.integrations.bed",
+		chromlist = "{outpath}/{dset}/seeksv/ints/{samp}.{host}.{virus}.chroms.tmp"
+	conda:
+		"../envs/simvi.yml"
+	container:
+		"docker://szsctt/simvi:2"
+	resources:
+		mem_mb= lambda wildcards, attempt, input: 100,
+		time = lambda wildcards, attempt: ('10:00', '30:00', '2:00:00', '24:00:00')[attempt - 1],
+		nodes = 1	
+	shell:
+		"""
+		awk 'BEGIN {{ ORS = " " }} {{a[$1]}} END {{for (i in a) print i}}' \
+			{input.fai} > {output.chromlist}
+		python3 scripts/write_seeksv_bed.py --seeksv-output {input.ints} --chromlist {output.chromlist} --output {output.tmp}
+		sort -k1,1 -k2,2n {output.tmp} > {output.bed}
+		"""	
+
+def get_bed_result(wildcards):
+	if analysis_df_value(wildcards, analysis_df, 'tool') == 'pipeline':
+		return rules.make_isling_bed.output.bed
+	if analysis_df_value(wildcards, analysis_df, 'tool') == 'vifi':
+		return rules.make_vifi_bed.output.bed
+	if analysis_df_value(wildcards, analysis_df, 'tool') == 'polyidus':
+		return rules.make_polyidus_bed.output.out_bed		
+	if analysis_df_value(wildcards, analysis_df, 'tool') == 'seeksv':
+		return rules.make_seeksv_bed.output.bed	
+	
+rule jaccard:
+	input:
+		results_bed = lambda wildcards: get_bed_result(wildcards),
+		sim_bed = "{outpath}/{exp}/sim_ints/{samp}.int-info.bed"
+	output:
+		jaccard = "{outpath}/{exp}/jaccard/{dset}.{samp}.{host}.{virus}{post}.txt"
+	container:
+		"docker://szsctt/bedtools:1"	
+	resources:
+		mem_mb= lambda wildcards, attempt, input: 1000,
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1		
+	shell:
+		"""
+		echo "{input.results_bed}	{input.sim_bed}	$(bedtools jaccard -a {input.sim_bed} -b {input.results_bed} | tail -n1)" > {output.jaccard}
+		"""
+
+rule combine_jaccard:
+	input:
+		lambda wildcards: scores_to_combine(wildcards, "jaccard")
+	output:
+		"{outpath}/{exp}/{exp}.jaccard_summary.tsv"
+	container:
+		"docker://ubuntu:18.04"	
+	resources:
+		mem_mb= lambda wildcards, attempt, input: attempt * len(input) * 10,
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
+	shell:
+		"""
+		echo "results_bed\tsim_bed\t"
+		cat {input} > {output}
+		"""	

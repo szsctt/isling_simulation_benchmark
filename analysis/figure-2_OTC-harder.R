@@ -193,17 +193,43 @@ print(p_legend)
 cowplot::save_plot("plots/figure2_v5_otc-harder.pdf", p_legend, base_height = 4.2, base_width = 5.5)
 
 
-#### try with new data ####
+#### try with new data - condition-breakdown 3 ####
 
 results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment1_OTC_chr1/condition-breakdown_OTC-harder-3"
 folders <- c("chr-fcov")
+
+df_list <- list()
 results <- importAllIntScoreExperiments(results_dir, folders, score_window_plot, coords_score_type)
+
+# import all data so that we can better look at the difference between analysis conditions
+df_list[['scores']] <- results$int_scores
+incomplete <- results$incomplete
+
+df_list[['scores']] <- df_list[['scores']] %>% 
+  filter(coords_score_type == coords_score_type_plot) %>% 
+  filter(window == score_window_plot)
+
+df_list[['found']] <- importAllFoundScores(results_dir, folders, incomplete, 
+                                           score_window_plot, coords_score_type_plot)
+
+df_list[['sim']] <- importAllSimScores(results_dir, folders, incomplete, 
+                                       score_window_plot, coords_score_type_plot)
+
 
 unique(results$int_scores$experiment)
 
 results$int_scores <- results$int_scores %>% 
   filter(coords_score_type == coords_score_type_plot) %>% 
   filter(window == score_window_plot)
+
+plot_exps <- list(
+  "chr-fcov" = "chr/fcov"
+)
+
+makeFigure2(plot_exps, df_list, "plots/figure2_v3_otc-harder.pdf", 12, 12)
+
+
+
 
 
 batch_plot <- "condition-breakdown_OTC-harder-3"
@@ -245,7 +271,7 @@ PPV_plot <- new_df_plot %>%
   ylab('PPV') +
   scale_color_manual(values = pal)
 
-print(PPV_plot)
+print(PPV_plot + theme(legend.position = "bottom"))
 
 TPR_plot <- new_df_plot %>% 
   filter(score_type == "TPR") %>% 
@@ -265,7 +291,7 @@ TPR_plot <- new_df_plot %>%
   scale_color_manual(values = pal)
 
 
-print(TPR_plot)
+print(TPR_plot + theme(legend.position = "bottom"))
 
 p <- cowplot::plot_grid(PPV_plot, TPR_plot, ncol = 1, labels = "AUTO")
 print(p)
@@ -274,5 +300,5 @@ legend <- cowplot::get_legend(TPR_plot + theme(legend.position = "bottom") + gui
 
 p_legend <- cowplot::plot_grid(p, legend, rel_heights = c(1, 0.1), ncol = 1)
 print(p_legend)
-cowplot::save_plot("plots/figure2_v6_otc-harder.pdf", p_legend, base_height = 4.2, base_width = 5.5)
+cowplot::save_plot("plots/isling-conditions_otc-harder.pdf", p_legend, base_height = 4.2, base_width = 5.5)
 

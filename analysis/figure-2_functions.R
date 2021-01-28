@@ -31,8 +31,8 @@ importAllIntScoreExperiments <- function(results_dir, folders, score_window, coo
                      post ~ TRUE,
                      TRUE ~ FALSE
     )) %>% 
-    mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) %>% 
-    mutate(analysis_condition = str_replace(analysis_tool, 'analysis|pipeline', 'isling')) 
+    mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+    mutate(analysis_tool = str_replace(analysis_tool, 'pipeline', 'isling')) 
   
   
   # for 'AAV' experiment, filter only for results where we used the correct viral reference
@@ -43,14 +43,15 @@ importAllIntScoreExperiments <- function(results_dir, folders, score_window, coo
   
   # check that we've got three replicates for each condition in each experiment, for each tool
   n_per_cond <- int_scores %>% 
-    select(window, coords_score_type, experiment, condition, replicate, tool, batch) %>% 
+    select(window, coords_score_type, experiment, condition, replicate, tool, batch, analysis_condition) %>% 
     distinct() %>% 
-    group_by(batch, window, coords_score_type, experiment, condition, tool) %>% 
+    group_by(batch, window, coords_score_type, experiment, condition, tool, analysis_condition) %>% 
     summarise(count = n())
   
   incomplete_exps <- n_per_cond %>% filter(count != 3) %>% pull(experiment)
   incomplete_conds <- n_per_cond %>% filter(count != 3) %>% pull(condition)
   incomplete_batches <- n_per_cond %>% filter(count != 3) %>% pull(batch)
+  incomplete_analysis_conditions <-  n_per_cond %>% filter(count != 3) %>% pull(analysis_condition)
   incomplete_tools <- n_per_cond %>% filter(count != 3) %>% pull(tool)
   
   # if we don't have three replicates for each tool, drop that condition
@@ -58,10 +59,12 @@ importAllIntScoreExperiments <- function(results_dir, folders, score_window, coo
     mutate(batch = str_split(filename, "/", simplify = TRUE)[,10]) %>% 
     ungroup() %>% 
     rowwise() %>% 
-    filter(!((experiment %in% incomplete_exps) & (batch %in% incomplete_batches) & (condition %in% incomplete_conds))) %>% 
+    filter(!((experiment %in% incomplete_exps) & (batch %in% incomplete_batches) & 
+               (condition %in% incomplete_conds) & (analysis_condition %in% incomplete_analysis_conditions))) %>% 
     ungroup()  
   
-  incomplete <- list('exps' = incomplete_exps, 'conds' = incomplete_conds, 'batches' = incomplete_batches)
+  incomplete <- list('exps' = incomplete_exps, 'conds' = incomplete_conds, 
+                     'batches' = incomplete_batches, 'analysis_conds' = incomplete_analysis_conditions)
   
   return(list('int_scores' = int_scores, 'incomplete' = incomplete))
 }
@@ -92,7 +95,8 @@ importAllFoundScores <- function(results_dir, folders, incomplete, score_window,
   found_scores <- found_scores %>% 
     ungroup() %>% 
     rowwise() %>% 
-    filter(!((experiment %in% incomplete[['exps']]) & (batch %in% incomplete[['batches']]) & (condition %in% incomplete[['conds']]))) %>% 
+    filter(!((experiment %in% incomplete[['exps']]) & (batch %in% incomplete[['batches']]) & 
+               (condition %in% incomplete[['conds']]) & (analysis_condition %in% incomplete[['analysis_conds']]))) %>% 
     ungroup()  
   
   # import analysis conditions and add to tibble
@@ -141,7 +145,8 @@ importAllSimScores <- function(results_dir, folders, incomplete, score_window, c
   sim_scores <- sim_scores %>% 
     ungroup() %>% 
     rowwise() %>% 
-    filter(!((experiment %in% incomplete[['exps']]) & (batch %in% incomplete[['batches']]) & (condition %in% incomplete[['conds']]))) %>% 
+    filter(!((experiment %in% incomplete[['exps']]) & (batch %in% incomplete[['batches']]) & 
+               (condition %in% incomplete[['conds']]) & (analysis_condition %in% incomplete[['analysis_conds']]))) %>% 
     ungroup()  
 
   # import analysis conditions and add to tibble

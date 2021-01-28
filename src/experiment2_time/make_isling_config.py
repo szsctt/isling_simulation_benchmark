@@ -66,7 +66,7 @@ def main(args):
 					in_config[dataset][key] = default[key]
 					
 	# import simulation dataframe from results dir
-	df_dir = os.path.join(in_config['coverage']['out_directory'], exp, "simulation_summary.tsv")
+	df_dir = os.path.join(in_config[exp]['out_directory'], exp, "simulation_summary.tsv")
 	in_df = pd.read_csv(df_dir, delimiter='\t')
 	row_idx = in_df.index[in_df['unique'] == f"{exp}__{name}"][0]
 	

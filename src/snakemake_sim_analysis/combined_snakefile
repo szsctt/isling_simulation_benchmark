@@ -597,7 +597,7 @@ rule merged_list:
 	wildcard_constraints:
 		dset = ".+_analysis\d+"	
 	run:
-		if os.path.basename(os.path.dirname(input.merged)) == "combined_reads":
+		if os.path.basename(os.path.dirname(input.merged[0])) == "combined_reads":
 			shell("touch {output.merged_reads}")
 		else:
 			shell("zcat {input.merged} | awk '{{if (NR%4==1) print substr($0, 2)}}' > {output.merged_reads}")

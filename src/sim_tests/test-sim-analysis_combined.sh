@@ -37,5 +37,4 @@ snakemake \
  --jobs 1 \
  --use-singularity \
  --singularity-args '-B $(realpath ../..)' \
- --rerun-incomplete --until run_discordant --forceall -np
-
+ --rerun-incomplete --forceall

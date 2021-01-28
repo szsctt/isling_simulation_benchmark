@@ -710,22 +710,10 @@ rule combine_read_scores:
 		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
 		"""
 
-def get_result(wildcards):
-	if analysis_df_value(wildcards, analysis_df, 'tool') == 'pipeline':
-		return rules.merged_bed.output.merged
-	elif analysis_df_value(wildcards, analysis_df, 'tool') == 'vifi':
-		return rules.vifi.output.clusters
-	elif analysis_df_value(wildcards, analysis_df, 'tool') == 'verse':
-		return rules.verse.output.output
-	elif analysis_df_value(wildcards, analysis_df, 'tool') == 'seeksv':
-		return rules.seeksv.output.ints
-	elif analysis_df_value(wildcards, analysis_df, 'tool') == 'polyidus':
-		return rules.polyidus.output.ints
-
 rule score_integrations:
 	input:
 		sim_info = rules.annotate_reads.output.annotated_info,
-		analysis_info = lambda wildcards: get_result(wildcards),
+		analysis_bed = lambda wildcards: get_bed_result(wildcards),
 		merged_reads = rules.merged_list.output.merged_reads
 	output:
 		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_summary.tsv",
@@ -749,7 +737,7 @@ rule score_integrations:
 		"""
 		python3 scripts/score_integrations.py \
 		--sim-info {input.sim_info} \
-		--found-info {input.analysis_info} \
+		--found-bed {input.analysis_bed} \
 		--output {output.scored_ints} \
 		--output-sim {output.sim_results} \
 		--output-found {output.found_results} \
@@ -851,8 +839,6 @@ rule combine_int_scores:
 		"""
 		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
 		"""	
-
-
 
 # jaccard
 rule make_isling_bed:

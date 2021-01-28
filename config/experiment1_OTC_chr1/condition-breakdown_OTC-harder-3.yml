@@ -92,11 +92,11 @@ global:
     - "coords_mean"
    
    # other tools 
-   polyidus_params:
-     aligner:
-      - "bowtie2"
-     trim:
-       - True
+#   polyidus_params:
+#     aligner:
+#      - "bowtie2"
+#     trim:
+#       - True
 
    vifi_params:
      host_info:
@@ -130,8 +130,6 @@ OTC-frag_len:
        - 300
        - 500 
        - 1000  
-     
-
 
 chr-fcov:
    hosts: 

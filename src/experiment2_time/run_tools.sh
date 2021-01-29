@@ -39,12 +39,14 @@ if [ ! -e ${VICONT} ]; then
 fi
 
 python3 ${WD}/run_tools.py \
- ${CONFIG} \
- ${ISCONT} \
- "${WD}/make_isling_config.py" \
- ${SECONT} \
- "${WD}/run_seeksv.sh" \
- ${POCONT} \
- ${VIDATA} \
- ${VICONT}
+ --sim-config ${CONFIG} \
+ --ising-sif ${ISCONT} \
+ --isling-config-script "${WD}/make_isling_config.py" \
+ --seeksv-sif ${SECONT} \
+ --seeksv-script "${WD}/run_seeksv.sh" \
+ --polyidus-sif ${POCONT} \
+ --vifi-data-repo ${VIDATA} \
+ --vifi-sif ${VICONT} \
+ --replicates 3 \
+ --parallel
 

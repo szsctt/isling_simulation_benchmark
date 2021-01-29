@@ -11,29 +11,26 @@ if [ -z "$2" ]
 		eval "$(conda shell.bash hook)"
 		conda activate snakemake
 		module load singularity
+		SNAKEARGS="--profile slurm --latency-wait 120 --jobs 100"
+else
+	SNAKEARGS="--resources mem_mb=60000 --cores 15"
 fi
 
 cd ../../intvi_simulation
 
 snakemake \
  --configfile ${CONFIG} \
- --jobs 100 \
  --use-singularity \
  --singularity-args "-B $(realpath ../)" \
- --profile slurm \
  --rerun-incomplete \
- --latency-wait 120 \
  --notemp \
- --until art
+ --until art ${SNAKEARGS}
  
  snakemake \
  --configfile ${CONFIG} \
- --jobs 100 \
  --use-singularity \
  --singularity-args "-B $(realpath ../)" \
- --profile slurm \
  --rerun-incomplete \
- --latency-wait 120 \
  --notemp \
- --until write_summary
+ --until write_summary ${SNAKEARGS}
 

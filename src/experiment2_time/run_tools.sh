@@ -2,7 +2,7 @@
 set -e
 
 # ./run_tools.sh <sim config yml> <isling docker string> <seeksv docker string> <polyidus docker string> 
-#   <vifi docker string> <vifi data repo> <local>
+#   <vifi docker string> <vifi data repo> <cores> <local>
 
 CONFIG=$1
 ISDOCK=$2
@@ -10,12 +10,14 @@ SEDOCK=$3
 PODOCK=$4
 VIDOCK=$5
 VIDATA=$6
+CORES=$7
 
-if [ -z "$7" ]
+if [ -z "$8" ]
 	then
 		eval "$(conda shell.bash hook)"
 		conda activate snakemake
 		module load singularity
+		ARGS="--parallel"
 fi
 
 ISCONT="isling.sif"
@@ -42,7 +44,7 @@ fi
 
 python3 ${WD}/run_tools.py \
  --sim-config ${CONFIG} \
- --ising-sif ${ISCONT} \
+ --isling-sif ${ISCONT} \
  --isling-config-script "${WD}/make_isling_config.py" \
  --seeksv-sif ${SECONT} \
  --seeksv-script "${WD}/run_seeksv.sh" \
@@ -50,5 +52,4 @@ python3 ${WD}/run_tools.py \
  --vifi-data-repo ${VIDATA} \
  --vifi-sif ${VICONT} \
  --replicates 3 \
- --parallel
-
+ --cores ${CORES} ${ARGS}

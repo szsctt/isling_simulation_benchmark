@@ -39,7 +39,7 @@ import multiprocessing.pool as mp_pool
 import functools
 import time
 import random
-
+import argparse
 replicates = 3
 retries = 3
 seeksv_threads = 20
@@ -57,16 +57,17 @@ def main(argv):
 	# get args
 	parser = argparse.ArgumentParser(description='run tools on simulated data and collect runtimes')
 	parser.add_argument('--sim-config', '-c', help='config from simulation')
-	parser.add_argument('--ising-sif', help='path to isling sif file')
+	parser.add_argument('--isling-sif', help='path to isling sif file')
 	parser.add_argument('--isling-config-script', help='path to script that is used to create config files for isiling')
 	parser.add_argument('--seeksv-sif', help='path to seeksv sif file')
 	parser.add_argument('--seeksv-script', help='bash script for running seeksv on one sample')
 	parser.add_argument('--polyidus-sif', help='path to polyidus sif file')
 	parser.add_argument('--vifi-sif', help='path to vifi sif file')	
 	parser.add_argument('--vifi-data-repo', help='path to vifi data repo')	
-	parser.add_argument('--parallel', action='store_true' help='run jobs in parallel on the cluster?')
-	parser.add_argument('--replicates', action='number of replicates to perform', default=replicates, type=int)	
-	args = parse_args(argv[1:])
+	parser.add_argument('--parallel', action='store_true', help='run jobs in parallel on the cluster?')
+	parser.add_argument('--replicates', help='number of replicates to perform', default=replicates, type=int)	
+	parser.add_argument('--cores', help='number of cores to use', default=16, type=int)
+	args = parser.parse_args(argv[1:])
 	
 	# import config file
 	sim_config = import_yaml(args.sim_config)
@@ -76,8 +77,8 @@ def main(argv):
 														config_path=args.sim_config, config_script=args.isling_config_script, 
 														seeksv_script=args.seeksv_script, isling_container=args.isling_sif,
 														seeksv_container=args.seeksv_sif, polyidus_container=args.polyidus_sif,
-														vifi_data_repo=args.vifi_data_repo, vifi_container=args.vifi_container,
-														reps=args.replicates, parallel=args.parallel
+														vifi_data_repo=args.vifi_data_repo, vifi_container=args.vifi_sif,
+														reps=args.replicates, parallel=args.parallel, cores=args.cores
 													)
 	procs = []
 	with mp_pool.ThreadPool(2) as pool:
@@ -92,7 +93,7 @@ def main(argv):
 		if args.parallel:
 			[p.get() for p in procs]
 
-def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, isling_container, seeksv_container, polyidus_container, vifi_data_repo, vifi_container, reps, parallel):
+def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, isling_container, seeksv_container, polyidus_container, vifi_data_repo, vifi_container, reps, parallel, cores):
 
 	# write header for experiment
 	outfile = os.path.join(sim_config[exp]['out_directory'], exp, f"{exp}_runtime.tsv")
@@ -107,17 +108,17 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 	run_isling_partial = functools.partial(run_isling, sim_config=sim_config, 
 																					sim_config_path=config_path, config_script=config_script,		
 																				 container=isling_container, reps=reps, outfile=outfile, 
-																				 lock=lock, retries=retries, parlallel=parallel)
+																				 lock=lock, retries=retries, parallel=parallel, threads=cores)
 	run_seeksv_partial = functools.partial(run_seeksv, sim_config=sim_config, seeksv_script=seeksv_script, 
 																					container=seeksv_container, reps=reps, outfile=outfile, \
-																					lock=lock, retries=retries, parlallel=parallel)
+																					lock=lock, retries=retries, parallel=parallel, threads=cores)
 	run_polyidus_partial = functools.partial(run_polyidus, sim_config=sim_config, 
 																				 	container=polyidus_container, reps=reps, 
-																				 	outfile=outfile, lock=lock, retries=retries, parlallel=parallel)	
+																				 	outfile=outfile, lock=lock, retries=retries, parallel=parallel)	
 	run_vifi_partial = functools.partial(run_vifi, sim_config=sim_config,vifi_data_repo = vifi_data_repo,
 																				 	container=vifi_container, reps=reps, 
-																				 	outfile=outfile, lock=lock, threads=seeksv_threads,
-																				 	retries=retries, parlallel=parallel)	
+																				 	outfile=outfile, lock=lock, threads=cores,
+																				 	retries=retries, parallel=parallel)	
 	# get samples for this experiment
 	samples = get_samples(exp, sim_config[exp])
 
@@ -139,7 +140,6 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 		#get all results
 		if parallel:
 			[p.get() for p in procs]
-		
 
 def run_polyidus(exp, sample, sim_config, container, reps, outfile, lock, retries, parallel):
 	print(f"running polyidus on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
@@ -184,7 +184,7 @@ def run_polyidus(exp, sample, sim_config, container, reps, outfile, lock, retrie
 
 
 def run_vifi(exp, sample, sim_config, vifi_data_repo, container, reps, outfile, lock, threads, retries, parallel):
-	print(f"running vifi on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
+	print(f"running vifi using {threads} cores on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
 
 	# make directory for output
 	vifi_dir = os.path.join(sim_config[exp]['out_directory'], exp, 
@@ -247,8 +247,8 @@ def run_vifi(exp, sample, sim_config, vifi_data_repo, container, reps, outfile, 
 				break
 		collect_output(vifi, 'vifi', exp, sample, i, outfile, lock, args)	
 
-def run_seeksv(exp, sample, sim_config, seeksv_script, container, reps, outfile, lock, retries, parallel):
-	print(f"running seeksv on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
+def run_seeksv(exp, sample, sim_config, seeksv_script, container, reps, outfile, lock, retries, parallel, threads):
+	print(f"running seeksv using {threads} cores on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
 	
 	# make directory for output
 	seeksv_dir = os.path.join(sim_config[exp]['out_directory'], exp, 
@@ -262,7 +262,6 @@ def run_seeksv(exp, sample, sim_config, seeksv_script, container, reps, outfile,
 	virus = list(sim_config[exp]['viruses'].keys())[0]
 	host = list(sim_config[exp]['hosts'].keys())[0]
 	prefix = os.path.join(sim_config[exp]['out_directory'], 'seeksv_refs', virus, f"{host}_{virus}.fas")
-	threads = seeksv_threads
 	
 	sing_args = ['singularity', 'exec', 
 								'-B', os.path.abspath(os.path.dirname(r1)),
@@ -285,9 +284,9 @@ def run_seeksv(exp, sample, sim_config, seeksv_script, container, reps, outfile,
 		collect_output(seeksv, 'seeksv', exp, sample, i, outfile, lock, args)
 
 			
-def run_isling(exp, sample, sim_config, sim_config_path, config_script, container, reps, outfile, lock, retries, parallel):
+def run_isling(exp, sample, sim_config, sim_config_path, config_script, container, reps, outfile, lock, retries, parallel, threads):
 
-	print(f"running isling on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S ', time.localtime())}")
+	print(f"running isling using {threads} cores on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S ', time.localtime())}")
 	isling_config = os.path.join(sim_config[exp]['out_directory'], exp, 
 																'isling', sample, f"{exp}_{sample}.yml")	
 	
@@ -297,7 +296,7 @@ def run_isling(exp, sample, sim_config, sim_config_path, config_script, containe
 	a.check_returncode()
 	
 	# make config file
-	args = ['python3', config_script, sim_config_path, exp, sample, isling_config]
+	args = ['python3', config_script, sim_config_path, exp, sample, isling_config, str(threads)]
 	a = subprocess.run(args)
 	a.check_returncode()
 	

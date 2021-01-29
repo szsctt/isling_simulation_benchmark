@@ -13,11 +13,12 @@ VIFI="docker://szsctt/vifi:1"
 
 
 # simulate data
-bash run_sim.sh ${CONFIG}
+echo bash run_sim.sh ${CONFIG} local
+bash run_sim.sh ${CONFIG} local
 
 # bwa index host and virus for isling
-bash run_index.sh ${CONFIG} ${CLUSTER} ${VIFI_REPO}
+bash run_index.sh ${CONFIG} ${CLUSTER} ${VIFI_REPO} local
 
 # run tools
-bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO} 20
+bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO} 16 local
 

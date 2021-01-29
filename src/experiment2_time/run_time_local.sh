@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-CONFIG="../config/experiment2_time/simulation.yml"
-#CONFIG="../config/experiment2_time/test_sim.yml"
+#CONFIG="../config/experiment2_time/simulation.yml"
+CONFIG="../config/experiment2_time/test_sim.yml"
 CLUSTER="../config/experiment2_time/cluster.json"
 VIFI_REPO="../data/references/data_repo"
 

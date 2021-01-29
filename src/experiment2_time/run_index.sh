@@ -1,18 +1,20 @@
 #!/bin/bash
 set -e
 
-# ./run_sim.sh <sim config yml> <cluster_config> <vifi_data_repo>
+# ./run_sim.sh <sim config yml> <cluster_config> <vifi_data_repo> <local>
 
 CONFIG=$1
 CLUSTER=$2
 VIFI=$3
 
+if [ -z "$4" ]
+	then
+		eval "$(conda shell.bash hook)"
+		conda activate snakemake
+		module load singularity
+fi
+
 WD=$(pwd)
-
-eval "$(conda shell.bash hook)"
-conda activate snakemake
-
-module load singularity
 
 cd ../../intvi_pipeline
 

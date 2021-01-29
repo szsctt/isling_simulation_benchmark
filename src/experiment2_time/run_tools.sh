@@ -2,7 +2,7 @@
 set -e
 
 # ./run_tools.sh <sim config yml> <isling docker string> <seeksv docker string> <polyidus docker string> 
-#   <vifi docker string> <vifi data repo>
+#   <vifi docker string> <vifi data repo> <local>
 
 CONFIG=$1
 ISDOCK=$2
@@ -11,16 +11,18 @@ PODOCK=$4
 VIDOCK=$5
 VIDATA=$6
 
+if [ -z "$7" ]
+	then
+		eval "$(conda shell.bash hook)"
+		conda activate snakemake
+		module load singularity
+fi
+
 ISCONT="isling.sif"
 SECONT="seeksv.sif"
 POCONT="polyidus.sif"
 VICONT="vifi.sif"
 WD=$(pwd)
-
-eval "$(conda shell.bash hook)"
-conda activate snakemake
-
-module load singularity
 
 cd ../../intvi_pipeline
 

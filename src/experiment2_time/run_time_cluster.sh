@@ -11,6 +11,7 @@ POLYIDUS="docker://szsctt/polyidus:3"
 SEEKSV="docker://szsctt/seeksv:1"
 VIFI="docker://szsctt/vifi:1"
 
+
 # simulate data
 bash run_sim.sh ${CONFIG}
 

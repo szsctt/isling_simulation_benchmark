@@ -1,15 +1,17 @@
 #!/bin/bash
 
-# ./run_sim.sh <config yml> 
+# ./run_sim.sh <config yml> <local>
 
 CONFIG=$1
 
 WD=$(pwd)
 
-eval "$(conda shell.bash hook)"
-conda activate snakemake
-
-module load singularity
+if [ -z "$2" ]
+	then
+		eval "$(conda shell.bash hook)"
+		conda activate snakemake
+		module load singularity
+fi
 
 cd ../../intvi_simulation
 

@@ -42,7 +42,7 @@ import random
 import argparse
 max_time = 86400 # max time in seconds for each run of each tool
 replicates = 3
-retries = 3
+retries = 1
 seeksv_threads = 20
 srun_args = ['srun', '--exclusive', '-c20', '-n1', '--mem', '128gb', '--time', '24:00:00']
 srun_debug = ['srun']
@@ -129,9 +129,9 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 		for samp in samples:
 			if parallel:
 				procs.append(pool.apply_async(run_isling_partial, (exp, samp)))
-				procs.append(pool.apply_async(run_seeksv_partial, (exp, samp)))
-				procs.append(pool.apply_async(run_polyidus_partial, (exp, samp)))
-				procs.append(pool.apply_async(run_vifi_partial, (exp, samp)))					
+				#procs.append(pool.apply_async(run_seeksv_partial, (exp, samp)))
+				#procs.append(pool.apply_async(run_polyidus_partial, (exp, samp)))
+				#procs.append(pool.apply_async(run_vifi_partial, (exp, samp)))					
 			else:
 				run_isling_partial(exp, samp)
 				run_seeksv_partial(exp, samp)
@@ -143,7 +143,6 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 			[p.get() for p in procs]
 
 def run_polyidus(exp, sample, sim_config, container, reps, outfile, lock, retries, parallel):
-	print(f"running polyidus on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
 
 	# make directory for output
 	poly_dir = os.path.join(sim_config[exp]['out_directory'], exp, 
@@ -170,31 +169,10 @@ def run_polyidus(exp, sample, sim_config, container, reps, outfile, lock, retrie
 								'--fastq', r1, r2, '--outdir', poly_dir]
 
 
-	# this one can't be parallel because they have the same output files
-	for i in range(reps):
-		if check_already_run(lock, outfile, 'seeksv', exp, sample, i):
-			continue
-		args = time_args + sing_args + poly_args
-		if parallel:
-			args = srun_args + ['--job-name', f'seeksv.{exp}.{sample}.{i}']  + args
-		for j in range(retries):
-			try:
-				if parallel:
-					polyidus = subprocess.run(args, capture_output=True, text=True)
-				else:
-					polyidus = subprocess.run(args, capture_output=True, text=True, timeout=max_time)
-			except subprocess.TimeoutExpired:
-				print('timed out!')
-				break
-			if polyidus.returncode == 0:
-				break
-		try:
-			collect_output(polyidus, 'polyidus', exp, sample, i, outfile, lock, args)
-		except NameError:
-			write_blank_line('timeout', 'polyidus', exp, sample, i, outfile, lock, args)
+	# run polyidus
+	run_tool(lock, outfile, poly_dir, 'polyidus', exp, sample, reps, retries, parallel, sing_args, poly_args)
 
 def run_vifi(exp, sample, sim_config, vifi_data_repo, container, reps, outfile, lock, threads, retries, parallel):
-	print(f"running vifi using {threads} cores on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
 
 	# make directory for output
 	vifi_dir = os.path.join(sim_config[exp]['out_directory'], exp, 
@@ -245,30 +223,9 @@ def run_vifi(exp, sample, sim_config, vifi_data_repo, container, reps, outfile, 
 								 '-c', str(threads), '--reference', ref,
 								'-v', virus, '-o', vifi_dir, '-d', 'True', '-C', chr_list]
 
-	for i in range(reps):
-		if check_already_run(lock, outfile, 'vifi', exp, sample, i):
-			continue
-		args = time_args + sing_args + vifi_args
-		if parallel:
-			args = srun_args + ['--job-name', f'vifi.{exp}.{sample}.{i}']  + args
-		for j in range(retries):
-			try:
-				if parallel:
-					vifi = subprocess.run(args, capture_output=True, text=True)
-				else:
-					vifi = subprocess.run(args, capture_output=True, text=True, timeout=max_time)
-			except subprocess.TimeoutExpired:
-				print('timed out!')
-				break
-			if vifi.returncode == 0:
-				break
-		try:
-			collect_output(vifi, 'vifi', exp, sample, i, outfile, lock, args)	
-		except NameError:
-			write_blank_line('timeout', 'vifi', exp, sample, i, outfile, lock, args)
+	run_tool(lock, outfile, vifi_dir, 'vifi', exp, sample, reps, retries, parallel, sing_args, vifi_args)
 
 def run_seeksv(exp, sample, sim_config, seeksv_script, container, reps, outfile, lock, retries, parallel, threads):
-	print(f"running seeksv using {threads} cores on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
 	
 	# make directory for output
 	seeksv_dir = os.path.join(sim_config[exp]['out_directory'], exp, 
@@ -290,33 +247,10 @@ def run_seeksv(exp, sample, sim_config, seeksv_script, container, reps, outfile,
 								container]
 	seeksv_args = ['bash', seeksv_script, r1, r2, prefix, str(threads), seeksv_dir]
 
-	# this one can't be parallel because they have the same output files
-	for i in range(reps):
-		if check_already_run(lock, outfile, 'seeksv', exp, sample, i):
-			continue
-		args =  time_args + sing_args + seeksv_args
-		if parallel:
-			args = srun_args + ['--job-name', f'seeksv.{exp}.{sample}.{i}'] + args
-		for j in range(retries):
-			try:
-				if parallel:
-					seeksv = subprocess.run(args, capture_output=True, text=True)
-				else:
-					seeksv = subprocess.run(args, capture_output=True, text=True, timeout=max_time)
-			except subprocess.TimeoutExpired:
-				print('timed out!')
-				break
-			if seeksv.returncode == 0:
-				break
-		
-		try:
-			collect_output(seeksv, 'seeksv', exp, sample, i, outfile, lock, args)
-		except NameError:
-			write_blank_line('timeout', 'seeksv', exp, sample, i, outfile, lock, args)
+	run_tool(lock, outfile, seeksv_dir, 'seeksv', exp, sample, reps, retries, parallel, sing_args, seeksv_args)
 			
 def run_isling(exp, sample, sim_config, sim_config_path, config_script, container, reps, outfile, lock, retries, parallel, threads):
 
-	print(f"running isling using {threads} cores on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S ', time.localtime())}")
 	isling_config = os.path.join(sim_config[exp]['out_directory'], exp, 
 																'isling', sample, f"{exp}_{sample}.yml")	
 	
@@ -326,8 +260,8 @@ def run_isling(exp, sample, sim_config, sim_config_path, config_script, containe
 	a.check_returncode()
 	
 	# make config file
-	args = ['python3', config_script, sim_config_path, exp, sample, isling_config, str(threads)]
-	a = subprocess.run(args)
+	config_args = ['python3', config_script, sim_config_path, exp, sample, isling_config, str(threads)]
+	a = subprocess.run(config_args)
 	a.check_returncode()
 	
 	# run isling
@@ -350,30 +284,53 @@ def run_isling(exp, sample, sim_config, sim_config_path, config_script, containe
 				]
 	isling_args = ['snakemake', '--jobs', '100', '--configfile', isling_config, '--forceall']
 		
-	# this one can't be parallel because they have the same output files
-	# and snakemake will chuck a hissy 
+	# run tool 
+	run_tool(lock, outfile, isling_dir, 'isling', exp, sample, reps, retries, parallel, sing_args, isling_args)
+
+
+def run_tool(lock, outfile, out_dir, tool, exp, sample, reps, retries, parallel, sing_args, tool_args):
+
+	# this one can't be parallel because all runs with the same data have the same output files
 	for i in range(reps):
-		if check_already_run(lock, outfile, 'isling', exp, sample, i):
+		if check_already_run(lock, outfile, tool, exp, sample, i):
+			print(f"skipping {tool} on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
 			continue
-		args = time_args + sing_args + isling_args
+		run_args = time_args + sing_args + tool_args
 		if parallel:
-			args = srun_args + ['--job-name', f'isling.{exp}.{sample}.{i}'] + args
+			run_args = srun_args + ['--job-name', f'{tool}.{exp}.{sample}.{i}'] + srun_args
 		for j in range(retries):
+			log = os.path.join(out_dir, f"{sample}.run_rep{i}.try{j}.log")
 			try:
+				print(f"running try {j}, replicate {i} for {tool} on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
 				if parallel:
-					isling = subprocess.run(args, capture_output=True, text=True)
+					tool_run = subprocess.run(run_args, capture_output=True, text=True)
 				else:
-					isling = subprocess.run(args, capture_output=True, text=True, timeout=max_time)  
+					tool_run = subprocess.run(run_args, capture_output=True, text=True, timeout=max_time)  
+				
 			except subprocess.TimeoutExpired:
 				print('timed out!')
+				handle_error(tool_run, log, exp, sample, tool, i, j)
 				break
-			if isling.returncode == 0:
+			if tool_run.returncode == 0:
+				write_log(tool_run, log)
 				break
+			handle_error(tool_run, log, exp, sample, tool, i, j)
 
 		try:
-			collect_output(isling, 'isling', exp, sample, i, outfile, lock, args)
+			collect_output(tool_run, tool, exp, sample, i, outfile, lock, run_args)
 		except NameError:
-			write_blank_line('timeout', 'isling', exp, sample, i, outfile, lock, args)
+			write_blank_line('timeout', tool, exp, sample, i, outfile, lock, run_args)
+
+
+def handle_error(tool_run, log_file, exp, sample, tool, rep, retry):
+	print(f'{tool} failed while trying to process sample {sample} from experiment {exp} on try {retry} of replicate {rep}')
+	print(f'see log file {os.path.abspath(log_file)} for more information\n')
+	write_log(tool_run, log_file)
+
+def write_log(tool_run, log_file):	
+	output = f"stdout:\n{tool_run.stdout}\n\nstderr:\n{tool_run.stderr}\n"
+	with open (log_file, 'w') as handle:
+		handle.write(output)	
 
 def write_blank_line(return_code, tool, dataset, sample, rep, outfile, lock, args):
 	results = { 
@@ -410,7 +367,7 @@ def collect_output(proc, tool, dataset, sample, rep, outfile, lock, args):
 		line1 = stdout[-3].split()
 		line2 = stdout[-2].split()
 	else:
-		print(proc.stderr)
+		#print(proc.stderr)
 		line1 = ['user', 'system', 'elapsed', 'CPU', '(text+data', 'max)k']
 		line2 = ['inputs+outputs', '(major+minor)pagefaults', 'swaps'] * 10
 

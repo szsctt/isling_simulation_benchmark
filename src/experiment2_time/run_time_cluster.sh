@@ -6,7 +6,7 @@ CONFIG="../config/experiment2_time/simulation.yml"
 CLUSTER="../config/experiment2_time/cluster.json"
 VIFI_REPO="../data/references/data_repo"
 
-ISLING="docker://szsctt/isling:1"
+ISLING="docker://szsctt/isling:latest"
 POLYIDUS="docker://szsctt/polyidus:3"
 SEEKSV="docker://szsctt/seeksv:1"
 VIFI="docker://szsctt/vifi:1"

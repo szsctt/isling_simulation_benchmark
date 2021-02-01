@@ -317,7 +317,8 @@ wildcard_constraints:
 	score_type = "|".join(score_types),
 	part = "\d+"
 
-dset_non_isling = ".+_((vifi)|(seeksv)|(polyidus))\d+"
+dset_non_isling = ".+"
+#dset_non_isling = ".+_((vifi)|(seeksv)|(polyidus))\d+"
 
 localrules: write_summary, write_analysis_summary, write_analysis_summary_all_tools
 
@@ -329,7 +330,7 @@ localrules: write_summary, write_analysis_summary, write_analysis_summary_all_to
 # rule polyidus has a wildcard contstraint so it can't be used for our pipeline
 # so make it higher in the priority
 
-ruleorder: vifi > polyidus > verse > seeksv > combine_ints > merged_bed 
+ruleorder: vifi > polyidus > verse > seeksv > combine_ints > merged_bed > merged_list > touch_merged_reads_other_tools
 
 #####################################################
 ################### target files ####################
@@ -473,6 +474,7 @@ def analysis_df_tool_value(wildcards, analysis_df, tool, column_name):
 	row = analysis_df[(analysis_df['unique'] == wildcards.dset) & (analysis_df['tool'] == tool)].index[0]
 	return analysis_df.loc[row, column_name]
 
+
 #####################################################
 ##################### trimming ######################
 #####################################################
@@ -504,7 +506,20 @@ def get_input_reads(wildcards, read_num):
 	else:
 		suffix = analysis_df_value(wildcards, analysis_df, 'R2_suffix')		
 	return os.path.join(readdir, f"{wildcards.samp}{suffix}")
-		
+
+	
+def get_reads(wildcards, analysis_df, rules, read_num):
+	assert read_num in (1, 2)
+	if analysis_df_value(wildcards, analysis_df, 'trim') == 1:
+		if read_num == 1:
+			return rules.trim.output.proc_r1
+		else:
+			return rules.trim.output.proc_r2
+	else:
+		if read_num == 1:
+			return get_input_reads(wildcards, 1)
+		else:
+			return get_input_reads(wildcards, 2)		
 
 rule trim:
 	input:
@@ -852,6 +867,8 @@ rule make_isling_bed:
 		mem_mb= lambda wildcards, attempt, input: 100,
 		time = lambda wildcards, attempt: ('10:00', '30:00', '2:00:00', '24:00:00')[attempt - 1],
 		nodes = 1
+	wildcard_constraints:
+		dset = ".+_analysis\d+"
 	shell:
 		"""
 		awk '(NR != 1) {{print $1"\t"$2"\t"$3}}' {input.merged} | sort -k1,1 -k2,2n > {output.bed}
@@ -868,6 +885,8 @@ rule make_vifi_bed:
 		mem_mb= lambda wildcards, attempt, input: 100,
 		time = lambda wildcards, attempt: ('10:00', '30:00', '2:00:00', '24:00:00')[attempt - 1],
 		nodes = 1
+	wildcard_constraints:
+		dset = ".+_vifi\d+"
 	shell:
 		"""
 		awk -F, '(NR != 1) {{print $1"\t"$2"\t"$3}}' {input.range} | sort -k1,1 -k2,2n > {output.bed}
@@ -884,6 +903,8 @@ rule make_polyidus_bed:
 		mem_mb= lambda wildcards, attempt, input: 100,
 		time = lambda wildcards, attempt: ('10:00', '30:00', '2:00:00', '24:00:00')[attempt - 1],
 		nodes = 1
+	wildcard_constraints:
+		dset = ".+_polyidus\d+"
 	shell:
 		"""
 		awk '(NR != 1) {{print $1"\t"$2"\t"$3}}' {input.in_bed} | sort -k1,1 -k2,2n > {output.out_bed}
@@ -905,6 +926,8 @@ rule make_seeksv_bed:
 		mem_mb= lambda wildcards, attempt, input: 100,
 		time = lambda wildcards, attempt: ('10:00', '30:00', '2:00:00', '24:00:00')[attempt - 1],
 		nodes = 1	
+	wildcard_constraints:
+		dset = ".+_seeksv\d+"
 	shell:
 		"""
 		awk 'BEGIN {{ ORS = " " }} {{a[$1]}} END {{for (i in a) print i}}' \

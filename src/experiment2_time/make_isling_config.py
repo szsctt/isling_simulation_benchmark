@@ -44,8 +44,9 @@ import pandas as pd
 def main(args):
 
 	# get inputs
-	config, exp, name, out = args[1:]
-	
+	config, exp, name, out, align_cpus = args[1:]
+	align_cpus = int(align_cpus)
+
 	# import simulation config yaml
 	with open(config, 'r') as stream:
 		try:
@@ -115,7 +116,7 @@ def main(args):
 	out_config[exp]['mean-frag-len'] = float(in_df.loc[row_idx,'frag_len'])
 	
 	# cpus for alignment
-	out_config[exp]['align-cpus'] = 20
+	out_config[exp]['align-cpus'] = align_cpus
 	
 	# number of parts for splitting - make this approximatley the fold coverage
 	# but no more than 20 and no less than 1

@@ -19,5 +19,5 @@ bash run_sim.sh ${CONFIG}
 bash run_index.sh ${CONFIG} ${CLUSTER} ${VIFI_REPO}
 
 # run tools
-bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO}
+bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO} 20
 

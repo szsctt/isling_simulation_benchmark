@@ -11,6 +11,8 @@ POLYIDUS="docker://szsctt/polyidus:3"
 SEEKSV="docker://szsctt/seeksv:1"
 VIFI="docker://szsctt/vifi:1"
 
+
+
 # simulate data
 bash run_sim.sh ${CONFIG} local
 
@@ -18,5 +20,7 @@ bash run_sim.sh ${CONFIG} local
 bash run_index.sh ${CONFIG} ${CLUSTER} ${VIFI_REPO} local
 
 # run tools
-bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO} local
+
+bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO} 1 local
+
 

@@ -12,6 +12,9 @@ if [ -z "$4" ]
 		eval "$(conda shell.bash hook)"
 		conda activate snakemake
 		module load singularity
+		SNAKEARGS="--profile slurm --cluster-config ${CLUSTER} --latency-wait 120 --jobs 100"
+else
+	SNAKEARGS="--resources mem_mb=60000 --cores 15"
 fi
 
 WD=$(pwd)
@@ -31,15 +34,11 @@ echo
 echo "indexing references for isling"
 snakemake \
  --configfile "${ISLCONFIG}" \
- --jobs 5 \
  --use-singularity \
  --singularity-args "-B $(realpath ../)" \
- --profile slurm \
  --rerun-incomplete \
- --latency-wait 120 \
  --until index \
- --cluster-config ${CLUSTER} \
- --quiet
+ --quiet ${SNAKEARGS}
 
 # also make config file for other tools
 cd ../intvi_other-tools
@@ -47,37 +46,28 @@ echo
 echo "indexing references for polyidus"
 snakemake \
  --configfile "${OTHCONFIG}" \
- --jobs 5 \
  --use-singularity \
  --singularity-args "-B $(realpath ../)" \
- --profile slurm \
  --rerun-incomplete \
- --latency-wait 120 \
- --until bwt2_index
+ --until bwt2_index ${SNAKEARGS}
 
 echo
 echo "indexing references for vifi"
 snakemake \
  --configfile "${OTHCONFIG}" \
- --jobs 5 \
  --use-singularity \
  --singularity-args "-B $(realpath ../)" \
- --profile slurm \
  --rerun-incomplete \
- --latency-wait 120 \
- --until host_virus_index
+ --until host_virus_index ${SNAKEARGS}
  
 echo
 echo "indexing references for seeksv"
 snakemake \
  --configfile "${OTHCONFIG}" \
- --jobs 5 \
  --use-singularity \
  --singularity-args "-B $(realpath ../)" \
- --profile slurm \
  --rerun-incomplete \
- --latency-wait 120 \
- --until host_virus_index_seeksv
+ --until host_virus_index_seeksv ${SNAKEARGS}
 
 echo
 echo "done indexing references"

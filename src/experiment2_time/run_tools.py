@@ -64,7 +64,7 @@ def main(argv):
 	parser.add_argument('--polyidus-sif', help='path to polyidus sif file')
 	parser.add_argument('--vifi-sif', help='path to vifi sif file')	
 	parser.add_argument('--vifi-data-repo', help='path to vifi data repo')	
-	parser.add_argument('--parallel', action='store_true' help='run jobs in parallel on the cluster?')
+	parser.add_argument('--parallel', action='store_true', help='run jobs in parallel on the cluster?')
 	parser.add_argument('--replicates', action='number of replicates to perform', default=replicates, type=int)	
 	args = parse_args(argv[1:])
 	
@@ -242,7 +242,11 @@ def run_vifi(exp, sample, sim_config, vifi_data_repo, container, reps, outfile, 
 		if parallel:
 			args = srun_args + ['--job-name', f'vifi.{exp}.{sample}.{i}']  + args
 		for j in range(retries):
+			pdb.set_trace()
 			vifi = subprocess.run(args, capture_output=True, text=True)
+			log = os.path.join(vifi_dir, f"{sample}.rep{i}.retry{j}.log")
+			with open(log, 'w') as handle:
+				handle.write(log)
 			if vifi.returncode == 0:
 				break
 		collect_output(vifi, 'vifi', exp, sample, i, outfile, lock, args)	

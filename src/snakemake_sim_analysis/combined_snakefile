@@ -187,6 +187,8 @@ analysis_df = pd.concat((extra, analysis_df), axis=0, ignore_index=True)
 analysis_df['bam_suffix'] = ['.sam' for i in range(analysis_df.shape[0])]
 analysis_df['R1_suffix'] = ['1.fq' for i in range(analysis_df.shape[0])]
 analysis_df['R2_suffix'] = ['2.fq' for i in range(analysis_df.shape[0])]
+analysis_df['adapter_1'] = [HS25['read1-adapt'] for i in range(analysis_df.shape[0])]
+analysis_df['adapter_2'] = [HS25['read2-adapt'] for i in range(analysis_df.shape[0])]
 
 analysis_df['read_folder'] = [os.path.join(config[dataset]['out_directory'], dataset, "sim_reads") for dataset in analysis_df['experiment']]
 

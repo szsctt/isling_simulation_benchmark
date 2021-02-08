@@ -297,7 +297,7 @@ def run_tool(lock, outfile, out_dir, tool, exp, sample, reps, retries, parallel,
 			continue
 		run_args = time_args + sing_args + tool_args
 		if parallel:
-			run_args = srun_args + ['--job-name', f'{tool}.{exp}.{sample}.{i}'] + srun_args
+			run_args = srun_args + ['--job-name', f'{tool}.{exp}.{sample}.{i}'] + run_args
 		for j in range(retries):
 			log = os.path.join(out_dir, f"{sample}.run_rep{i}.try{j}.log")
 			try:

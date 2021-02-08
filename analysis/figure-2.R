@@ -5,6 +5,7 @@ library(cowplot)
 
 
 source("/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/analysis/sim_functions.R")
+source("/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/analysis/figure-2_functions.R")
 
 results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment1_OTC_chr1"
 folders <- c("condition-breakdown-1", "condition-breakdown-2")

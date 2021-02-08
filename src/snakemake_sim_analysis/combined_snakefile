@@ -498,7 +498,7 @@ def get_adapters(wildcards, num):
 	else:
 		return adapter_seqs[seq_sys]['read2-adapt']		
 
-def get_input_reads(wildcards, read_num):
+def get_input_reads(wildcards, analysis_df, read_num):
 	assert read_num in (1, 2)
 	readdir = analysis_df_value(wildcards, analysis_df, 'read_folder')
 	if read_num == 1:
@@ -517,14 +517,14 @@ def get_reads(wildcards, analysis_df, rules, read_num):
 			return rules.trim.output.proc_r2
 	else:
 		if read_num == 1:
-			return get_input_reads(wildcards, 1)
+			return get_input_reads(wildcards, analysis_df, 1)
 		else:
-			return get_input_reads(wildcards, 2)		
+			return get_input_reads(wildcards, analysis_df, 2)		
 
 rule trim:
 	input:
-		r1 = lambda wildcards: get_input_reads(wildcards, 1),
-		r2 = lambda wildcards: get_input_reads(wildcards, 2)
+		r1 = lambda wildcards: get_input_reads(wildcards, analysis_df, 1),
+		r2 = lambda wildcards: get_input_reads(wildcards, analysis_df, 2)
 	output:
 		proc_r1 = temp("{outpath}/{dset}/trimmed_reads/{samp}.1.fastq.gz"),
 		proc_r2 = temp("{outpath}/{dset}/trimmed_reads/{samp}.2.fastq.gz")
@@ -574,6 +574,14 @@ include: "snakemake_rules/verse.smk"
 #####################################################
 
 include: "snakemake_rules/seeksv.smk"
+
+
+#####################################################
+################### VSeq-Toolkit ####################
+#####################################################
+
+include: "snakemake_rules/vseq.smk"
+
 
 
 #####################################################
@@ -936,6 +944,18 @@ rule make_seeksv_bed:
 		sort -k1,1 -k2,2n {output.tmp} > {output.bed}
 		"""	
 
+rule make_vseq_bed:
+	input:
+		ints = rules.vseq_toolkit.output.csv
+	output:
+		bed = "{outpath}/{dset}/vseq_toolkit/{samp}.{host}.{virus}/ISGenomeVector.bed"
+#	wildcard_constraints:
+#		dset = ".+_vseq_toolkit\d+"
+	shell:
+		"""
+		python3 scripts/write_vseq-toolkit_bed.py --vseq-toolkit-output {input.ints} --output {output.bed}
+		"""
+
 def get_bed_result(wildcards):
 	if analysis_df_value(wildcards, analysis_df, 'tool') == 'pipeline':
 		return rules.make_isling_bed.output.bed
@@ -945,6 +965,8 @@ def get_bed_result(wildcards):
 		return rules.make_polyidus_bed.output.out_bed		
 	if analysis_df_value(wildcards, analysis_df, 'tool') == 'seeksv':
 		return rules.make_seeksv_bed.output.bed	
+	if analysis_df_value(wildcards, analysis_df, 'tool') == 'vseq_toolkit':
+		return rules.make_vseq_bed.output.bed	
 	
 rule jaccard:
 	input:

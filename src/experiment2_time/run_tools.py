@@ -4,7 +4,7 @@
 # collect runtime from each and save to file
 
 # usage: python3 run_tools.py <config file> <isling_sif> <isling_config_script>
-# <seeksv_sif> <seeksv_script> <polyidus_sif>
+# <seeksv_sif> <seeksv_script> <polyidus_sif> <vseq_toolkit_sif>
 
 # collect information from time 
 #           %Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata %Mmax)k
@@ -65,6 +65,7 @@ def main(argv):
 	parser.add_argument('--polyidus-sif', help='path to polyidus sif file')
 	parser.add_argument('--vifi-sif', help='path to vifi sif file')	
 	parser.add_argument('--vifi-data-repo', help='path to vifi data repo')	
+	parser.add_argument('--vseq-toolkit-sif', help='path to vifi sif file')
 	parser.add_argument('--parallel', action='store_true', help='run jobs in parallel on the cluster?')
 	parser.add_argument('--replicates', help='number of replicates to perform', default=replicates, type=int)	
 	parser.add_argument('--cores', help='number of cores to use', default=16, type=int)
@@ -141,6 +142,53 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 		#get all results
 		if parallel:
 			[p.get() for p in procs]
+
+def run_vseq_toolkit(exp, sample, sim_config, container, reps, outfile, lock, retries, parallel):
+
+	# make directory for output
+	vseq_dir = os.path.join(sim_config[exp]['out_directory'], exp, 
+																'vseq_toolkit', sample)
+	a = subprocess.run(['mkdir', '-p', vseq_dir])
+	a.check_returncode()	
+	
+	# collect inputs
+	r1 = os.path.join(sim_config[exp]['out_directory'], exp, 'sim_reads', f"{sample}1.fq")
+	r2 = os.path.join(sim_config[exp]['out_directory'], exp, 'sim_reads', f"{sample}2.fq")
+	virus = list(sim_config[exp]['viruses'].keys())[0]
+	virus_prefix = os.path.join(sim_config[exp]['out_directory'], 'references', virus, virus)
+	host = list(sim_config[exp]['hosts'].keys())[0]
+	host_prefix = os.path.join(sim_config[exp]['out_directory'], 'references', host, host)
+	
+	# write config file
+	config = os.path.join(vseq_dir, "config.txt")
+	with open(config, 'w') as handle:
+		handle.write(f"file1= {r1}\n")
+		handle.write(f"file2= {r2}\n")
+		handle.write(f"outDir= {vseq_dir}\n")
+		handle.write("bin= $VSeqToolkit/scripts/\n")
+		handle.write("qua=20\n")
+		handle.write("lenPer=50\n")
+		handle.write("adapter1=AGATCGGAAGAGCACACGTCTGAACTCCAGTCA\n")
+		handle.write("adapter2=AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT\n")
+		handle.write("trimmer= $VSeqToolkit/thirdPartyTools/skewer\n")
+		handle.write("aligner= $VSeqToolkit/thirdPartyTools/bwa\n")
+		handle.write("samtools= $VSeqToolkit/thirdPartyTools/samtools\n")
+		handle.write("mode=default\n")
+	
+	
+	# arguments
+	sing_args = ['singularity', 'exec', 
+								'-B', os.path.abspath(os.path.dirname(r1)),
+								'-B', os.path.abspath(os.path.dirname(host_prefix)),
+								'-B', os.path.abspath(os.path.dirname(virus_prefix)),
+								'-B', os.path.abspath(poly_dir),
+								container]		
+	poly_args = ['perl', '/usr/src/app/src/polyidus.py', '-c', config]
+
+
+	# run polyidus
+	run_tool(lock, outfile, poly_dir, 'polyidus', exp, sample, reps, retries, parallel, sing_args, poly_args)
+
 
 def run_polyidus(exp, sample, sim_config, container, reps, outfile, lock, retries, parallel):
 

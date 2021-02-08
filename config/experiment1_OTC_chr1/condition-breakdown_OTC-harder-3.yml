@@ -127,6 +127,8 @@ global:
       - 20
      lenPer: 
       - 50
+     mode: 
+      - 'default'
      vecVecFusion: 
       - 'true'
       - 'false'

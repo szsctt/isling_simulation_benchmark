@@ -124,6 +124,47 @@ global:
 #      - 80     
 #     trim: 
 #      - True
+
+
+   vseq_toolkit_params:
+     qua: 
+      - 20
+     lenPer: 
+      - 50
+     mode: 
+      - default
+     vecVecFusion: 
+      - 'true'
+     stringencyVec: 
+      - 'medium'
+     UMthresholdVec: 
+      - 0.95
+     minMapSpanVec: 
+      - 20
+     distVecVec: 
+      - 10
+     opVecVec: 
+      - 5
+     idenVecVec: 
+      - 95
+     stringencyVecGen: 
+      - 'medium'
+     UMthresholdVecGen: 
+      - 0.95
+     minMapSpanVecGen: 
+      - 20
+     distVecGen: 
+      - 10
+     opVecGen: 
+      - 5
+     idenVecGen: 
+      - 95
+     clusterRange: 
+      - 3
+     host_info:
+       human: # fasta will be used from general analysis_hosts
+         mappability: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt" 
+
   
    # scoring
    score_reads: True

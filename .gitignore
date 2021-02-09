@@ -70,9 +70,6 @@ polyidus.sif
 polyidus_test/larger-dataset-timing.log
 verse_test/sbatch_template.sb
 config/experiment1_OTC_chr1/*.cloud.yml
-
-
-
 data/references/data_repo/
 verse_test/reads/
 verse_test/test-chr1/
@@ -91,3 +88,7 @@ analysis/plots/
 .RData
 .Rhistory
 src/snakemake_sim_analysis/results-summary.tsv
+data/references/NC_001401_2.fa
+data/references/NC_003977_2.fa
+vseq_test/
+

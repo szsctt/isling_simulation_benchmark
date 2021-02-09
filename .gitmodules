@@ -19,3 +19,6 @@
 [submodule "Canine_hemophilia_AAV"]
 	path = Canine_hemophilia_AAV
 	url = https://github.com/everettJK/Canine_hemophilia_AAV.git
+[submodule "vseq_test/VSeq-Toolkit"]
+	path = vseq_test/VSeq-Toolkit
+	url = https://github.com/szsctt/VSeq-Toolkit.git

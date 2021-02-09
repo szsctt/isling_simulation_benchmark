@@ -160,7 +160,7 @@ global:
       - 3
      host_info:
        hg38: # fasta will be used from general analysis_hosts
-         mappability: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
+         host_table: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
 
 
 # things that are different for each dataset

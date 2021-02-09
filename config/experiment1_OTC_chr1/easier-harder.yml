@@ -183,11 +183,11 @@ global:
       - 3
      host_info:
        hg38: # fasta will be used from general analysis_hosts
-         mappability: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
+         host_table: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
 
 AAV-harder:
    viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
+      AAV2 :  "../../data/references/NC_001401_2.fa"
    epi_num:
        - 100
    p_whole:
@@ -216,7 +216,7 @@ AAV-harder:
    fcov: 
        - 5
    analysis_viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
+      AAV2 :  "../../data/references/NC_001401_2.fa"
    
 OTC-harder:
    viruses:

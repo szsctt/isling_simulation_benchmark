@@ -17,6 +17,8 @@ coords_score_type_plot <- "coords_mean"
 dist_plot_offset <- 0.5
 facet_scales <- "free_y"
 
+plot_tool_order <- c("isling", "Seeksv", "Polyidus", "ViFi")
+
 # https://stackoverflow.com/questions/11335836/increase-number-of-axis-ticks
 offset <- dist_plot_offset
 num_y_breaks <- 2
@@ -79,7 +81,7 @@ for (name in names(df_list)) {
 p <- makeFigure2(plot_exps, df_list, "plots/figure2_v4_otc-harder.pdf", 8, 11)
 
 legend_plot <- df_list$scores %>% 
-  filter(batch = batch_plot)
+  filter(batch == batch_plot) %>% 
   ggplot(aes(x = PPV, y = TPR, color = tool)) +
   geom_point() +
   theme_classic() +
@@ -97,7 +99,7 @@ for (e in names(plot_exps)) {
   for (y_var in c("TPR", "PPV")) {
     exp_var <- getExpVars(df_list[['scores']], e)[1]
   plotlist[[paste0(e, "_", y_var)]] <- df_list[['scores']] %>% 
-    filter(batch = batch_plot)
+    filter(batch == batch_plot) %>% 
     filter(experiment == e) %>% 
     ggplot(aes(x = !!sym(exp_var), y = !!sym(y_var), color = analysis_tool)) + 
     geom_line() 
@@ -128,14 +130,16 @@ exp_plot <- "chr-fcov"
 pal <- scales::hue_pal()(4)[1:3]
 
 new_df_plot <- results$int_scores %>% 
-  filter(analysis_condition != "vifi") %>% 
-  mutate(case_when(
-    analysis_condition == "polyidus" ~ "Polyidus",
-    analysis_condition == "seeksv" ~ "Seeksv"
+  mutate(tool = str_replace(analysis_condition, "\\d+", "")) %>% 
+  mutate(tool = case_when(
+    tool == "polyidus" ~ "Polyidus",
+    tool == "seeksv" ~ "Seeksv",
+    tool == "vifi" ~"ViFi",
+    TRUE ~ tool
   )) %>% 
   ungroup() %>% 
   pivot_longer(TPR:PPV, names_to = "score_type", values_to = "score") %>% 
-  group_by(host_name, fcov, analysis_condition, score_type) %>% 
+  group_by(host_name, fcov, analysis_condition, score_type, tool) %>% 
   summarise(mean_score = mean(score),
             sd_score = sd(score),
             sem_score = sd(score)/sqrt(n()),
@@ -146,7 +150,9 @@ new_df_plot <- results$int_scores %>%
 
 PPV_plot <- new_df_plot %>% 
   filter(score_type == "PPV") %>% 
-  ggplot(aes(x = fcov, y = mean_score, color = analysis_condition)) + 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, plot_tool_order)) %>% 
+  ggplot(aes(x = fcov, y = mean_score, color = tool)) + 
   geom_point() +
   geom_line() +
   geom_linerange(aes(ymin = mean_minus_sem, ymax = mean_plus_sem)) +
@@ -158,14 +164,15 @@ PPV_plot <- new_df_plot %>%
         axis.title.x = element_blank()) +
   ylim(0, 1) +
   xlab('Fold coverage') +
-  ylab('PPV') +
-  scale_color_manual(values = pal)
+  ylab('PPV')
 
 print(PPV_plot)
 
 TPR_plot <- new_df_plot %>% 
   filter(score_type == "TPR") %>% 
-  ggplot(aes(x = fcov, y = mean_score, color = analysis_condition)) + 
+  mutate(tooln = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, plot_tool_order)) %>% 
+  ggplot(aes(x = fcov, y = mean_score, color = tool)) + 
   geom_point() +
   geom_line() +
   geom_linerange(aes(ymin = mean_minus_sem, ymax = mean_plus_sem)) +
@@ -177,8 +184,7 @@ TPR_plot <- new_df_plot %>%
         strip.text.x = element_blank()) +
   ylim(0, 1) +
   xlab('Fold coverage') +
-  ylab('TPR') +
-  scale_color_manual(values = pal)
+  ylab('TPR')
 
 
 print(TPR_plot)
@@ -226,7 +232,7 @@ plot_exps <- list(
   "chr-fcov" = "chr/fcov"
 )
 
-makeFigure2(plot_exps, df_list, "plots/figure2_v3_otc-harder.pdf", 12, 12)
+makeFigure2(plot_exps, df_list, "plots/figure2_v6_otc-harder.pdf", 12, 12)
 
 
 
@@ -235,28 +241,35 @@ makeFigure2(plot_exps, df_list, "plots/figure2_v3_otc-harder.pdf", 12, 12)
 batch_plot <- "condition-breakdown_OTC-harder-3"
 exp_plot <- "chr-fcov"
 pal <- scales::hue_pal()(4)[1:3]
+min_mapq_keep <- 25
 
 new_df_plot <- results$int_scores %>% 
   filter(analysis_condition != "vifi") %>% 
-  mutate(case_when(
-    analysis_condition == "polyidus" ~ "Polyidus",
-    analysis_condition == "seeksv" ~ "Seeksv"
+  mutate(tool = str_replace(analysis_condition, "\\d+", "")) %>% 
+  mutate(tool = case_when(
+    tool == "polyidus" ~ "Polyidus",
+    tool == "seeksv" ~ "Seeksv",
+    tool == "vifi" ~ "ViFi",
+    TRUE ~ tool
   )) %>% 
   ungroup() %>% 
   pivot_longer(TPR:PPV, names_to = "score_type", values_to = "score") %>% 
-  group_by(host_name, fcov, analysis_condition, score_type) %>% 
+  group_by(host_name, fcov, tool, score_type, min_mapq) %>% 
   summarise(mean_score = mean(score),
             sd_score = sd(score),
             sem_score = sd(score)/sqrt(n()),
             n_score = n(),
             mean_minus_sem = mean_score - sem_score,
-            mean_plus_sem = mean_score + sem_score) 
+            mean_plus_sem = mean_score + sem_score) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, plot_tool_order)) %>% 
+  filter(ifelse(tool == "isling", min_mapq==min_mapq_keep, TRUE))  
 
-mapq_values <- unique(new_df_plot$min_mapq)
-for (mapq in c(10))
+unique(new_df_plot$min_mapq)
+
 PPV_plot <- new_df_plot %>% 
   filter(score_type == "PPV") %>% 
-  ggplot(aes(x = fcov, y = mean_score, color = analysis_condition)) + 
+  ggplot(aes(x = fcov, y = mean_score, color =tool)) + 
   geom_point() +
   geom_line() +
   geom_linerange(aes(ymin = mean_minus_sem, ymax = mean_plus_sem)) +
@@ -268,14 +281,16 @@ PPV_plot <- new_df_plot %>%
         axis.title.x = element_blank()) +
   ylim(0, 1) +
   xlab('Fold coverage') +
-  ylab('PPV') +
-  scale_color_manual(values = pal)
+  ylab('PPV') 
+
+#+
+#  scale_color_manual(values = pal)
 
 print(PPV_plot + theme(legend.position = "bottom"))
 
 TPR_plot <- new_df_plot %>% 
   filter(score_type == "TPR") %>% 
-  ggplot(aes(x = fcov, y = mean_score, color = analysis_condition)) + 
+  ggplot(aes(x = fcov, y = mean_score, color = tool)) + 
   geom_point() +
   geom_line() +
   geom_linerange(aes(ymin = mean_minus_sem, ymax = mean_plus_sem)) +
@@ -284,11 +299,14 @@ TPR_plot <- new_df_plot %>%
   theme_classic() +
   theme(legend.position = "none",
         strip.background = element_blank(),
-        strip.text.x = element_blank()) +
+#        strip.text.x = element_blank()
+) +
   ylim(0, 1) +
   xlab('Fold coverage') +
-  ylab('TPR') +
-  scale_color_manual(values = pal)
+  ylab('TPR')
+
+#+
+#  scale_color_manual(values = pal)
 
 
 print(TPR_plot + theme(legend.position = "bottom"))
@@ -300,5 +318,11 @@ legend <- cowplot::get_legend(TPR_plot + theme(legend.position = "bottom") + gui
 
 p_legend <- cowplot::plot_grid(p, legend, rel_heights = c(1, 0.1), ncol = 1)
 print(p_legend)
-cowplot::save_plot("plots/isling-conditions_otc-harder.pdf", p_legend, base_height = 4.2, base_width = 5.5)
 
+cowplot::save_plot("plots/figure2_v7_otc-harder.pdf", p_legend, base_height = 4.2, base_width = 5.5)
+
+p <- cowplot::plot_grid(PPV_plot, TPR_plot, ncol = 1)
+print(p)
+p_legend <- cowplot::plot_grid(p, legend, rel_heights = c(1, 0.1), ncol = 1)
+print(p_legend)
+cowplot::save_plot("plots/otc-harder-fcov.pdf", p_legend, base_height = 4.2, base_width = 5.5)

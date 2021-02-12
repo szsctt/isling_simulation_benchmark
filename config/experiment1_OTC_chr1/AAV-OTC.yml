@@ -1,14 +1,10 @@
-# things that are the same for all datasets
 global:
-   out_directory: "../../out/experiment1_OTC_chr1/condition-breakdown"
+   out_directory: "../../out/experiment1_OTC_chr1/AAV-OTC"
    
    # integration simulation
    replicates: 3 
    hosts: 
       chr1 : "../../data/references/chrs/chr1.fa"
-       
-   viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    
    initial_seed: 12345
    seed_increment: 123 
@@ -40,11 +36,11 @@ global:
        - 500
    # read simulation
    read_len: 
-       - 150
+       - 250
    fcov: 
        - 5 
    frag_len: 
-       - 500 
+       - 500
    frag_std: 
        - 30
    seq_sys: 
@@ -54,8 +50,6 @@ global:
    analysis_hosts: 
       hg38: "../../data/references/GRCh38.fa"
        
-   analysis_viruses:
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    merge: 
        - False
    trim: 
@@ -68,17 +62,17 @@ global:
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
-       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 20 -h 200"
    merge-dist:
        - 1000
    merge-n-min:
        - 1
    cigar-tol:
-       - 1
+       - 2
    clip-cutoff:
        - 20
    min-mapq:
-       - 10
+       - 20
        
     # scoring
    score_reads: False
@@ -86,12 +80,9 @@ global:
    score_merged_ints: True
    score_ints_window: 
     - 5
-    - 20
-    - 120
+
    score_ints_type: 
-    - "coords_min"
     - "coords_mean"
-    - "overlap"
    
    # other tools 
    polyidus_params:
@@ -143,139 +134,107 @@ global:
       - 1
      merge_dist:
       - 100
+      
+   vseq_toolkit_params:
+     qua: 
+      - 20
+     lenPer: 
+      - 50
+     mode: 
+      - default
+     vecVecFusion: 
+      - 'true'
+     stringencyVec: 
+      - 'medium'
+     UMthresholdVec: 
+      - 0.95
+     minMapSpanVec: 
+      - 20
+     distVecVec: 
+      - 10
+     opVecVec: 
+      - 5
+     idenVecVec: 
+      - 95
+     stringencyVecGen: 
+      - 'medium'
+     UMthresholdVecGen: 
+      - 0.95
+     minMapSpanVecGen: 
+      - 25
+     distVecGen: 
+      - 10
+     opVecGen: 
+      - 5
+     idenVecGen: 
+      - 95
+     clusterRange: 
+      - 3
+     host_table:
+       hg38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
 
-# things that are different for each dataset
-OTC-whole:
-   p_whole:
-       - 0
-       - 0.25
-       - 0.5
-       - 0.75
-       - 1
-
-OTC-epi:
+AAV-harder:
+   viruses:
+      AAV2 :  "../../data/references/NC_001401_2.fa"
    epi_num:
-       - 0 
        - 100
-       - 1000
-       - 100000
-       - 10000000
- 
-OTC-rearrange:
+   p_whole:
+       - 0.3
    p_rearrange:
        - 0
-       - 0.25
-       - 0.5
-       - 0.75
-       - 1
-
-OTC-deletion:
    p_delete:
        - 0
-       - 0.25
-       - 0.5
-       - 0.75
-       - 1
-
-OTC-rearrange-frags:
-   p_rearrange:
-       - 0
-       - 0.5
-       - 1
-   p_delete:
-       - 0
-       - 0.5
-       - 1
    lambda_split:
        - 1
-       - 2
-       - 3
-
-OTC-overlap:
    p_overlap:
-       - 0
-       - 0.25
-       - 0.5
-       - 0.75
-       - 1
-
-OTC-gap:
+       - 0.3
    p_gap:
-       - 0
-       - 0.25
-       - 0.5
-       - 0.75
-       - 1
-       
-OTC-juncs:
-   p_overlap:
-       - 0
-       - 0.25
-       - 0.5
-   p_gap:
-       - 0
-       - 0.25
-       - 0.5
+       - 0.3
    lambda_junction:
        - 1
-       - 4
-       - 10
-       
-OTC-host_deletion:
    p_host_deletion:
-       - 0
-       - 0.25
        - 0.5
-       - 0.75
-       - 1
    lambda_host_deletion:
-       - 10
-       - 100
-       - 1000
-       - 10000
-
-OTC-fcov:
-   fcov: 
-       - 0.75
-       - 1.5
-       - 3
-       - 6
-
-OTC-frag_len:
-   frag_len: 
-       - 250
-       - 300
-       - 500 
-       - 1000  
-   
-OTC-min_sep:
+       - 500
    min_sep:
        - 100
-       - 300
-       - 500
-       - 800
-       - 1000
-
-OTC-min_len:
    min_len:
        - 20
-       - 50
-       - 100
-       - 300
-       - 500
-       - 1000
-       
-AAV:
-   viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
-      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   # read simulation
+   fcov: 
+       - 5
    analysis_viruses:
-      AAV2 :  "../../data/references/NC_001401.2.fa"
+      AAV2 :  "../../data/references/NC_001401_2.fa"
+   
+OTC-harder:
+   viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
-      
-chromosomes:
-   hosts: 
-      chr1 : "../../data/references/chrs/chr1.fa"
-      chr8 : "../../data/references/chrs/chr8.fa"
-      chr14: "../../data/references/chrs/chr14.fa"
-      chrX : "../../data/references/chrs/chrX.fa"
+   epi_num:
+       - 1000
+   p_whole:
+       - 0.3
+   p_rearrange:
+       - 0.1
+   p_delete:
+       - 0.1
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0.3
+   p_gap:
+       - 0.3
+   lambda_junction:
+       - 1
+   p_host_deletion:
+       - 0.5
+   lambda_host_deletion:
+       - 500
+   min_sep:
+       - 100
+   min_len:
+       - 20
+   # read simulation
+   fcov: 
+       - 1.5
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"

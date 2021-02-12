@@ -2,7 +2,7 @@
 set -e
 
 # ./run_tools.sh <sim config yml> <isling docker string> <seeksv docker string> <polyidus docker string> 
-#   <vifi docker string> <vifi data repo> <cores> <local>
+#   <vifi docker string> <vifi data repo> <vseq-toolkit docker string> <cores> <local>
 
 CONFIG=$1
 ISDOCK=$2
@@ -10,9 +10,10 @@ SEDOCK=$3
 PODOCK=$4
 VIDOCK=$5
 VIDATA=$6
-CORES=$7
+VSDOCK=$7
+CORES=$8
 
-if [ -z "$8" ]
+if [ -z "$9" ]
 	then
 		eval "$(conda shell.bash hook)"
 		conda activate snakemake
@@ -24,6 +25,7 @@ ISCONT="isling.sif"
 SECONT="seeksv.sif"
 POCONT="polyidus.sif"
 VICONT="vifi.sif"
+VSCONT="vseq.sif"
 WD=$(pwd)
 
 cd ../../intvi_pipeline
@@ -41,6 +43,9 @@ fi
 if [ ! -e ${VICONT} ]; then
 	singularity pull --name ${VICONT} ${VIDOCK}
 fi
+if [ ! -e ${VSCONT} ]; then
+	singularity pull --name ${VSCONT} ${VSDOCK}
+fi
 
 python3 ${WD}/run_tools.py \
  --sim-config ${CONFIG} \
@@ -51,5 +56,6 @@ python3 ${WD}/run_tools.py \
  --polyidus-sif ${POCONT} \
  --vifi-data-repo ${VIDATA} \
  --vifi-sif ${VICONT} \
+ --vseq-toolkit-sif ${VSCONT} \
  --replicates 3 \
  --cores ${CORES} ${ARGS}

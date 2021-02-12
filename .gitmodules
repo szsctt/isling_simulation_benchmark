@@ -13,9 +13,4 @@
 [submodule "intvi_other-tools"]
 	path = intvi_other-tools
 	url = https://github.com/szsctt/intvi_other-tools.git
-[submodule "gene-is"]
-	path = gene-is
-	url = https://github.com/G100DKFZ/gene-is.git
-[submodule "Canine_hemophilia_AAV"]
-	path = Canine_hemophilia_AAV
-	url = https://github.com/everettJK/Canine_hemophilia_AAV.git
+

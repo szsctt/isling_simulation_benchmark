@@ -4,7 +4,7 @@
 # collect runtime from each and save to file
 
 # usage: python3 run_tools.py <config file> <isling_sif> <isling_config_script>
-# <seeksv_sif> <seeksv_script> <polyidus_sif>
+# <seeksv_sif> <seeksv_script> <polyidus_sif> <vseq_toolkit_sif>
 
 # collect information from time 
 #           %Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata %Mmax)k
@@ -65,6 +65,7 @@ def main(argv):
 	parser.add_argument('--polyidus-sif', help='path to polyidus sif file')
 	parser.add_argument('--vifi-sif', help='path to vifi sif file')	
 	parser.add_argument('--vifi-data-repo', help='path to vifi data repo')	
+	parser.add_argument('--vseq-toolkit-sif', help='path to vifi sif file')
 	parser.add_argument('--parallel', action='store_true', help='run jobs in parallel on the cluster?')
 	parser.add_argument('--replicates', help='number of replicates to perform', default=replicates, type=int)	
 	parser.add_argument('--cores', help='number of cores to use', default=16, type=int)
@@ -79,6 +80,7 @@ def main(argv):
 														seeksv_script=args.seeksv_script, isling_container=args.isling_sif,
 														seeksv_container=args.seeksv_sif, polyidus_container=args.polyidus_sif,
 														vifi_data_repo=args.vifi_data_repo, vifi_container=args.vifi_sif,
+														vseq_container=args.vseq_toolkit_sif,
 														reps=args.replicates, parallel=args.parallel, cores=args.cores
 													)
 	procs = []
@@ -94,7 +96,7 @@ def main(argv):
 		if args.parallel:
 			[p.get() for p in procs]
 
-def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, isling_container, seeksv_container, polyidus_container, vifi_data_repo, vifi_container, reps, parallel, cores):
+def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, isling_container, seeksv_container, polyidus_container, vifi_data_repo, vifi_container, vseq_container, reps, parallel, cores):
 
 	# write header for experiment
 	outfile = os.path.join(sim_config[exp]['out_directory'], exp, f"{exp}_runtime.tsv")
@@ -111,7 +113,7 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 																				 container=isling_container, reps=reps, outfile=outfile, 
 																				 lock=lock, retries=retries, parallel=parallel, threads=cores)
 	run_seeksv_partial = functools.partial(run_seeksv, sim_config=sim_config, seeksv_script=seeksv_script, 
-																					container=seeksv_container, reps=reps, outfile=outfile, \
+																					container=seeksv_container, reps=reps, outfile=outfile, 
 																					lock=lock, retries=retries, parallel=parallel, threads=cores)
 	run_polyidus_partial = functools.partial(run_polyidus, sim_config=sim_config, 
 																				 	container=polyidus_container, reps=reps, 
@@ -120,6 +122,9 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 																				 	container=vifi_container, reps=reps, 
 																				 	outfile=outfile, lock=lock, threads=cores,
 																				 	retries=retries, parallel=parallel)	
+	run_vseq_partial = functools.partial(run_vseq_toolkit, sim_config=sim_config, 
+																				 	container=vseq_container, reps=reps, 
+																				 	outfile=outfile, lock=lock, retries=retries, parallel=parallel)	 
 	# get samples for this experiment
 	samples = get_samples(exp, sim_config[exp])
 
@@ -129,18 +134,76 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 		for samp in samples:
 			if parallel:
 				procs.append(pool.apply_async(run_isling_partial, (exp, samp)))
-				#procs.append(pool.apply_async(run_seeksv_partial, (exp, samp)))
-				#procs.append(pool.apply_async(run_polyidus_partial, (exp, samp)))
-				#procs.append(pool.apply_async(run_vifi_partial, (exp, samp)))					
+				procs.append(pool.apply_async(run_seeksv_partial, (exp, samp)))
+				procs.append(pool.apply_async(run_polyidus_partial, (exp, samp)))
+				procs.append(pool.apply_async(run_vifi_partial, (exp, samp)))			
+				procs.append(pool.apply_async(run_vseq_partial, (exp, samp)))			
 			else:
 				run_isling_partial(exp, samp)
 				run_seeksv_partial(exp, samp)
 				run_polyidus_partial(exp, samp)
 				run_vifi_partial(exp, samp)
+				run_vseq_partial(exp, samp)
 				
 		#get all results
 		if parallel:
 			[p.get() for p in procs]
+
+def run_vseq_toolkit(exp, sample, sim_config, container, reps, outfile, lock, retries, parallel):
+
+	# make directory for output
+	vseq_dir = os.path.join(sim_config[exp]['out_directory'], exp, 
+																'vseq_toolkit', sample)
+	a = subprocess.run(['mkdir', '-p', vseq_dir])
+	a.check_returncode()	
+	
+	# collect inputs
+	r1 = os.path.join(sim_config[exp]['out_directory'], exp, 'sim_reads', f"{sample}1.fq")
+	r2 = os.path.join(sim_config[exp]['out_directory'], exp, 'sim_reads', f"{sample}2.fq")
+	virus = list(sim_config[exp]['viruses'].keys())[0]
+	virus_prefix = os.path.join(sim_config[exp]['out_directory'], 'refs', 'bwa', virus, f"{virus}.fa")
+	host = list(sim_config[exp]['hosts'].keys())[0]
+	combined_prefix = os.path.join(sim_config[exp]['out_directory'], 'seeksv_refs', virus, f"{host}_{virus}.fa")
+	
+	# copy template config file from singularity container to local filesystem
+	template_config = '/var/work/VSeq-Toolkit/config.test.txt'
+	config = os.path.abspath(os.path.join(vseq_dir, "config.txt"))
+	config_tmp = config + ".tmp"
+	a = subprocess.run(['singularity', 'exec', '-B', os.path.abspath(vseq_dir), container, 
+												'cp', template_config, config_tmp])
+	a.check_returncode()
+	# write config file - replace lines in test config included with repo
+	replace = {
+		"file1= $VSeqToolkit/testDir/testData/testDataCombined.R1.fastq.gz" : f"file1= {r1}",
+		"file2= $VSeqToolkit/testDir/testData/testDataCombined.R1.fastq.gz" : f"file2= {r2}",	
+		"outDir= $VSeqToolkit/testDir/testResultsCheck/" : f"outDir= {vseq_dir}/",
+		"contAna=true": "contAna=false",
+		"vecRef= $VSeqToolkit/testDir/testReferenceIndex/vector1.fa" : f"vecRef= {virus_prefix}",
+		"stringencyVec=low" : "stringencyVec=medium",
+		"vecGenRef= $VSeqToolkit/testDir/testReferenceIndex/hg38chr22Vector1.fa" : f"vecGenRef= {combined_prefix}",
+		"stringencyVecGen=low" : "stringencyVecGen=medium"
+	}
+	with open(config_tmp, 'r') as in_handle, open(config, 'w') as out_handle:
+		for line in in_handle:
+			for to_replace in replace:
+				if to_replace in in_handle:
+					line = line.replace(to_replace, replace[to_replace])
+					continue
+			out_handle.write(line)
+			
+	# arguments
+	sing_args = ['singularity', 'exec', 
+								'-B', os.path.abspath(os.path.dirname(r1)),
+								'-B', os.path.abspath(os.path.dirname(virus_prefix)),
+								'-B', os.path.abspath(os.path.dirname(combined_prefix)),
+								'-B', os.path.abspath(vseq_dir),
+								container]		
+	vseq_args = ['perl', '/var/work/VSeq-Toolkit/scripts/VSeq-TK.pl', '-c', config]
+
+
+	# run vseq-toolkit
+	run_tool(lock, outfile, vseq_dir, 'vseq-toolkit', exp, sample, reps, retries, parallel, sing_args, vseq_args)
+
 
 def run_polyidus(exp, sample, sim_config, container, reps, outfile, lock, retries, parallel):
 

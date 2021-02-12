@@ -1,6 +1,6 @@
 global:
    int_num:
-      - 50
+      - 1000
 
 test-easier:
    out_directory: "../../out/test/chr1"
@@ -10,7 +10,7 @@ test-easier:
    hosts: 
        "chr1" : "../../data/references/chrs/chr1.fa"
    viruses:
-       "AAV" :  "../../data/references/NC_001401.2.fa"
+       "OTC" :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    initial_seed: 12345
    seed_increment: 123 
    epi_num:
@@ -22,9 +22,9 @@ test-easier:
    p_whole:
        - 1
    p_rearrange:
-       - 0
+       - 0.02
    p_delete:
-       - 0
+       - 0.02
    lambda_split:
        - 1
    p_overlap:
@@ -44,6 +44,7 @@ test-easier:
        - 10 
    frag_len: 
        - 250 
+       - 500
    frag_std: 
        - 30
    seq_sys: 
@@ -53,7 +54,7 @@ test-easier:
    analysis_hosts: # if running vifi, there must be a matching key in analysis_hosts under vifi_params
        "chr1" : "../../data/references/chrs/chr1.fa"
    analysis_viruses:
-       "AAV" :  "../../data/references/NC_001401.2.fa"
+       "OTC" :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    merge: 
        - True
    trim: 
@@ -76,42 +77,90 @@ test-easier:
    min-mapq:
        - 5
    
-   polyidus_params:
-     aligner:
-      - "bowtie2" 
+#   polyidus_params:
+#     aligner:
+#      - "bowtie2" 
 
-   vifi_params:
+#   vifi_params:
+#     host_info:
+#       chr1: 
+#         mappability: "../../data/references/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
+#         mappability_exclude: "../../data/references/data_repo/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
+#         genes:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
+#         exons:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
+#         oncogenes:  "../../data/references/data_repo/GRCh38/cancer/oncogenes/Census_oncomerge_hg38.gff"
+#         centromeres:  "../../data/references/data_repo/GRCh38/GRCh38_centromere.bed"
+#         conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
+#         segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
+
+#   verse_params:
+#     detection_mode:
+#      - sensitive
+#     flank_region_size:
+#      - 4000
+#     sensitivity_level:
+#      - 1
+#     min_contig_length:
+#      - 300
+#     blastn_evalue_thrd:
+#      - 0.05
+#     similarity_thrd:
+#      - 0.8
+#     chop_read_length:
+#      - 25
+#     minIdentity:
+#      - 80
+
+   vseq_toolkit_params:
+     qua: 
+      - 20
+     lenPer: 
+      - 50
+     mode: 
+      - default
+     vecVecFusion: 
+      - 'true'
+      - 'false'
+     stringencyVec: 
+      - 'low'
+      - 'medium'
+      - 'high'
+     UMthresholdVec: 
+      - 0.95
+     minMapSpanVec: 
+      - 20
+     distVecVec: 
+      - 10
+     opVecVec: 
+      - 5
+     idenVecVec: 
+      - 95
+     stringencyVecGen: 
+      - 'low'
+      - 'medium'
+      - 'high'
+     UMthresholdVecGen: 
+      - 0.95
+     minMapSpanVecGen: 
+      - 20
+     distVecGen: 
+      - 10
+     opVecGen: 
+      - 5
+     idenVecGen: 
+      - 95
+     clusterRange: 
+      - 3
      host_info:
-       chr1: 
-         mappability: "../../data/references/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/data_repo/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         genes:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
-         exons:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
-         oncogenes:  "../../data/references/data_repo/GRCh38/cancer/oncogenes/Census_oncomerge_hg38.gff"
-         centromeres:  "../../data/references/data_repo/GRCh38/GRCh38_centromere.bed"
-         conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
-         segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
+       chr1: # fasta will be used from general analysis_hosts
+         host_table: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt" 
 
-   verse_params:
-     detection_mode:
-      - sensitive
-     flank_region_size:
-      - 4000
-     sensitivity_level:
-      - 1
-     min_contig_length:
-      - 300
-     blastn_evalue_thrd:
-      - 0.05
-     similarity_thrd:
-      - 0.8
-     chop_read_length:
-      - 25
-     minIdentity:
-      - 80
    # scoring
    score_reads: True
    score_ints: True
-   score_merged_ints: True
-   score_ints_window: 20 # window either side of simulated integrations to look for detected integrations
+   score_ints_window:  # window either side of simulated integrations to look for detected integrations
+    - 20
+#    - 100
+   score_ints_type:  
+    - "coords_mean"
 

@@ -1,6 +1,6 @@
 # things that are the same for all datasets
 global:
-   out_directory: "../../out/experiment1_OTC_chr1/condition-breakdown_OTC-harder-3"
+   out_directory: "../../out/experiment1_OTC_chr1/OTC-condition-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -68,18 +68,17 @@ global:
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
-       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 20 -h 200"
    merge-dist:
        - 1000
    merge-n-min:
        - 1
    cigar-tol:
-       - 1
+       - 2
    clip-cutoff:
        - 20
    min-mapq:
        - 20
-       - 25
        - 30
        
     # scoring
@@ -121,6 +120,45 @@ global:
       - 1
      merge_dist:
       - 100
+
+   vseq_toolkit_params:
+     qua: 
+      - 20
+     lenPer: 
+      - 50
+     mode: 
+      - 'default'
+     vecVecFusion: 
+      - 'true'
+     stringencyVec: 
+      - 'high'
+     UMthresholdVec: 
+      - 0.95
+     minMapSpanVec: 
+      - 20
+     distVecVec: 
+      - 10
+     opVecVec: 
+      - 5
+     idenVecVec: 
+      - 95
+     stringencyVecGen: 
+      - 'medium'
+     UMthresholdVecGen: 
+      - 0.95
+     minMapSpanVecGen: 
+      - 25
+     distVecGen: 
+      - 10
+     opVecGen: 
+      - 5
+     idenVecGen: 
+      - 95
+     clusterRange: 
+      - 3
+     host_table:
+       hg38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
+
 
 # things that are different for each dataset
 

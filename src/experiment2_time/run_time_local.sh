@@ -11,13 +11,14 @@ ISLING="docker://szsctt/isling:1"
 POLYIDUS="docker://szsctt/polyidus:3"
 SEEKSV="docker://szsctt/seeksv:1"
 VIFI="docker://szsctt/vifi:1"
+VSEQ="docker://szsctt/vseq:1"
 
 
 
 # simulate data
 bash run_sim.sh ${CONFIG} local
 
-# bwa index host and virus for isling
+# bwa index host and virus for tools
 bash run_index.sh ${CONFIG} ${CLUSTER} ${VIFI_REPO} local
 
 # run tools

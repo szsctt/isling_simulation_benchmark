@@ -542,6 +542,63 @@ importIntScoresFromSummaries <- function(exp_path) {
 }
 
 
+importJaccardExperiment <- function(exp_path) {
+  
+  # list files
+  jaccard_folder <- "jaccard"
+  
+  folders <- list.dirs(exp_path)
+  folders <- folders[str_detect(folders, jaccard_folder)]
+
+  # get files for each folder
+  filenames <- c()
+  for (dir in folders) {
+    files <- list.files(dir)
+    files <- file.path(dir, files)
+    filenames <- c(filenames, files)
+  }
+  
+  column_names = c("result_file", "sim_file", "intersection", "union", "jaccard", "n_intersection")
+  
+  column_types <- cols(
+    result_file = col_character(),
+    sim_file = col_character(),
+    intersection = col_integer(),
+    union = col_integer(),
+    jaccard = col_double(),
+    n_intersections = col_integer()
+  )
+  
+  # import each file
+  jaccard <- tibble(
+    filename = filenames,
+    scores = map(filenames, ~read_tsv(., col_types = column_types, col_names = column_names))
+  ) %>% 
+    unnest(scores)
+  
+  jaccard <- jaccard %>% 
+    mutate(file_name = basename(filename)) %>% 
+    mutate(analysis_condition = str_split(file_name, "\\.", simplify=TRUE)[,1]) %>% 
+    mutate(analysis_condition_short = str_match(analysis_condition, "(analysis|seeksv|polyidus|vifi)\\d+")[,1] ) %>% 
+    mutate(r = paste0("(.+)_", analysis_condition_short)) %>% 
+    mutate(experiment = str_match(analysis_condition, r)[,2]) %>% 
+    select(-r) %>% 
+    mutate(analysis_tool = str_match(analysis_condition_short, "(.+)\\d+")[,2]) %>% 
+    mutate(condition = str_split(file_name, "\\.", simplify=TRUE)[,2]) %>% 
+    mutate(replicate = str_split(file_name, "\\.", simplify=TRUE)[,3]) %>%  
+    mutate(replicate = as.double(str_extract(replicate, "\\d+"))) %>%
+    mutate(analysis_host = str_split(file_name, "\\.", simplify=TRUE)[,4]) %>%     
+    mutate(analysis_virus = str_split(file_name, "\\.", simplify=TRUE)[,5]) %>%   
+    mutate(post = str_split(file_name, "\\.", simplify=TRUE)[,6] == "post") %>% 
+    select(-file_name)
+    
+  # import simulation conditions
+  sim_conditions <- importSimulationConditions(exp_path)
+  
+  return(left_join(jaccard, sim_conditions, by=c("experiment", "condition", "replicate")))  
+    
+}
+
 importDistScoreExperiment <- function(exp_path, type, keep_window = "all", keep_score_type = "all") {
   if (type == "found") {
     summary_suffix <- "_found-results.tsv"

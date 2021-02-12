@@ -64,6 +64,25 @@
 #   seeksv_params:
 #     trim: True
 #     dedup: False
+#   vseq_toolkit_params:
+#     qua: 20
+#     lenPer: 50
+#     vecVecFusion: 'true'
+#     stringencyVec: 'high'
+#     UMthresholdVec: 0.95
+#     minMapSpanVec: 20
+#     distVecVec: 10
+#     opVecVec: 5
+#     idenVecVec: 95
+#     stringencyVecGen: 'high'
+#     UMthresholdVecGen: 0.95
+#     minMapSpanVecGen: 20
+#     distVecGen: 10
+#     opVecGen: 5
+#     idenVecGen: 95
+#     clusterRange: 3
+#     host_table:
+#       human: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"
 
 
 # assume that all experiments have the same host and virus
@@ -111,6 +130,26 @@ def make_tools_config(in_config, tools_config_path, vifi_repo):
 		'aligner': 'bowtie2'
 	}
 	vifi_params = get_vifi_params(vifi_repo, host)
+	vseq_params = {
+		'qua': 20,
+		'lenPer' : 50,
+		'mode' : 'default',
+		'vecVecFusion': 'true',
+		'stringencyVec': 'medium',
+		'UMthresholdVec' : 0.95,
+		'minMapSpanVec': 20,
+		'distVecVec' : 10,
+		'opVecVec' : 5,
+		'idenVecVec' : 95,
+		'stringencyVecGen' : 'medium',
+		'UMthresholdVecGen' : 0.95,
+		'minMapSpanVecGen' : 20,
+		'distVecGen' : 10,
+		'opVecGen': 5,
+		'idenVecGen' : 95,
+		'clusterRange': 3,
+		'host_table' : {host : '$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt'}
+	}
 	
 	out_config = {
 		exp: {
@@ -124,7 +163,8 @@ def make_tools_config(in_config, tools_config_path, vifi_repo):
 			'analysis_virus' : {virus: in_config[exp]['viruses'][virus]},
 			'polyidus_params': polyidus_params,
 			'vifi_params': vifi_params,
-			'seeksv_params': seeksv_params
+			'seeksv_params': seeksv_params,
+			'vseq_toolkit_params': vseq_params
 		}
 	}
 	

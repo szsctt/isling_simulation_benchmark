@@ -139,10 +139,10 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 				procs.append(pool.apply_async(run_vifi_partial, (exp, samp)))			
 				procs.append(pool.apply_async(run_vseq_partial, (exp, samp)))			
 			else:
-				run_isling_partial(exp, samp)
-				run_seeksv_partial(exp, samp)
-				run_polyidus_partial(exp, samp)
-				run_vifi_partial(exp, samp)
+				#run_isling_partial(exp, samp)
+				#run_seeksv_partial(exp, samp)
+				#run_polyidus_partial(exp, samp)
+				#run_vifi_partial(exp, samp)
 				run_vseq_partial(exp, samp)
 				
 		#get all results
@@ -170,27 +170,26 @@ def run_vseq_toolkit(exp, sample, sim_config, container, reps, outfile, lock, re
 	config = os.path.abspath(os.path.join(vseq_dir, "config.txt"))
 	config_tmp = config + ".tmp"
 	a = subprocess.run(['singularity', 'exec', '-B', os.path.abspath(vseq_dir), container, 
-												'cp', template_config, config_tmp])
+												'cp', template_config, config_tmp], capture_output=True, text=True)
 	a.check_returncode()
 	# write config file - replace lines in test config included with repo
 	replace = {
-		"file1= $VSeqToolkit/testDir/testData/testDataCombined.R1.fastq.gz" : f"file1= {r1}",
-		"file2= $VSeqToolkit/testDir/testData/testDataCombined.R1.fastq.gz" : f"file2= {r2}",	
-		"outDir= $VSeqToolkit/testDir/testResultsCheck/" : f"outDir= {vseq_dir}/",
+		"file1= $VSeqToolkit/testDir/testData/testDataCombined.R1.fastq.gz" : f"file1= {os.path.abspath(r1)}",
+		"file2= $VSeqToolkit/testDir/testData/testDataCombined.R1.fastq.gz" : f"file2= {os.path.abspath(r2)}",	
+		"outDir= $VSeqToolkit/testDir/testResultsCheck/" : f"outDir= {os.path.abspath(vseq_dir)}/",
 		"contAna=true": "contAna=false",
-		"vecRef= $VSeqToolkit/testDir/testReferenceIndex/vector1.fa" : f"vecRef= {virus_prefix}",
+		"vecRef= $VSeqToolkit/testDir/testReferenceIndex/vector1.fa" : f"vecRef= {os.path.abspath(virus_prefix)}",
 		"stringencyVec=low" : "stringencyVec=medium",
-		"vecGenRef= $VSeqToolkit/testDir/testReferenceIndex/hg38chr22Vector1.fa" : f"vecGenRef= {combined_prefix}",
+		"vecGenRef= $VSeqToolkit/testDir/testReferenceIndex/hg38chr22Vector1.fa" : f"vecGenRef= {os.path.abspath(combined_prefix)}",
 		"stringencyVecGen=low" : "stringencyVecGen=medium"
 	}
 	with open(config_tmp, 'r') as in_handle, open(config, 'w') as out_handle:
 		for line in in_handle:
 			for to_replace in replace:
-				if to_replace in in_handle:
+				if to_replace in line:
 					line = line.replace(to_replace, replace[to_replace])
 					continue
 			out_handle.write(line)
-			
 	# arguments
 	sing_args = ['singularity', 'exec', 
 								'-B', os.path.abspath(os.path.dirname(r1)),
@@ -378,7 +377,7 @@ def run_tool(lock, outfile, out_dir, tool, exp, sample, reps, retries, parallel,
 				write_log(tool_run, log)
 				break
 			handle_error(tool_run, log, exp, sample, tool, i, j)
-
+	
 		try:
 			collect_output(tool_run, tool, exp, sample, i, outfile, lock, run_args)
 		except NameError:

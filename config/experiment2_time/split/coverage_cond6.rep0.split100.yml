@@ -1,0 +1,29 @@
+coverage:
+  R1_suffix: 1.fq
+  R2_suffix: 2.fq
+  align-cpus: 1
+  bam_suffix: .sorted.bam
+  bwa-mem: -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200
+  cigar-tol: 3
+  clip-cutoff: 20
+  dedup: false
+  host_name: chr1
+  host_prefix: ../out/experiment2_time/references/chr1/chr1
+  mean-frag-len: 500.0
+  merge: false
+  merge-dist: 1000
+  merge-n-min: 1
+  min-mapq: 10
+  out_dir: ../out/experiment2_time/coverage/isling/split/cond6.rep0/100
+  post:
+  - filter
+  read1-adapt: AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+  read2-adapt: AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+  read_folder: ../out/experiment2_time/coverage/sim_reads
+  samples:
+  - cond6.rep0
+  split: 100
+  trim: false
+  virus_name: OTC
+  virus_prefix: ../out/experiment2_time/references/OTC/OTC
+snakedir: .

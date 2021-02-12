@@ -70,4 +70,13 @@ snakemake \
  --until host_virus_index_seeksv ${SNAKEARGS}
 
 echo
+echo "indexing references for vseq-toolkit"
+snakemake \
+ --configfile "${OTHCONFIG}" \
+ --use-singularity \
+ --singularity-args "-B $(realpath ../)" \
+ --rerun-incomplete \
+ --until bwa_index ${SNAKEARGS}
+
+echo
 echo "done indexing references"

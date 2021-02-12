@@ -10,7 +10,7 @@ test-easier:
    hosts: 
        "chr1" : "../../data/references/chrs/chr1.fa"
    viruses:
-       "AAV" :  "../../data/references/NC_001401.2.fa"
+       "OTC" :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    initial_seed: 12345
    seed_increment: 123 
    epi_num:
@@ -54,7 +54,7 @@ test-easier:
    analysis_hosts: # if running vifi, there must be a matching key in analysis_hosts under vifi_params
        "chr1" : "../../data/references/chrs/chr1.fa"
    analysis_viruses:
-       "AAV" :  "../../data/references/NC_001401.2.fa"
+       "OTC" :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    merge: 
        - True
    trim: 

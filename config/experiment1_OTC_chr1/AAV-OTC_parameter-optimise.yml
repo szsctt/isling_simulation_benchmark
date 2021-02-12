@@ -1,5 +1,5 @@
 global:
-   out_directory: "../../out/experiment1_OTC_chr1/easier-harder_parameters"
+   out_directory: "../../out/experiment1_OTC_chr1/AAV-OTC_parameters"
    
    # integration simulation
    replicates: 3 

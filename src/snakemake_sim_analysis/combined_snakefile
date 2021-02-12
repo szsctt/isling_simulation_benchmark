@@ -948,14 +948,16 @@ rule make_seeksv_bed:
 
 rule make_vseq_bed:
 	input:
-		ints = rules.vseq_toolkit.output.csv
+		ints = rules.vseq_toolkit.output.unique
 	output:
-		bed = "{outpath}/{dset}/vseq_toolkit/{samp}.{host}.{virus}/ISGenomeVector.bed"
+		bed = "{outpath}/{dset}/vseq_toolkit/{samp}.{host}.{virus}/ISGenomeVector.bed",
+		tmp =  temp("{outpath}/{dset}/vseq_toolkit/{samp}.{host}.{virus}/ISGenomeVector.bed.tmp"),
 #	wildcard_constraints:
 #		dset = ".+_vseq_toolkit\d+"
 	shell:
 		"""
-		python3 scripts/write_vseq-toolkit_bed.py --vseq-toolkit-output {input.ints} --output {output.bed}
+		python3 scripts/write_vseq-toolkit_bed.py --vseq-toolkit-output {input.ints} --output {output.tmp}
+		sort -k1,1 -k2,2n {output.tmp} > {output.bed}
 		"""
 
 def get_bed_result(wildcards):

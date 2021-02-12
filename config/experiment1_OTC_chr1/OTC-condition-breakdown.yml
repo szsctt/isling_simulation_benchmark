@@ -1,6 +1,6 @@
 # things that are the same for all datasets
 global:
-   out_directory: "../../out/experiment1_OTC_chr1/condition-breakdown_OTC-harder-3"
+   out_directory: "../../out/experiment1_OTC_chr1/OTC-condition-breakdown"
    
    # integration simulation
    replicates: 3 
@@ -68,18 +68,17 @@ global:
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
-       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 20 -h 200"
    merge-dist:
        - 1000
    merge-n-min:
        - 1
    cigar-tol:
-       - 1
+       - 2
    clip-cutoff:
        - 20
    min-mapq:
        - 20
-       - 25
        - 30
        
     # scoring
@@ -131,7 +130,6 @@ global:
       - 'default'
      vecVecFusion: 
       - 'true'
-      - 'false'
      stringencyVec: 
       - 'high'
      UMthresholdVec: 
@@ -145,11 +143,11 @@ global:
      idenVecVec: 
       - 95
      stringencyVecGen: 
-      - 'high'
+      - 'medium'
      UMthresholdVecGen: 
       - 0.95
      minMapSpanVecGen: 
-      - 20
+      - 25
      distVecGen: 
       - 10
      opVecGen: 
@@ -158,9 +156,8 @@ global:
       - 95
      clusterRange: 
       - 3
-     host_info:
-       hg38: # fasta will be used from general analysis_hosts
-         host_table: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
+     host_table:
+       hg38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
 
 
 # things that are different for each dataset

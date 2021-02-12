@@ -1,5 +1,5 @@
 global:
-   out_directory: "../../out/experiment1_OTC_chr1/easier-harder"
+   out_directory: "../../out/experiment1_OTC_chr1/AAV-OTC"
    
    # integration simulation
    replicates: 3 
@@ -36,15 +36,11 @@ global:
        - 500
    # read simulation
    read_len: 
-       - 150
        - 250
    fcov: 
        - 5 
    frag_len: 
-       - 300  
        - 500
-       - 600
-       - 1000
    frag_std: 
        - 30
    seq_sys: 
@@ -56,7 +52,6 @@ global:
        
    merge: 
        - False
-       - True
    trim: 
        - True
    dedup: 
@@ -67,18 +62,16 @@ global:
          - mask-exclude:
            - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
-       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 20 -h 200"
    merge-dist:
        - 1000
    merge-n-min:
        - 1
    cigar-tol:
-       - 1
+       - 2
    clip-cutoff:
        - 20
    min-mapq:
-       - 10
-       - 15
        - 20
        
     # scoring
@@ -149,12 +142,9 @@ global:
       - 50
      mode: 
       - default
-      - sensitive
      vecVecFusion: 
       - 'true'
-      - 'false'
      stringencyVec: 
-      - 'high'
       - 'medium'
      UMthresholdVec: 
       - 0.95
@@ -167,12 +157,11 @@ global:
      idenVecVec: 
       - 95
      stringencyVecGen: 
-      - 'high'
       - 'medium'
      UMthresholdVecGen: 
       - 0.95
      minMapSpanVecGen: 
-      - 20
+      - 25
      distVecGen: 
       - 10
      opVecGen: 
@@ -181,9 +170,8 @@ global:
       - 95
      clusterRange: 
       - 3
-     host_info:
-       hg38: # fasta will be used from general analysis_hosts
-         host_table: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
+     host_table:
+       hg38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
 
 AAV-harder:
    viruses:

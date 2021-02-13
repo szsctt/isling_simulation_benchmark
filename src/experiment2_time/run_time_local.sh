@@ -22,6 +22,6 @@ bash run_sim.sh ${CONFIG} local
 bash run_index.sh ${CONFIG} ${CLUSTER} ${VIFI_REPO} local
 
 # run tools
-bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO} 16 local
+bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO} ${VSEQ} 16 local
 
 

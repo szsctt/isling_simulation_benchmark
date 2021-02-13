@@ -139,10 +139,10 @@ def run_experiment(exp, sim_config, config_path, config_script, seeksv_script, i
 				procs.append(pool.apply_async(run_vifi_partial, (exp, samp)))			
 				procs.append(pool.apply_async(run_vseq_partial, (exp, samp)))			
 			else:
-				#run_isling_partial(exp, samp)
-				#run_seeksv_partial(exp, samp)
-				#run_polyidus_partial(exp, samp)
-				#run_vifi_partial(exp, samp)
+				run_isling_partial(exp, samp)
+				run_seeksv_partial(exp, samp)
+				run_polyidus_partial(exp, samp)
+				run_vifi_partial(exp, samp)
 				run_vseq_partial(exp, samp)
 				
 		#get all results
@@ -163,20 +163,22 @@ def run_vseq_toolkit(exp, sample, sim_config, container, reps, outfile, lock, re
 	virus = list(sim_config[exp]['viruses'].keys())[0]
 	virus_prefix = os.path.join(sim_config[exp]['out_directory'], 'refs', 'bwa', virus, f"{virus}.fa")
 	host = list(sim_config[exp]['hosts'].keys())[0]
-	combined_prefix = os.path.join(sim_config[exp]['out_directory'], 'seeksv_refs', virus, f"{host}_{virus}.fa")
+	combined_prefix = os.path.join(sim_config[exp]['out_directory'], 'seeksv_refs', virus, f"{host}_{virus}.fas")
 	
 	# copy template config file from singularity container to local filesystem
 	template_config = '/var/work/VSeq-Toolkit/config.test.txt'
-	config = os.path.abspath(os.path.join(vseq_dir, "config.txt"))
+	config = os.path.abspath(f"{vseq_dir}.config.txt")
 	config_tmp = config + ".tmp"
 	a = subprocess.run(['singularity', 'exec', '-B', os.path.abspath(vseq_dir), container, 
 												'cp', template_config, config_tmp], capture_output=True, text=True)
 	a.check_returncode()
 	# write config file - replace lines in test config included with repo
-	replace = {
+	replace_lines = {
 		"file1= $VSeqToolkit/testDir/testData/testDataCombined.R1.fastq.gz" : f"file1= {os.path.abspath(r1)}",
-		"file2= $VSeqToolkit/testDir/testData/testDataCombined.R1.fastq.gz" : f"file2= {os.path.abspath(r2)}",	
+		"file2= $VSeqToolkit/testDir/testData/testDataCombined.R2.fastq.gz" : f"file2= {os.path.abspath(r2)}",	
 		"outDir= $VSeqToolkit/testDir/testResultsCheck/" : f"outDir= {os.path.abspath(vseq_dir)}/",
+		"adapter1=GATCGGAAGAGCACACGTCTGAACTCCAGTCAC" : "adapter1=AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+		"adapter2=AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" : "adapter2=AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",
 		"contAna=true": "contAna=false",
 		"vecRef= $VSeqToolkit/testDir/testReferenceIndex/vector1.fa" : f"vecRef= {os.path.abspath(virus_prefix)}",
 		"stringencyVec=low" : "stringencyVec=medium",
@@ -185,9 +187,9 @@ def run_vseq_toolkit(exp, sample, sim_config, container, reps, outfile, lock, re
 	}
 	with open(config_tmp, 'r') as in_handle, open(config, 'w') as out_handle:
 		for line in in_handle:
-			for to_replace in replace:
+			for to_replace in replace_lines:
 				if to_replace in line:
-					line = line.replace(to_replace, replace[to_replace])
+					line = line.replace(to_replace, replace_lines[to_replace])
 					continue
 			out_handle.write(line)
 	# arguments
@@ -197,8 +199,7 @@ def run_vseq_toolkit(exp, sample, sim_config, container, reps, outfile, lock, re
 								'-B', os.path.abspath(os.path.dirname(combined_prefix)),
 								'-B', os.path.abspath(vseq_dir),
 								container]		
-	vseq_args = ['perl', '/var/work/VSeq-Toolkit/scripts/VSeq-TK.pl', '-c', config]
-
+	vseq_args = ['perl', '-I', '/var/work/VSeq-Toolkit/scripts/', '/var/work/VSeq-Toolkit/scripts/VSeq-TK.pl', '-c', config]
 
 	# run vseq-toolkit
 	run_tool(lock, outfile, vseq_dir, 'vseq-toolkit', exp, sample, reps, retries, parallel, sing_args, vseq_args)
@@ -364,6 +365,7 @@ def run_tool(lock, outfile, out_dir, tool, exp, sample, reps, retries, parallel,
 			log = os.path.join(out_dir, f"{sample}.run_rep{i}.try{j}.log")
 			try:
 				print(f"running try {j}, replicate {i} for {tool} on experiment {exp}, sample {sample} at time {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}")
+				#print(" ".join(run_args))
 				if parallel:
 					tool_run = subprocess.run(run_args, capture_output=True, text=True)
 				else:

@@ -78,5 +78,12 @@ snakemake \
  --rerun-incomplete \
  --until bwa_index ${SNAKEARGS}
 
+snakemake \
+ --configfile "${OTHCONFIG}" \
+ --use-singularity \
+ --singularity-args "-B $(realpath ../)" \
+ --rerun-incomplete \
+ --until link_virus ${SNAKEARGS}
+ 
 echo
 echo "done indexing references"

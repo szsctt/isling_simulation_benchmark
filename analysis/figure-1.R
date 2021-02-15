@@ -18,7 +18,7 @@ num_y_breaks <- 2
 #### figure 1 ####
 
 # import scored integrations
-exp_dir <- file.path(results_dir, "easier-harder")
+exp_dir <- file.path(results_dir, "AAV-OTC")
 int_scores <- importIntScoreExperiment(exp_dir) 
 
 # only use postprocessed data from our pipeline
@@ -29,6 +29,32 @@ int_scores <- int_scores %>%
   )) %>% 
   mutate(analysis_tool = str_replace(analysis_tool, 'analysis|pipeline', 'isling')) %>% 
   mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) 
+
+
+# check out the scores for the VSeq-Toolkit conditions  - there are many!
+int_scores %>% 
+  rowwise() %>% 
+  mutate(dist = (PPV-1)^2 + (TPR-1)^2) %>% 
+  colnames()
+
+
+int_scores %>% 
+  filter(coords_score_type == coords_score_type_plot) %>% 
+  filter(window == score_window) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~experiment) +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL,
+    ),
+    legend.position = "bottom"
+  )
+
+ggsave("plots/AAV_OTC.pdf", width=10, height = 10)
 
 #import distances from each found integration to nearest simulated integration
 found_scores <- importNearestSimToFound(exp_dir, score_window, coords_score_type_plot) 
@@ -52,28 +78,6 @@ sim_scores <- sim_scores%>%
     TRUE ~ FALSE
   )) %>%  
   mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling'))
-
-
-# we had some different analysis and simulation conditions - figure out which ones to keep
-isling_conditions <- int_scores 
-
-
-
-int_scores %>% 
-  filter(coords_score_type == coords_score_type_plot) %>% 
-  filter(window == score_window) %>% 
-  ggplot(aes(x = PPV, y = TPR, color = analysis_condition)) +
-  geom_point() +
-  xlim(0, 1) +
-  ylim(0, 1) +
-  facet_wrap(experiment~condition) +
-  theme_classic() +
-  theme(
-    strip.background = element_rect(
-      color = 'white', fill = "#f2f2f2", linetype = NULL,
-    ),
-    legend.position = "bottom"
-  )
 
 
 
@@ -151,18 +155,20 @@ found_scores %>%
 
 
 # filter data for plotting
-isling_to_keep <- "isling2"
-condition_to_keep <- "cond5"
+#isling_to_keep <- "isling2"
+#condition_to_keep <- "cond5"
 
 plot_found_scores <- found_scores %>% 
   filter(score_type == coords_score_type_plot) %>% 
   filter(score_dist == score_window) %>% 
-  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE)) %>%  # keep isling2 only
-  filter(condition == condition_to_keep) %>% 
+#  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE)) %>%  # keep isling2 only
+#  filter(condition == condition_to_keep) %>% 
   mutate(tool = str_match(analysis_condition, "(.+)\\d+")[,2]) %>% 
   mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
   mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
-  mutate(tool = str_replace(tool, "vifi", "ViFi"))
+  mutate(tool = str_replace(tool, "vifi", "ViFi")) %>% 
+  mutate(tool = str_replace(tool, "vseq-toolkit", "VSeq-Toolkit"))
+  
 
 
 # double check filtering
@@ -174,12 +180,13 @@ plot_found_scores %>%
 plot_sim_scores <- sim_scores %>% 
   filter(score_type == coords_score_type_plot) %>% 
   filter(score_dist == score_window) %>% 
-  filter(condition == condition_to_keep) %>% 
-  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE)) %>%   # keep isling2 only
+#  filter(condition == condition_to_keep) %>% 
+#  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE)) %>%   # keep isling2 only
   mutate(tool = str_match(analysis_condition, "(.+)\\d+")[,2])  %>% 
   mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
   mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
-  mutate(tool = str_replace(tool , "vifi", "ViFi"))
+  mutate(tool = str_replace(tool , "vifi", "ViFi"))  %>% 
+  mutate(tool = str_replace(tool, "vseq-toolkit", "VSeq-Toolkit"))
 
 # double check filtering
 plot_sim_scores %>% 
@@ -190,16 +197,17 @@ plot_sim_scores %>%
 
 # scored integrations
 plot_int_scores <- int_scores %>% 
-  filter(condition == condition_to_keep) %>% 
+#  filter(condition == condition_to_keep) %>% 
+#  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE))  %>% 
   filter(coords_score_type == coords_score_type_plot) %>% 
-  filter(window == score_window) %>% 
-  filter(ifelse(str_detect(analysis_condition, "isling"), str_detect(analysis_condition, isling_to_keep), TRUE))  
+  filter(window == score_window) 
 
 plot_int_scores <- plot_int_scores %>% 
   select(experiment, analysis_tool, window, coords_score_type, condition, replicate, tp, fp, fn, PPV, TPR)  %>% 
   mutate(analysis_tool = str_replace(analysis_tool, "polyidus", "Polyidus")) %>% 
   mutate(analysis_tool = str_replace(analysis_tool, "seeksv", "Seeksv")) %>% 
-  mutate(analysis_tool = str_replace(analysis_tool, "vifi", "ViFi")) 
+  mutate(analysis_tool = str_replace(analysis_tool, "vifi", "ViFi"))   %>% 
+  mutate(tanalysis_tool= str_replace(analysis_tool, "vseq_toolkit", "VSeq-Toolkit"))
 
 
 OTC_found <- plot_found_scores %>% 

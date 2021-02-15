@@ -1,0 +1,496 @@
+---
+title: "Integration site update"
+author: Suzanne Scott
+date: 16 February 2021
+output: ioslides_presentation
+---
+
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+
+library(tidyverse)
+library(cowplot)
+
+source("/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/analysis/sim_functions.R")
+source("/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/analysis/figure-2_functions.R")
+
+results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment1_OTC_chr1"
+
+score_window <- 5
+coords_score_type_plot <- "coords_mean"
+dist_plot_offset <- 0.5
+facet_scales <- "free_y"
+
+# https://stackoverflow.com/questions/11335836/increase-number-of-axis-ticks
+offset <- dist_plot_offset
+num_y_breaks <- 2
+
+plot_tool_order <- c("isling", "Seeksv", "Polyidus", "ViFi", 'VSeq-Toolkit')
+
+```
+
+## Vector and viral integration
+
+Vector and wild-type viral integration are different use-cases  
+
+- Wild-type virus
+  - Viral reference may be unknown
+  - Often only interested in clonally expanded sites
+  - Often few integration sites
+- Vector integration
+  - Vector reference known, but possible homology with host
+  - Integration profile may be heterogenous
+  - High doses result in large number of integration sites
+
+## Benchmarking isling performance
+  
+Use simulated integrations  
+
+  - 1000 integrations of AAV2 or OTC vector into chr1
+  - ‘Wild-type’ integrations: no structural variation, higher coverage mimics clonal expansion
+  - ‘Vector’ integrations: some structural variation, lower coverage mimics heterogenous integration
+
+Comparing ground truth with tool outputs  
+
+  - correct chromosome
+  - jaccard statistic
+  - distance from each simulated integration to nearest found
+  - distance from each found integration to nearest sim 
+
+## Correct chromosome?
+
+Simulated integrations only integrations on chromosome 1 - anything output on another chromosome is a false positive
+
+```{r include=FALSE}
+exp_dir <- file.path(results_dir, "AAV-OTC")
+found_scores <- importNearestSimToFound(exp_dir, score_window, coords_score_type_plot) 
+
+found_scores <- found_scores %>% 
+  mutate(analysis_tool = str_replace(analysis_condition, "\\d+", "")) %>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline|analysis") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>%  
+  mutate(analysis_tool = case_when(
+    analysis_tool == "vifi" ~ "ViFi",
+    analysis_tool == "seeksv" ~ "Seeksv",
+    analysis_tool == "polyidus" ~ "Polyidus",
+    analysis_tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+    analysis_tool == "analysis" ~ "isling",
+    TRUE ~ analysis_tool
+  )) %>% 
+  mutate(analysis_tool = as.factor(analysis_tool)) %>% 
+  mutate(analysis_tool = forcats::fct_relevel(analysis_tool, plot_tool_order))
+```
+
+
+```{r}
+found_scores %>% 
+  filter(condition == "cond0") %>% 
+  mutate(chr1 = (chr == "chr1")) %>% 
+  ggplot(aes(x = analysis_tool, fill = chr1)) +
+  geom_bar() +
+  facet_wrap(~experiment)  + 
+  theme(axis.text.x = element_text(angle = 90))
+  
+```
+
+## Jaccard statistic
+
+Consider 'ambiguous bases' to be integration site - (sometimes) nonzero length due to:  
+
+ - Microhomology
+ - Inserted bases at integration site
+ 
+ 
+![](figures/jaccard.svg)
+
+$jaccard(simulated, output) =\frac{length(intersection)}{length(union) - length(intersection)}$
+
+
+## Jaccard results
+
+
+```{r include=FALSE}
+jac <- importJaccardExperiment(exp_dir)
+jac <- jac  %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                   post ~ TRUE,
+                   TRUE ~ FALSE
+  )) %>% 
+  mutate(analysis_tool = case_when(
+    analysis_tool == "vifi" ~ "ViFi",
+    analysis_tool == "seeksv" ~ "Seeksv",
+    analysis_tool == "polyidus" ~ "Polyidus",
+    analysis_tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+    TRUE ~ analysis_tool
+  )) %>% 
+  mutate(analysis_tool = as.factor(analysis_tool)) %>% 
+  mutate(analysis_tool = forcats::fct_relevel(analysis_tool, plot_tool_order))
+```
+
+
+
+```{r echo=FALSE}
+jac %>% 
+  filter(condition == "cond0") %>% 
+  ggplot(aes(x = analysis_tool, y= jaccard, fill=analysis_tool)) +
+  geom_boxplot() +
+  geom_jitter(height = 0) +
+  facet_wrap(~experiment) + 
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+## Distance scoring
+
+![](figures/bedtools-dist.svg)
+
+![](figures/everything-right-place.svg)
+
+
+
+## Sim-to-output
+
+```{r include=FALSE}
+sim_scores <- importNearestFoundToSim(exp_dir, score_window, coords_score_type_plot) 
+
+sim_scores <- sim_scores %>% 
+  mutate(analysis_tool  = str_replace(analysis_condition, "\\d+", "")) %>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline|analysis") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>%  
+  mutate(analysis_tool = case_when(
+    analysis_tool == "vifi" ~ "ViFi",
+    analysis_tool == "seeksv" ~ "Seeksv",
+    analysis_tool == "polyidus" ~ "Polyidus",
+    analysis_tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+    analysis_tool == "analysis" ~ "isling",
+    TRUE ~ analysis_tool
+  )) %>% 
+  mutate(analysis_tool = as.factor(analysis_tool)) %>% 
+  mutate(analysis_tool = forcats::fct_relevel(analysis_tool, plot_tool_order))
+```
+
+true positive: dist <= 5; false negative: dist > 5
+```{r warning=FALSE}
+sim_scores %>% 
+  filter(score_type == coords_score_type_plot) %>% 
+  filter(score_dist == score_window) %>%  
+  filter(condition == "cond0") %>% 
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = analysis_tool)) +
+  geom_freqpoly(bins = 20) +
+  geom_vline(xintercept=score_window) +
+  scale_x_log10() +
+  xlab("sim-to-found") +
+  ylab("Count") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+  facet_grid(rows=vars(analysis_tool), cols = vars(experiment))  +
+  theme(legend.position = "bottom")
+```
+
+
+
+## Output-to-sim
+
+true positive: dist <= 5; false positive: dist > 5
+```{r warning=FALSE}
+found_scores %>% 
+  filter(score_type == coords_score_type_plot) %>% 
+  filter(score_dist == score_window) %>%  
+  filter(condition == "cond0") %>% 
+  mutate(dist = dist+offset) %>% 
+  ggplot(aes(x = dist, colour = analysis_tool)) +
+  geom_freqpoly(bins = 20) +
+  geom_vline(xintercept=score_window) +
+  scale_x_log10() +
+  xlab("found-to-sim") +
+  ylab("Count") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+  facet_grid(rows=vars(analysis_tool), cols = vars(experiment))  +
+  theme(legend.position = "bottom")
+```
+
+## Scoring
+
+
+```{r include=FALSE}
+sim_scores_sum <- sim_scores %>% 
+  ungroup() %>% 
+  group_by(filename, analysis_condition, experiment, condition, replicate, unique, results_file) %>% 
+  summarize(tp = sum(dist <= score_window, na.rm=TRUE) - is.na(dist),
+            fn = sum(dist > score_window, na.rm=TRUE) + is.na(dist)) %>% 
+  distinct()
+
+sim_scores_sum
+
+found_scores_sum <- found_scores %>% 
+  ungroup() %>% 
+  group_by(filename, analysis_condition, experiment, condition, replicate, unique, results_file) %>% 
+  summarize(fp = sum(dist > score_window, na.rm=TRUE) + is.na(dist)) %>% 
+  distinct()
+
+found_scores_sum
+
+combined_scores <- sim_scores_sum %>% 
+  left_join(found_scores_sum, by = c("analysis_condition", "experiment", "condition", "replicate"))
+
+combined_scores
+
+```
+
+
+```{r include=FALSE}
+sim_scores %>% 
+  filter(condition == "cond0") %>% 
+  filter(is.na(dist)) %>% 
+  pull(analysis_condition) %>% 
+  table()
+
+
+
+sim_scores %>% 
+  filter(chr == "chr1") %>% 
+  filter(is.na(dist)) %>% 
+  filter(str_detect(analysis_condition, "polyidus"))
+```
+
+
+
+```{r include=FALSE}
+# import scored integrations
+int_scores <- importIntScoreExperiment(exp_dir) 
+int_scores <- int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                   post ~ TRUE,
+                   TRUE ~ FALSE
+  )) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_tool = case_when(
+    analysis_tool == "vifi" ~ "ViFi",
+    analysis_tool == "seeksv" ~ "Seeksv",
+    analysis_tool == "polyidus" ~ "Polyidus",
+    analysis_tool == "vseq_toolkit" ~ "VSeq-Toolkit",
+    TRUE ~ analysis_tool
+  ))  %>% 
+  mutate(analysis_tool = as.factor(analysis_tool)) %>% 
+  mutate(analysis_tool = forcats::fct_relevel(analysis_tool, plot_tool_order))
+```
+
+
+
+```{r echo=FALSE, warning=FALSE}
+int_scores %>% 
+  filter(host_name == "chr1") %>% 
+  filter(coords_score_type == coords_score_type_plot) %>% 
+  filter(window == score_window) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_tool)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~experiment) +
+  theme(
+    legend.position = "bottom"
+  )
+```
+
+
+## Effect of chromosome and coverage
+
+```{r include=FALSE, warning=FALSE}
+
+min_mapq_keep <- 20
+
+results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment1_OTC_chr1/OTC-condition-breakdown"
+folders <- c("chr-fcov")
+
+df_list <- list()
+results <- importAllIntScoreExperiments(results_dir, folders, score_window, coords_score_type)
+
+# import all data so that we can better look at the difference between analysis conditions
+
+results$int_scores <- results$int_scores %>% 
+  filter(coords_score_type == coords_score_type_plot) %>% 
+  filter(window == score_window)
+
+results$int_scores
+
+unique(results$int_scores$unique.x)
+
+results$int_scores
+
+results$int_scores %>% 
+    select(window, coords_score_type, experiment, condition, replicate, tool, batch, analysis_condition) %>%
+    distinct() %>% 
+    group_by(batch, window, coords_score_type, experiment, condition, tool, analysis_condition) %>% 
+    summarise(count = n())
+
+plot_int_scores <- results$int_scores %>% 
+  mutate(tool = str_replace(analysis_condition, "\\d+", "")) %>% 
+  mutate(tool = case_when(
+    tool == "polyidus" ~ "Polyidus",
+    tool == "seeksv" ~ "Seeksv",
+    tool == "vifi" ~ "ViFi",
+    tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+    tool == "pipeline" ~ "isling",
+    TRUE ~ tool
+  )) %>% 
+  ungroup() %>% 
+  pivot_longer(TPR:PPV, names_to = "score_type", values_to = "score") %>% 
+  group_by(host_name, fcov, tool, score_type, min_mapq, analysis_condition) %>% 
+  summarise(mean_score = mean(score),
+            sd_score = sd(score),
+            sem_score = sd(score)/sqrt(n()),
+            n_score = n(),
+            mean_minus_sem = mean_score - sem_score,
+            mean_plus_sem = mean_score + sem_score) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, plot_tool_order)) %>% 
+  filter(ifelse(tool == "isling", min_mapq==min_mapq_keep, TRUE)) 
+
+
+```
+
+```{r warning=FALSE}
+plot_int_scores %>% 
+  ggplot(aes(x = fcov, y = mean_score, color = tool)) + 
+  geom_point() +
+  geom_line() +
+  geom_linerange(aes(ymin = mean_minus_sem, ymax = mean_plus_sem)) +
+  facet_grid(score_type~host_name) +
+  scale_x_log10() + 
+  theme_classic() +
+  theme(legend.position = "bottom",
+        strip.background = element_blank(),
+        axis.title.x = element_blank()) +
+  ylim(0, 1) +
+  xlab('Fold coverage') +
+  ylab('Score') 
+```
+
+
+
+## Runtime
+
+- Compare tools on simulated data
+  - Viral load: increasing number of integrations and episomes
+  - Fold covarage: 1000 integrations, increasing number of reads
+- Run tools inside singularity container
+- Each run gets 20 cores, 128 Gb memory (1 node on Pearcey), 24 hours max
+
+
+## Runtime - viral load
+
+
+
+```{r include=FALSE, warning=FALSE}
+
+experiments <- c("coverage", 'viral_load')
+
+results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment2_time/"
+files <- list.files(results_dir, recursive = TRUE, pattern="_runtime.tsv")
+
+files <- files[ basename(dirname(files)) %in% experiments]
+
+files <- files[dirname(dirname(files)) == "."]
+
+
+coltypes <- cols(
+  tool = col_character(),
+  dataset = col_character(),
+  sample = col_character(),
+  replicate = col_double(),
+  exit_value = col_double(),
+  user_time = col_double(),
+  system_time = col_double(),
+  elapsed_time = col_character(),
+  CPU = col_character(),
+  shared_text = col_double(),
+  unshared_data = col_double(),
+  max_rss = col_double(),
+  fs_inputs = col_double(),
+  fs_outputs = col_double(),
+  major_page_faults = col_double(),
+  minor_page_faults = col_double(),
+  swaps = col_double(),
+  command = col_character()
+)
+
+times <- tibble(
+  filename = file.path(results_dir, files),
+  experiment = dirname(files),
+  data = map(filename, ~read_tsv(., col_types=coltypes))
+) %>% 
+  unnest(data) %>% 
+  mutate(duration_elapsed_time = case_when(
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\.\\d{2}") ~ lubridate::as.duration(lubridate::ms(elapsed_time)),
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\:\\d{2}") ~ lubridate::as.duration(lubridate::hms(elapsed_time)),
+    TRUE ~ lubridate::as.duration(NA)
+  )) %>% 
+  rename(time_rep = replicate)
+
+conds <- importSimulationConditions(results_dir)
+
+times <- left_join(times, conds, by=c("experiment", "sample")) %>% 
+  mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
+  mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
+  mutate(tool = str_replace(tool, "vifi", "ViFi")) %>% 
+  mutate(tool = str_replace(tool, "vseq-toolkit", "VSeq-Toolkit"))  
+
+times <- times %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, plot_tool_order))
+
+```
+
+Number of episomes
+
+```{r warning=FALSE}
+times %>% 
+  filter(experiment == "viral_load") %>% 
+  mutate(int_num = as_factor(int_num)) %>% 
+   ggplot(aes(x = int_num, y = duration_elapsed_time, color=tool)) +
+  geom_boxplot()  +
+  facet_wrap(vars(epi_num)) +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 90, hjust = 1),
+    #    axis.title.y = element_blank(),
+  )  +
+  xlab("Number of integrations") +
+  ylab("Runtime (s)") +
+  scale_y_log10()
+
+```
+
+## Runtime - fold coverage
+
+```{r warning=FALSE}
+
+ times %>% 
+  filter(experiment == "coverage") %>% 
+  mutate(fcov = as.factor(fcov)) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, plot_tool_order)) %>% 
+  ggplot(aes(x = fcov, y = duration_elapsed_time, color=tool)) +
+  geom_boxplot()  +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1),
+    legend.position = "bottom"
+  ) +
+  xlab("Fold coverage") +
+  ylab("Runtime (s)") +
+  scale_y_log10() 
+
+
+
+```
+

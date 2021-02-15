@@ -558,7 +558,7 @@ importJaccardExperiment <- function(exp_path) {
     filenames <- c(filenames, files)
   }
   
-  column_names = c("result_file", "sim_file", "intersection", "union", "jaccard", "n_intersection")
+  column_names = c("result_file", "sim_file", "intersection", "union", "jaccard", "n_intersections")
   
   column_types <- cols(
     result_file = col_character(),
@@ -579,7 +579,7 @@ importJaccardExperiment <- function(exp_path) {
   jaccard <- jaccard %>% 
     mutate(file_name = basename(filename)) %>% 
     mutate(analysis_condition = str_split(file_name, "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(analysis_condition_short = str_match(analysis_condition, "(analysis|seeksv|polyidus|vifi)\\d+")[,1] ) %>% 
+    mutate(analysis_condition_short = str_match(analysis_condition, "(analysis|seeksv|polyidus|vifi|vseq-toolkit)\\d+")[,1] ) %>% 
     mutate(r = paste0("(.+)_", analysis_condition_short)) %>% 
     mutate(experiment = str_match(analysis_condition, r)[,2]) %>% 
     select(-r) %>% 
@@ -630,7 +630,7 @@ importDistScoreExperiment <- function(exp_path, type, keep_window = "all", keep_
     rowwise() %>% 
     mutate(results_file = basename(filename)) %>% 
     mutate(unique = str_split(results_file, "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(analysis_condition = str_match(unique(unique), "(analysis|seeksv|polyidus|vifi)\\d+")[,1] ) %>% 
+    mutate(analysis_condition = str_match(unique(unique), "(analysis|seeksv|polyidus|vifi|vseq-toolkit)\\d+")[,1] ) %>% 
     mutate(r = paste0("(.+)_", analysis_condition)) %>% 
     mutate(experiment = str_match(unique, r)[,2]) %>% 
     select(-r) %>% 

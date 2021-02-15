@@ -6,11 +6,11 @@ library(lubridate)
 
 source("/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/analysis/sim_functions.R")
 
-plot_tool_order <- c("isling", "Seeksv", "Polyidus", "ViFi")
+plot_tool_order <- c("isling", "Seeksv", "Polyidus", "ViFi", 'VSeq-Toolkit')
 
 experiments <- c("coverage", 'viral_load')
 
-results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment2_time_gcloud/"
+results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment2_time/"
 files <- list.files(results_dir, recursive = TRUE, pattern="_runtime.tsv")
 
 files <- files[ basename(dirname(files)) %in% experiments]
@@ -54,6 +54,9 @@ times <- tibble(
 
 # how many times does each exit value occur?
 table(times$exit_value)
+times %>% 
+  group_by(tool, exit_value) %>% 
+  summarise(n = n())
 
 # check number of replicates for each pair of fastq files
 times %>% 
@@ -65,13 +68,19 @@ times %>%
   summarise(n = n()) %>% 
   filter(n != 3)
 
+times %>% 
+  group_by(experiment, sample) %>% 
+  summarise(n = n()) %>% 
+  filter(n != 15)
+
 # add simulation conditions
 conds <- importSimulationConditions(results_dir)
 
 times <- left_join(times, conds, by=c("experiment", "sample")) %>% 
   mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
   mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
-  mutate(tool = str_replace(tool, "vifi", "ViFi"))
+  mutate(tool = str_replace(tool, "vifi", "ViFi")) %>% 
+  mutate(tool = str_replace(tool, "vseq-toolkit", "VSeq-Toolkit"))  
 
 
 times %>% 

@@ -232,7 +232,7 @@ plot_exps <- list(
   "chr-fcov" = "chr/fcov"
 )
 
-makeFigure2(plot_exps, df_list, "plots/figure2_v6_otc-harder.pdf", 12, 12)
+#makeFigure2(plot_exps, df_list, "plots/figure2_v6_otc-harder.pdf", 12, 12)
 
 
 

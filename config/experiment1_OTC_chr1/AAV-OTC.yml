@@ -5,6 +5,7 @@ global:
    replicates: 3 
    hosts: 
       chr1 : "../../data/references/chrs/chr1.fa"
+      hg38 : "../../data/references/GRCh38_main.fa" 
    
    initial_seed: 12345
    seed_increment: 123 

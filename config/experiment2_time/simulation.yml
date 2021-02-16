@@ -58,13 +58,13 @@ coverage:
        - 50
        - 100
 
-#viral_load:
-#   int_num:  
-#       - 0   
-#       - 100
-#       - 10000
-#   epi_num:
-#       - 0   
-#       - 100
-#       - 10000 
+viral_load:
+   int_num:  
+       - 0   
+       - 100
+       - 10000
+   epi_num:
+       - 0   
+       - 100
+       - 10000 
 

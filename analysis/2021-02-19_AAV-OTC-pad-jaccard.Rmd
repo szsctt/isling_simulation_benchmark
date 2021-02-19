@@ -1,0 +1,196 @@
+---
+title: "Simulalation results - padding and jaccard"
+output: html_notebook
+---
+
+```{r include=F}
+knitr::opts_chunk$set(echo = FALSE, warning=F)
+library(tidyverse)
+
+source("sim_functions.R")
+
+AAV_OTC_dir <- "../out/experiment1_OTC_chr1/AAV-OTC/"
+score_window <- 5
+coords_score_type_plot <- "coords_mean"
+
+```
+
+# AAV and OTC integration
+
+I simulated data as before - with an OTC and AAV condition - and compared the performance of various viral integration tools in various ways.  I simulated integrations into either chromosome 1, or all of hg38.  I used hg38 for analysis in the intergration tools.
+
+## Jaccard
+
+The first is the Jaccard statistic - the ratio of the intersection and union of the simulated and output integrations.   I
+
+
+I converted the location of the simulated integrations, as well as the output of the various tools to bed format.  For the various tools:  
+
+- ViFi: use the output file `output.clusters.txt.range.bed`, and change commas to tabs.  These intervals are often long - can be hundreds of bp.
+- Polyidus: use the output file `exactHpvIntegrations.simple.bed`, take the first three columns.  This is a one-length interval
+- Seeksv: used script `write_seeksv_bed.py`, which takes a list of chromosomes for the host, as well as the Seeksv output file.  This script identifies lines with viral integrations (rather than other kinds of structural variation), and then uses the 'position' (either `left_pos` or `right_pos`, depending on if host is left or right) as the start coordinate, and start + microhomology_length as the stop coordinate.
+- VSeq-Toolkit: used script `write_vseq_bed.py`, which uses the `GenomicPosition` column as the start coordinate, and uses `GenomicPosition + OverlapFusion + DistanceFusion` as the stop coordinate.  I used the `ISGenomeVector.UniqueGenome.csv` file. 
+
+For Seeksv and VSeq-Toolkit, it's not entirley clear that this is the right way to calculate a start and stop, since I couldn't find a detailed description of what the data in the columns I'm using actually means.  For Seeksv, the microhomology length column was either negative or positive, so I assumed that positive meant homology and negative means a gap.  I think this is a fair assumption.  For VSeq-Toolkit, the description from an [issue on github](https://github.com/CompMeth/VSeq-Toolkit/issues/4) of these columns is:  
+
+> OverlapFusion - the analysis strategy depends on finding a fusion between vector and genome mapped regions of the read. This column indicates how many bases at the fusion site were overlapped between genomic and vector mapped regions.
+DistanceFusion - similarly it indicates if there were any bases at the fusion site between vector and genome that were not mapped.
+
+I also added various amounts of padding to all intervals - 0, 2 or 5 bp.
+
+```{r}
+jac <- importJaccardExperiment(AAV_OTC_dir) %>% 
+  mutate(pad = as.integer(str_extract(sim_file, "(?<=pad)\\d+"))) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, "analysis", "isling"))
+```
+
+```{r}
+jac %>% 
+  select(host_name, virus_name, analysis_tool, replicate, pad, jaccard, intersection, union, n_intersections, experiment, analysis_condition)
+```
+
+
+```{r fig.height=10, fig.width=10}
+plotlist <- list()
+for (p in unique(jac$pad)) {
+  plotlist[[glue("{p}")]] <- jac %>% 
+    filter(pad == p) %>% 
+    ggplot(aes(x = analysis_tool, y = jaccard)) +
+    geom_boxplot() +
+    geom_point() +
+    facet_wrap(experiment~host_name, scales="free") +
+    ggtitle(glue("padding {p}")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+cowplot::plot_grid(plotlist=plotlist)
+```
+
+We don't HAVE to pad the intervals for the Jaccard statistic.  Indeed, doing so may create intersections, where none existed before padding. The argument for padding is that not all tools acknowledge that the integration site is an interval, not just a point. 
+
+## Chromosomes
+
+For the runs where I only used chromosome 1, it's easy to see if integrations are output on the correct chromosome, because if they're not on chromosome 1, they're wrong.
+
+```{r include=FALSE}
+
+#import distances from each found integration to nearest simulated integration
+found_scores <- importNearestSimToFound(AAV_OTC_dir, score_window, coords_score_type_plot) 
+
+# only use postprocessed data from our pipeline
+found_scores <- found_scores %>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(tool = str_replace(analysis_condition, "\\d+", ""))
+
+# import distances from each simulated integration to the nearest found integration
+sim_scores <- importNearestFoundToSim(AAV_OTC_dir, score_window, coords_score_type_plot) 
+
+sim_scores <- sim_scores%>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>%  
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(tool = str_replace(analysis_condition, "\\d+", ""))
+
+```
+
+```{r}
+found_scores %>% 
+  filter(condition == "cond0") %>% 
+  mutate(correct_chr = (chr == "chr1")) %>% 
+  ggplot(aes(x = tool, fill = correct_chr)) +
+  geom_bar() +
+  facet_wrap(~experiment, scales="free")
+```
+
+## Distances
+
+I also calculated the distance from each simulated integration to the nearest output one, which indicates false negatives (if the distance is large), and from each output integration to the nearest simulated one, which indicates false positives (if the distance is large).
+
+First, plot the distribution of the sim-to-found distances.  Note that cond0 means chr1 as reference for simulation, and cond1 means hg38.
+
+```{r}
+sim_scores %>% 
+  mutate(dist = dist+0.5) %>% 
+  ggplot(aes(x = dist, color = tool)) +
+  geom_freqpoly(bins = 100) +
+  scale_x_log10() +
+  facet_wrap(experiment~condition)
+```
+
+Next, the found-to-sim distances:
+```{r}
+found_scores %>% 
+  mutate(dist = dist+0.5) %>% 
+  ggplot(aes(x = dist, color = tool)) +
+  geom_freqpoly(bins = 100) +
+  scale_x_log10() +
+  facet_wrap(experiment~condition)
+```
+
+
+## Scores
+
+If we place a threshold on the distances, we can get a count of true positives, false positives and false negatives.  A true positive is a simulated integration for which there is a found integration within this threshold, a false positive is an ouput integration for which there is nost a simulated integration within this threshold, and a false negative is a simulated integration for which there is not a found integration within this threshold.  
+
+We could define a true positive in either of two ways: a found integration with a simulated integration near it, or a simulated integration with a found integration near it.  If a tool outputs the same integration twice, this would count as two true positives in the former situation, but one in the latter.  Since there is no information gained by outputing the same integration twice, I don't want to reward this behaviour, so I chose the latter situation for scoring.  However, this scoring scheme doesn't penalise this behaviour either, since all that matters is that the two output integrations are both close to a simulated integration.
+
+```{r include=FALSE}
+int_scores <- importIntScoreExperiment(AAV_OTC_dir) 
+
+# only use postprocessed data from our pipeline
+int_scores <- int_scores %>% 
+  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
+                   post ~ TRUE,
+                   TRUE ~ FALSE
+  )) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) 
+```
+
+
+```{r}
+int_scores %>% 
+  select(host_name, virus_name, analysis_tool, window, replicate, PPV, TPR, tp:fn, experiment)
+```
+
+And a plot:
+```{r fig.height=10, fig.width=10}
+plotlist <- list()
+for (w in unique(int_scores$window)) {
+  plotlist[[glue("{w}")]] <- int_scores %>% 
+    filter(window == w) %>% 
+    ggplot(aes(x = PPV, y = TPR, color = analysis_tool)) +
+    geom_point() +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    facet_wrap(host_name~virus_name) +
+    theme(legend.position = "none") +
+    ggtitle(glue("dist threshold: {w}"))
+}
+
+plotlist[['legend']] = cowplot::get_legend(plotlist[["0"]] + theme(legend.position = "right"))
+cowplot::plot_grid(plotlist=plotlist)
+```
+
+## Figure 1
+
+If we don't pad for the Jaccard statistic, and we use a distance threshold of 5 for scoring, then our figure would look something like this:
+
+```{r}
+jaccard_pad <- 0
+scoring_dist <- 5
+score_type <- "coords_mean"
+tool_order <- c("isling", "Polyidus", "Seeksv", "ViFi", "VSeq-Toolkit")
+
+
+
+
+```
+

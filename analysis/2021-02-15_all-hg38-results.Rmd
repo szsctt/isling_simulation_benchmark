@@ -40,7 +40,7 @@ Vector and wild-type viral integration are different use-cases
   - Often few integration sites
 - Vector integration
   - Vector reference known, but possible homology with host
-  - Integration profile may be heterogenous
+  - Integration profile may be heterogeneous
   - High doses result in large number of integration sites
 
 ## Benchmarking isling performance
@@ -49,7 +49,7 @@ Use simulated integrations
 
   - 1000 integrations of AAV2 or OTC vector into chr1
   - ‘Wild-type’ integrations: no structural variation, higher coverage mimics clonal expansion
-  - ‘Vector’ integrations: some structural variation, lower coverage mimics heterogenous integration
+  - ‘Vector’ integrations: some structural variation, lower coverage mimics heterogeneous integration
 
 Comparing ground truth with tool outputs  
 
@@ -60,7 +60,7 @@ Comparing ground truth with tool outputs
 
 ## Correct chromosome?
 
-Simulated integrations only integrations on chromosome 1 - anything output on another chromosome is a false positive
+Simulated integrations only on chromosome 1 - anything output on another chromosome is a false positive
 
 ```{r include=FALSE}
 exp_dir <- file.path(results_dir, "AAV-OTC")
@@ -382,7 +382,7 @@ plot_int_scores %>%
 
 - Compare tools on simulated data
   - Viral load: increasing number of integrations and episomes
-  - Fold covarage: 1000 integrations, increasing number of reads
+  - Fold coverage: 1000 integrations, increasing number of reads
 - Run tools inside singularity container
 - Each run gets 20 cores, 128 Gb memory (1 node on Pearcey), 24 hours max
 

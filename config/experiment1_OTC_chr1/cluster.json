@@ -60,6 +60,21 @@
 		"time" : "6:00:00",
 		"job-name" : "viInt-ints"
 	},
+	"run_discordant":
+	{
+		"time" : "2:00:00",
+		"job-name" : "viInt-ints"
+	},
+	"run_soft":
+	{
+		"time" : "2:00:00",
+		"job-name" : "viInt-ints"
+	},
+	"run_short":
+	{
+		"time" : "2:00:00",
+		"job-name" : "viInt-ints"
+	},
 	"post":
 	{
 		"time" : "2:00:00",

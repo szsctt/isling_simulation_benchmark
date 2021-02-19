@@ -80,10 +80,16 @@ global:
    score_ints: True
    score_merged_ints: True
    score_ints_window: 
+    - 0
+    - 2
     - 5
+    - 10
 
    score_ints_type: 
     - "coords_mean"
+    - "coords_min"
+    - "shortest"
+    - "midpoint"
    
    # other tools 
    polyidus_params:
@@ -206,6 +212,44 @@ AAV-harder:
        - 5
    analysis_viruses:
       AAV2 :  "../../data/references/NC_001401_2.fa"
+      
+   vseq_toolkit_params:
+     qua: 
+      - 20
+     lenPer: 
+      - 50
+     mode: 
+      - default
+     vecVecFusion: 
+      - 'false'
+     stringencyVec: 
+      - 'medium'
+     UMthresholdVec: 
+      - 0.95
+     minMapSpanVec: 
+      - 20
+     distVecVec: 
+      - 10
+     opVecVec: 
+      - 5
+     idenVecVec: 
+      - 95
+     stringencyVecGen: 
+      - 'medium'
+     UMthresholdVecGen: 
+      - 0.95
+     minMapSpanVecGen: 
+      - 25
+     distVecGen: 
+      - 10
+     opVecGen: 
+      - 5
+     idenVecGen: 
+      - 95
+     clusterRange: 
+      - 3
+     host_table:
+       hg38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"  
    
 OTC-harder:
    viruses:

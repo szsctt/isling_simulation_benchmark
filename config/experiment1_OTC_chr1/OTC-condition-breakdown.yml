@@ -86,6 +86,7 @@ global:
    score_ints: True
    score_merged_ints: True
    score_ints_window: 
+    - 2
     - 5
    score_ints_type: 
     - "coords_mean"

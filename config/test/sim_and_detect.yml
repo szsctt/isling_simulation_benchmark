@@ -161,21 +161,23 @@ global:
       - 95
      clusterRange: 
       - 3
-     host_info:
-       human: # fasta will be used from general analysis_hosts
-         mappability: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt" 
+     host_table:
+       human: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt" 
 
   
    # scoring
    score_reads: True
    score_ints: True
    score_ints_window:  # window either side of simulated integrations to look for detected integrations
+    - 0
+    - 5
     - 20
 #    - 100
    score_ints_type:  
-    - "coords_min"
     - "coords_mean"
-    - "overlap"
+    - "coords_min"
+    - "shortest"
+    - "midpoint"
 
 test-easier:
    int_num:

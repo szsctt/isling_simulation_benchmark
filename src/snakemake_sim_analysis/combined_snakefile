@@ -8,6 +8,7 @@ import copy
 import itertools
 import pandas as pd
 import re
+import collections
 
 from python_scripts.parse_config import parse_config
 from python_scripts.make_df import make_df, make_post_args, make_reference_dict
@@ -28,7 +29,13 @@ verse_threads = 8
 
 #defaults for scoring
 default_scoring = {'score_ints' : 1, 'score_reads' : 0}
-score_types = {'overlap', 'coords_min', 'coords_mean'}
+score_type_cols = {
+	'shortest' : 7,
+	'coords_mean': 8,
+	'coords_min': 9,
+	'midpoint': 10 
+}
+score_types = score_type_cols.keys()
 
 
 #####################################################
@@ -40,13 +47,29 @@ score_types = {'overlap', 'coords_min', 'coords_mean'}
 # datasets in the config file.  If a key is specified in both 'global' and a dataset,
 # the value specified in the dataset will be used
 
+
+def add_default(default, dataset):
+	for key in default.keys():
+
+		# if this key is not set for this dataset, add it with default value
+		if not (isinstance(default[key], dict) or isinstance(default[key], collections.OrderedDict)):
+
+			if key not in dataset.keys():
+				dataset[key] = default[key]
+		# otherwise, descend into dict
+		else:
+			if key not in dataset.keys():
+				dataset[key] = {}
+			add_default(default[key], dataset[key])
+
 if 'global' in config:		
 	# get default (global) options
 	default = config.pop('global')
-	for dataset in config:
-		for key in default:
-			if key not in config[dataset]:
-				config[dataset][key] = default[key]
+	
+	# replace any missing values with default values
+	for dataset in config.values():
+		add_default(default, dataset)
+		
 
 #####################################################
 ############# simulation parameters #################
@@ -317,7 +340,8 @@ wildcard_constraints:
 	outpath = "|".join(set(analysis_df.loc[:, 'outdir'])),
 	dist = "\d+",
 	score_type = "|".join(score_types),
-	part = "\d+"
+	part = "\d+",
+	pad_len = "\d+"
 
 dset_non_isling = ".+"
 #dset_non_isling = ".+_((vifi)|(seeksv)|(polyidus))\d+"
@@ -735,40 +759,51 @@ rule combine_read_scores:
 		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
 		"""
 
-rule score_integrations:
+rule bedtools_closest:
 	input:
-		sim_info = rules.annotate_reads.output.annotated_info,
-		analysis_bed = lambda wildcards: get_bed_result(wildcards),
-		merged_reads = rules.merged_list.output.merged_reads
+		results_bed = lambda wildcards: get_bed_result(wildcards, padding = 0),
+		sim_bed = rules.sim_bed.output.bed
 	output:
-		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_summary.tsv",
-		scored_ints = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}.tsv",
-		sim_results = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_sim-results.tsv",
-		found_results = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_found-results.tsv"
-	resources:
-		mem_mb= lambda wildcards, attempt: attempt * 5000,
-		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
-		nodes = 1
-	params:
-		tool = lambda wildcards: f"--analysis-tool {analysis_df_value(wildcards, analysis_df, 'tool')}",
-		window = lambda wildcards: f"--window {wildcards.dist}",
-		score_type = lambda wildcards: f"--score-type {wildcards.score_type}"
-	threads: 1
+		closest = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_{type}-results.tsv"
+	wildcard_constraints:
+		found = "found|sim"
 	container:
-		"docker://szsctt/simvi:2"
-	conda:
-		"envs/simvi.yml"
+		"docker://szsctt/bedtools:1"	
+	resources:
+		mem_mb= lambda wildcards, attempt, input: 1000,
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1	
+	params:
+		a_file = lambda wildcards, input: input.results_bed if wildcards.type == "found" else input.sim_bed,
+		b_file = lambda wildcards, input: input.sim_bed if wildcards.type == "found" else input.results_bed,
 	shell:
 		"""
-		python3 scripts/score_integrations.py \
-		--sim-info {input.sim_info} \
-		--found-bed {input.analysis_bed} \
-		--output {output.scored_ints} \
-		--output-sim {output.sim_results} \
-		--output-found {output.found_results} \
-		--summary {output.summary} \
-		{params}
+		bedtools closest -d -a {params.a_file} -b {params.b_file} | \
+		python3 scripts/add_cols.py > {output.closest}
+		"""		
+
+rule score_ints:
+	input:
+		sim_to_found = expand(rules.bedtools_closest.output.closest, type="sim", allow_missing=True),
+		found_to_sim =  expand(rules.bedtools_closest.output.closest, type="found", allow_missing=True),
+	output:
+		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_summary.tsv",
+	params:
+		tool = lambda wildcards: analysis_df_value(wildcards, analysis_df, 'tool'),
+	container:
+		"docker://szsctt/simvi:2"
+	shell:
 		"""
+		python3 scripts/summarise_ints.py \
+		 --sim-to-found {input.sim_to_found} \
+		 --found-to-sim {input.found_to_sim} \
+		 --output {output.summary} \
+		 --threshold {wildcards.dist} \
+		 --threshold-col {wildcards.score_type} \
+		 --tool {params.tool}
+		"""
+		
+		
 		
 # target files for per-read or per-integration comparison of analysis with simulation
 def scores_to_combine(wildcards, score_type):
@@ -805,21 +840,21 @@ def scores_to_combine(wildcards, score_type):
 		# get samples for this experiment
 		samples = set(sim_df[sim_df['experiment'] == exp]['sample'])
 		
-		
 		# we only have postprocessed data for our pipeline
 		if re.search("analysis", unique):
 			post = '.post'
 		else:
 			post = ''
 	
+		# get distances for this experiment - will only be used for jaccard and score_ints
+		dists = analysis_df[analysis_df['experiment'] == wildcards.exp]['score_ints_window']
+		row_num = dists.index[0]
+		assert all([entry == dists[row_num] for entry in dists])
+		dists = dists[row_num]
+		if not hasattr(dists, '__iter__'):
+			dists = [dists]
+	
 		if score_type == "ints":
-			# get distances for this experiment
-			dists = analysis_df[analysis_df['experiment'] == wildcards.exp]['score_ints_window']
-			row_num = dists.index[0]
-			assert all([entry == dists[row_num] for entry in dists])
-			dists = dists[row_num]
-			if not hasattr(dists, '__iter__'):
-				dists = [dists]
 			
 			# get score types for this experiment
 			types = analysis_df[analysis_df['experiment'] == wildcards.exp]['score_ints_type']
@@ -842,8 +877,8 @@ def scores_to_combine(wildcards, score_type):
 			]	
 		else:
 			scored_files += [
-			f"{outpath}/{exp}/jaccard/{dset}.{samp}.{host}.{virus}{post}.txt"
-				for samp in samples
+			f"{outpath}/{exp}/jaccard/{dset}.{samp}.{host}.{virus}{post}.pad{dist}.txt"
+				for samp, dist in itertools.product(samples, dists)
 			]
 
 	
@@ -960,24 +995,53 @@ rule make_vseq_bed:
 		sort -k1,1 -k2,2n {output.tmp} > {output.bed}
 		"""
 
-def get_bed_result(wildcards):
+def get_bed_result(wildcards, padding = 0):
+
 	if analysis_df_value(wildcards, analysis_df, 'tool') == 'pipeline':
-		return rules.make_isling_bed.output.bed
+		bed = rules.make_isling_bed.output.bed
+			
 	if analysis_df_value(wildcards, analysis_df, 'tool') == 'vifi':
-		return rules.make_vifi_bed.output.bed
+		bed = rules.make_vifi_bed.output.bed
+		
 	if analysis_df_value(wildcards, analysis_df, 'tool') == 'polyidus':
-		return rules.make_polyidus_bed.output.out_bed		
+		bed =  rules.make_polyidus_bed.output.out_bed		
+	
 	if analysis_df_value(wildcards, analysis_df, 'tool') == 'seeksv':
-		return rules.make_seeksv_bed.output.bed	
+		bed = rules.make_seeksv_bed.output.bed	
+	
 	if analysis_df_value(wildcards, analysis_df, 'tool') == 'vseq_toolkit':
-		return rules.make_vseq_bed.output.bed	
+		bed = rules.make_vseq_bed.output.bed	
+	
+	if padding == 0:
+		return bed
+	else:
+		base = os.path.splitext(bed)[0]
+		return base + f".pad{padding}.bed"
+
+rule pad_bed:
+	input:
+		bed = "{input_file}.bed",
+	output:
+		bed = "{input_file}.pad{pad_len}.bed"
+	resources:
+		mem_mb= lambda wildcards, attempt: 1000 * attempt,
+		time = lambda wildcards, attempt: ('2:00:00', '24:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1		
+	run:	
+		with open(input.bed, 'r') as in_file, open(output.bed, 'w') as out_file:
+			for line in in_file:
+				bed_line = line.strip().split()
+				bed_line[1] = str(int(bed_line[1]) - int(wildcards.pad_len))
+				bed_line[2] = str(int(bed_line[2]) + int(wildcards.pad_len))
+				out_file.write("\t".join(bed_line) + "\n")				
+				
 	
 rule jaccard:
 	input:
-		results_bed = lambda wildcards: get_bed_result(wildcards),
-		sim_bed = "{outpath}/{exp}/sim_ints/{samp}.int-info.bed"
+		results_bed = lambda wildcards: get_bed_result(wildcards, padding = wildcards.pad_len),
+		sim_bed = "{outpath}/{exp}/sim_ints/{samp}.int-info.pad{pad_len}.bed"
 	output:
-		jaccard = "{outpath}/{exp}/jaccard/{dset}.{samp}.{host}.{virus}{post}.txt"
+		jaccard = "{outpath}/{exp}/jaccard/{dset}.{samp}.{host}.{virus}{post}.pad{pad_len}.txt"
 	container:
 		"docker://szsctt/bedtools:1"	
 	resources:

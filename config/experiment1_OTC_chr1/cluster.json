@@ -21,7 +21,7 @@
 	"convert_to_bam":
 	{	
 		"mem" : "20GB",
-		"time" : "2:00:00",
+		"time" : "24:00:00",
 		"job-name" : "viInt-convert"
 
 	},
@@ -96,6 +96,12 @@
 		"job-name" : "viInt-seeksv"
 	},
 	"trim":
+	{	
+		"time" : "24:00:00",
+		"mem" : "50GB",
+		"job-name" : "viInt-trim"
+	},
+	"seqPrep_unmerged":
 	{	
 		"time" : "24:00:00",
 		"mem" : "50GB",

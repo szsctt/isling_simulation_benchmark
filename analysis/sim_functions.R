@@ -665,18 +665,16 @@ importDistScoreExperiment <- function(exp_path, type, keep_window = "all", keep_
 
 importDistFile <- function(filename) {
   colspec <- cols(
-    id = col_character(),
-    score = col_character(),
-    type = col_character(),
-    chr = col_character(),
-    pos = col_character(),
-    start = col_double(),
-    stop = col_double(),
-    dist = col_double(),
-    read_count = col_double(),
-    reads = col_character(),
-    left_read_count = col_double(),
-    right_read_count = col_double()
+    chr_1 = col_character(),
+    start_1 = col_integer(),
+    stop_1 = col_integer(),
+    chr_2 = col_character(),
+    start_2 = col_integer(),
+    stop_2 = col_integer(),
+    shortest = col_integer(),
+    coords_mean = col_double(),
+    coords_min = col_double(),
+    midpoint = col_double()
   )
   cat("importing file ", filename, "\n")
   
@@ -686,11 +684,32 @@ importDistFile <- function(filename) {
 
 
 importNearestSimToFound <- function(exp_path, keep_window, keep_score_type) {
-  return(importDistScoreExperiment(exp_path, "found", keep_window, keep_score_type))
+  dists <- importDistScoreExperiment(exp_path, "found", keep_window, keep_score_type)
+  
+  dists <- dists %>% 
+    rename(chr_found = chr_1) %>% 
+    rename(start_found = start_1) %>% 
+    rename(stop_found = stop_1) %>% 
+    rename(chr_sim = chr_2) %>% 
+    rename(start_sim = start_2) %>% 
+    rename(stop_sim = stop_2)
+  
+  return(dists)
 }
 
 importNearestFoundToSim <- function(exp_path, keep_window, keep_score_type) {
-  return(importDistScoreExperiment(exp_path, "sim", keep_window, keep_score_type))
+  
+  dists <- importDistScoreExperiment(exp_path, "sim", keep_window, keep_score_type)
+  
+  dists <- dists %>% 
+    rename(chr_sim = chr_1) %>% 
+    rename(start_sim = start_1) %>% 
+    rename(stop_sim = stop_1) %>% 
+    rename(chr_found = chr_2) %>% 
+    rename(start_found = start_2) %>% 
+    rename(stop_found = stop_2)
+  
+  return(dists)
 }
 
 #### plotting functions ####

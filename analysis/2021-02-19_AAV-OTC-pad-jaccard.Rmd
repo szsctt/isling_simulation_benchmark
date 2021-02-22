@@ -13,6 +13,8 @@ AAV_OTC_dir <- "../out/experiment1_OTC_chr1/AAV-OTC/"
 score_window <- 5
 coords_score_type_plot <- "coords_mean"
 
+score_types <- c("shortest", "coords_mean", "coords_min", "midpoint")
+
 ```
 
 # AAV and OTC integration
@@ -38,7 +40,7 @@ DistanceFusion - similarly it indicates if there were any bases at the fusion si
 
 I also added various amounts of padding to all intervals - 0, 2 or 5 bp.
 
-```{r}
+```{r include=FALSE}
 jac <- importJaccardExperiment(AAV_OTC_dir) %>% 
   mutate(pad = as.integer(str_extract(sim_file, "(?<=pad)\\d+"))) %>% 
   mutate(analysis_tool = str_replace(analysis_tool, "analysis", "isling"))
@@ -103,7 +105,7 @@ sim_scores <- sim_scores%>%
 ```{r}
 found_scores %>% 
   filter(condition == "cond0") %>% 
-  mutate(correct_chr = (chr == "chr1")) %>% 
+  mutate(correct_chr = (chr_found == "chr1")) %>% 
   ggplot(aes(x = tool, fill = correct_chr)) +
   geom_bar() +
   facet_wrap(~experiment, scales="free")
@@ -111,27 +113,54 @@ found_scores %>%
 
 ## Distances
 
+```{r}
+sim_scores
+```
+
+
 I also calculated the distance from each simulated integration to the nearest output one, which indicates false negatives (if the distance is large), and from each output integration to the nearest simulated one, which indicates false positives (if the distance is large).
+
+There are four types of distances that I used.  "shortest" is the shortest distance between the starts and stop of the two intervals, or 0 if they overlap.  "coords_mean" is the mean of $abs(start_1 - start_2)$ and $abs(stop_1 - stop_2)$, "coords_min" is the minimum of $abs(start_1 - start_2)$ and $abs(stop_1 - stop_2)$, and "midpoint" is the distance between the midpoints of the two intervals.  To calculate these, I used `bedtools closest` to find the closest output integration for each simulated integration (or vice versa), and also to calculate the shortest distance, and then I calcualted the other distances using this output. 
 
 First, plot the distribution of the sim-to-found distances.  Note that cond0 means chr1 as reference for simulation, and cond1 means hg38.
 
-```{r}
-sim_scores %>% 
-  mutate(dist = dist+0.5) %>% 
-  ggplot(aes(x = dist, color = tool)) +
-  geom_freqpoly(bins = 100) +
-  scale_x_log10() +
-  facet_wrap(experiment~condition)
+```{r fig.height=10, fig.width=10}
+dist_add <- 0.5
+plotlist <- list()
+for (s in score_types) {
+  plotlist[[s]] <- sim_scores %>% 
+   mutate(s := !!ensym(s)+dist_add) %>% 
+   ggplot(aes(x = s, color = tool)) +
+    geom_freqpoly(bins = 100) +
+    scale_x_log10() +
+    facet_wrap(experiment~condition, scales="free_y") +
+    ggtitle(s) +
+    xlab("distance") +
+    theme(legend.position = "none")
+}
+p <- cowplot::plot_grid(plotlist=plotlist)
+legend <- cowplot::get_legend(plotlist[[s]] + theme(legend.position = "bottom"))
+cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.1))
 ```
 
 Next, the found-to-sim distances:
-```{r}
-found_scores %>% 
-  mutate(dist = dist+0.5) %>% 
-  ggplot(aes(x = dist, color = tool)) +
-  geom_freqpoly(bins = 100) +
-  scale_x_log10() +
-  facet_wrap(experiment~condition)
+```{r fig.height=10, fig.width=10}
+dist_add <- 0.5
+plotlist <- list()
+for (s in score_types) {
+  plotlist[[s]] <- found_scores %>% 
+   mutate(s := !!ensym(s)+dist_add) %>% 
+   ggplot(aes(x = s, color = tool)) +
+    geom_freqpoly(bins = 100) +
+    scale_x_log10() +
+    facet_wrap(experiment~condition, scales="free_y") +
+    ggtitle(s) +
+    xlab("distance") +
+    theme(legend.position = "none")
+}
+p <- cowplot::plot_grid(plotlist=plotlist)
+legend <- cowplot::get_legend(plotlist[[s]] + theme(legend.position = "bottom"))
+cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.1))
 ```
 
 
@@ -141,23 +170,75 @@ If we place a threshold on the distances, we can get a count of true positives, 
 
 We could define a true positive in either of two ways: a found integration with a simulated integration near it, or a simulated integration with a found integration near it.  If a tool outputs the same integration twice, this would count as two true positives in the former situation, but one in the latter.  Since there is no information gained by outputing the same integration twice, I don't want to reward this behaviour, so I chose the latter situation for scoring.  However, this scoring scheme doesn't penalise this behaviour either, since all that matters is that the two output integrations are both close to a simulated integration.
 
-```{r include=FALSE}
-int_scores <- importIntScoreExperiment(AAV_OTC_dir) 
+```{r}
+score_dists <- function(dists, group_cols, above_threshold = "fp", score_col = "coords_mean", threshold = 5) {
+  print(glue("checking column {score_col} with threshold {threshold}"))
+  return(dists %>% 
+           mutate(score = case_when(
+             !!ensym(score_col) == -1 ~ above_threshold,
+             !!ensym(score_col) > threshold ~ above_threshold,
+             !!ensym(score_col) <= threshold ~ "tp",
+             TRUE ~ as.character(NA)
+           )) %>% 
+           group_by(across(one_of(c(group_cols, "score")))) %>% 
+           tally() %>% 
+           mutate(window = threshold) %>% 
+           mutate(score_type = score_col) %>% 
+           ungroup())
+  
+}
 
-# only use postprocessed data from our pipeline
-int_scores <- int_scores %>% 
-  filter(case_when((analysis_tool != "pipeline") ~ TRUE,
-                   post ~ TRUE,
-                   TRUE ~ FALSE
-  )) %>% 
-  mutate(analysis_tool = str_replace(analysis_tool, 'analysis|pipeline', 'isling')) %>% 
-  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) 
+all_scores <- function(found_dists, sim_dists, group_cols, threshold, score_col) {
+  
+  found <- score_dists(found_dists, group_cols, above_threshold ="fp", score_col, threshold) %>% 
+    filter(score == "fp")
+  sim <- score_dists(sim_dists, group_cols, above_threshold ="fn", score_col, threshold)
+  
+  
+  return(
+    bind_rows(found, sim) %>% 
+           pivot_wider(names_from = score, values_from = n, values_fill = 0) %>% 
+      ungroup() %>% 
+      rowwise() %>% 
+      mutate(PPV = tp / (tp + fp)) %>% 
+      mutate(TPR = tp / (tp + fn)) %>% 
+      ungroup()
+         )
+}
+
+
+#all_scores(found_scores, sim_scores, group_cols = group_cols, threshold = 5, score_col = "midpoint")  %>% 
+ arrange(experiment, condition, replicate)
+```
+
+
+
+```{r include=FALSE}
+group_cols<- c("unique", "analysis_condition", "experiment", "condition", "replicate",  "analysis_host", "analysis_virus", "post", "tool")
+
+dists = c(0, 2, 5, 10)
+
+
+int_scores <- tibble()
+
+for (s in score_types) {
+  
+  for (t in dists) {
+    
+    int_scores <- bind_rows(
+      int_scores, all_scores(found_scores, sim_scores, 
+                             group_cols = group_cols, threshold = t, score_col = s) 
+    )
+  }
+  
+}
+
 ```
 
 
 ```{r}
 int_scores %>% 
-  select(host_name, virus_name, analysis_tool, window, replicate, PPV, TPR, tp:fn, experiment)
+  select(analysis_host, analysis_virus, tool, window, score_type, replicate, PPV, TPR, tp:fp, experiment)
 ```
 
 And a plot:
@@ -166,30 +247,57 @@ plotlist <- list()
 for (w in unique(int_scores$window)) {
   plotlist[[glue("{w}")]] <- int_scores %>% 
     filter(window == w) %>% 
-    ggplot(aes(x = PPV, y = TPR, color = analysis_tool)) +
+    ggplot(aes(x = PPV, y = TPR, color = tool, shape = score_type)) +
     geom_point() +
     xlim(0, 1) +
     ylim(0, 1) +
-    facet_wrap(host_name~virus_name) +
+    facet_wrap(condition~analysis_virus) +
     theme(legend.position = "none") +
     ggtitle(glue("dist threshold: {w}"))
 }
 
-plotlist[['legend']] = cowplot::get_legend(plotlist[["0"]] + theme(legend.position = "right"))
-cowplot::plot_grid(plotlist=plotlist)
+legend <- cowplot::get_legend(plotlist[["0"]] + theme(legend.position = "bottom"))
+p <- cowplot::plot_grid(plotlist=plotlist)
+cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.1))
 ```
 
 ## Figure 1
 
-If we don't pad for the Jaccard statistic, and we use a distance threshold of 5 for scoring, then our figure would look something like this:
+If we just look at the chr1 data (not hg38), don't pad for the Jaccard statistic, and we use a distance threshold of 5 and the 'coords_mean' metric for scoring, then our figure would look something like this:
 
 ```{r}
 jaccard_pad <- 0
 scoring_dist <- 5
 score_type <- "coords_mean"
 tool_order <- c("isling", "Polyidus", "Seeksv", "ViFi", "VSeq-Toolkit")
+condition_plot <- "cond0"
 
+jac_plot <- jac %>% 
+  filter(pad == jaccard_pad) %>% 
+  filter(condition == condition_plot) %>% 
+  mutate(tool = case_when(
+    analysis_tool == "polyidus" ~ "Polyidus",
+    analysis_tool == "seeksv" ~ "Seeksv",
+    analysis_tool == "vifi" ~ "ViFi",
+    analysis_tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+    TRUE ~ analysis_tool
+  )) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  mutate(experiment = str_replace(experiment, "-harder", ""))
 
+sim_plot <- sim_scores %>% 
+  filter(condition == condition_plot) %>% 
+  mutate(tool = case_when(
+    tool == "polyidus" ~ "Polyidus",
+    tool == "seeksv" ~ "Seeksv",
+    tool == "vifi" ~ "ViFi",
+    tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+    TRUE ~ tool
+  ))  %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  mutate(experiment = str_replace(experiment, "-harder", ""))
 
 
 ```

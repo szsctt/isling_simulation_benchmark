@@ -35,7 +35,7 @@ score_type_cols = {
 	'coords_min': 9,
 	'midpoint': 10 
 }
-score_types = score_type_cols.keys()
+score_types = {'shortest', 'coords_mean', 'coords_min', 'midpoint'}
 
 
 #####################################################
@@ -757,7 +757,7 @@ rule combine_read_scores:
 		awk 'FNR==1 && NR!=1 {{ getline; }}; 1 {{print}}' {input} > {output}
 		"""
 
-rule bedtools_closest:
+rule closest:
 	input:
 		results_bed = lambda wildcards: get_bed_result(wildcards, padding = 0),
 		sim_bed = rules.sim_bed.output.bed
@@ -776,8 +776,7 @@ rule bedtools_closest:
 		b_file = lambda wildcards, input: input.sim_bed if wildcards.type == "found" else input.results_bed,
 	shell:
 		"""
-		bedtools closest -d -a {params.a_file} -b {params.b_file} | \
-		python3 scripts/add_cols.py > {output.closest}
+		python3 scripts/closest.py -a {params.a_file} -b {params.b_file} -o {output.closest}
 		"""		
 
 rule score_ints:
@@ -800,9 +799,7 @@ rule score_ints:
 		 --threshold-col {wildcards.score_type} \
 		 --tool {params.tool}
 		"""
-		
-		
-		
+
 # target files for per-read or per-integration comparison of analysis with simulation
 def scores_to_combine(wildcards, score_type):
 

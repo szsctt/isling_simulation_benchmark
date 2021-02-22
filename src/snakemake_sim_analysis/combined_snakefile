@@ -608,8 +608,6 @@ include: "snakemake_rules/seeksv.smk"
 
 include: "snakemake_rules/vseq.smk"
 
-
-
 #####################################################
 ############ compare sim with analysis ##############
 #####################################################
@@ -764,7 +762,7 @@ rule bedtools_closest:
 		results_bed = lambda wildcards: get_bed_result(wildcards, padding = 0),
 		sim_bed = rules.sim_bed.output.bed
 	output:
-		closest = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_{type}-results.tsv"
+		closest = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}_{type}-results.tsv"
 	wildcard_constraints:
 		found = "found|sim"
 	container:

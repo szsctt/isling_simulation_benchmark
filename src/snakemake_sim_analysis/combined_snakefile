@@ -299,7 +299,7 @@ for i, row in analysis_df.iterrows():
 		read_prefix = os.path.join(row['outdir'], experiment, 'sim_reads', sample)
 		todo_row['R1_file'] = read_prefix + row['R1_suffix']
 		todo_row['R2_file'] = read_prefix + row['R2_suffix']
-		todo_row['bam_file'] = read_prefix + row['bam_suffix']
+		todo_row['bam_file'] = ""
 		
 		# host and virus prefixes
 		todo_row['host_prefix'] = os.path.join(row['outdir'], 'references', row['host'], row['host'])
@@ -315,6 +315,7 @@ for i, row in analysis_df.iterrows():
 		rows.append(todo_row)
 		
 toDo = pd.DataFrame(rows, columns = column_names)
+
 
 # make dictionary of reference names and fasta files
 ref_names = make_reference_dict(toDo)
@@ -762,11 +763,11 @@ rule closest:
 		results_bed = lambda wildcards: get_bed_result(wildcards, padding = 0),
 		sim_bed = rules.sim_bed.output.bed
 	output:
-		closest = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}_{type}-results.tsv"
+		closest = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}{post}.{type}-results.tsv"
 	wildcard_constraints:
-		found = "found|sim"
+		type = "found|sim",
 	container:
-		"docker://szsctt/bedtools:1"	
+		"docker://szsctt/simvi:2"	
 	resources:
 		mem_mb= lambda wildcards, attempt, input: 1000,
 		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
@@ -781,8 +782,8 @@ rule closest:
 
 rule score_ints:
 	input:
-		sim_to_found = expand(rules.bedtools_closest.output.closest, type="sim", allow_missing=True),
-		found_to_sim =  expand(rules.bedtools_closest.output.closest, type="found", allow_missing=True),
+		sim_to_found = expand(rules.closest.output.closest, type="sim", allow_missing=True),
+		found_to_sim =  expand(rules.closest.output.closest, type="found", allow_missing=True),
 	output:
 		summary = "{outpath}/{exp}/scored_ints/{dset}.{samp}.{host}.{virus}.{dist}.{score_type}{post}_summary.tsv",
 	params:

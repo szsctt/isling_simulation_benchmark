@@ -26,8 +26,8 @@ snakemake \
  --use-singularity \
  --singularity-args "-B $(realpath ../../)" \
  --profile slurm \
- --cluster-config ${CLUSTER} \
  --rerun-incomplete \
  --latency-wait 120
-
+ 
+# --cluster-config ${CLUSTER} \
 

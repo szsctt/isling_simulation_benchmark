@@ -37,4 +37,4 @@ snakemake \
  --jobs 1 \
  --use-singularity \
  --singularity-args '-B $(realpath ../..)' \
- --rerun-incomplete 
+ --rerun-incomplete --forceall --notemp

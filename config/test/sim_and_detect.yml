@@ -1,6 +1,13 @@
 global:
    out_directory: "../../out/test"
    
+   # genome variation
+   snp_count: 10
+   indel_count: 10
+   cnv_count: 0
+   inversion_count: 0
+   translocation_count: 0
+   
    # integration simulation
    replicates: 1 
    hosts: 
@@ -58,50 +65,54 @@ global:
        - True
    dedup: 
        - False
-   post:
-       -
-         - dedup
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
-   merge-dist:
-       - 100
+   filter:
+       -
+         - "True"
+   bed-exclude:
+       -
+         - "../../data/references/hg38_homologoustoOTCvec.bed" 
+   bed-include:
+       -
+         - 
+   merge-method:
+       - 'common'
    merge-n-min:
        - 2
    cigar-tol:
        - 3
    clip-cutoff:
        - 20
-   min-mapq:
-       - 5
    
    #run polyidus?
-   polyidus_params:
-     aligner:
-      - "bowtie2"
-     trim: 
-      - False
+#   polyidus_params:
+#     aligner:
+#      - "bowtie2"
+#     trim: 
+#      - False
       
    # run vifi
-   vifi_params:
-   # first element in each list is first host, second is second host, etc etc
-     host_info:
-       human: # fasta will be used from general analysis_hosts
-         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
-         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
-         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
-         centromeres: "../../data/references/GRCh38/centromeres.bed"
-         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
-     trim: 
-      - True
+#   vifi_params:
+#   # first element in each list is first host, second is second host, etc etc
+#     host_info:
+#       human: # fasta will be used from general analysis_hosts
+#         mappability: "../../vifi-test/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
+#         mappability_exclude: "../../data/references/GRCh38/ENCFF356LFX.bed"
+#         genes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
+#         exons: "../../data/references/GRCh38/hg38.gencode.v35.annotation.exons.gff3"
+#         oncogenes: "../../data/references/GRCh38/hg38.gencode.v35.annotation.genes.gff3"
+#         centromeres: "../../data/references/GRCh38/centromeres.bed"
+#         conserved_regions: "../../data/references/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
+#         segdup: "../../data/references/GRCh38/genomicSuperDups.bed"
+#     trim: 
+#      - True
 
-   seeksv_params:
-     trim:
-      - True
-     dedup:
-      - False    
+#   seeksv_params:
+#     trim:
+#      - True
+#     dedup:
+#      - False    
 
    # run verse
    # https://bioinfo.uth.edu/VirusFinder/VirusFinder-manual.pdf?csrt=2093584511125027598
@@ -126,58 +137,58 @@ global:
 #      - True
 
 
-   vseq_toolkit_params:
-     qua: 
-      - 20
-     lenPer: 
-      - 50
-     mode: 
-      - default
-     vecVecFusion: 
-      - 'true'
-     stringencyVec: 
-      - 'medium'
-     UMthresholdVec: 
-      - 0.95
-     minMapSpanVec: 
-      - 20
-     distVecVec: 
-      - 10
-     opVecVec: 
-      - 5
-     idenVecVec: 
-      - 95
-     stringencyVecGen: 
-      - 'medium'
-     UMthresholdVecGen: 
-      - 0.95
-     minMapSpanVecGen: 
-      - 20
-     distVecGen: 
-      - 10
-     opVecGen: 
-      - 5
-     idenVecGen: 
-      - 95
-     clusterRange: 
-      - 3
-     host_table:
-       human: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt" 
+#   vseq_toolkit_params:
+#     qua: 
+#      - 20
+#     lenPer: 
+#      - 50
+#     mode: 
+#      - default
+#     vecVecFusion: 
+#      - 'true'
+#     stringencyVec: 
+#      - 'medium'
+#     UMthresholdVec: 
+#      - 0.95
+#     minMapSpanVec: 
+#      - 20
+#     distVecVec: 
+#      - 10
+#     opVecVec: 
+#      - 5
+#     idenVecVec: 
+#      - 95
+#     stringencyVecGen: 
+#      - 'medium'
+#     UMthresholdVecGen: 
+#      - 0.95
+#     minMapSpanVecGen: 
+#      - 20
+#     distVecGen: 
+#      - 10
+#     opVecGen: 
+#      - 5
+#     idenVecGen: 
+#      - 95
+#     clusterRange: 
+#      - 3
+#     host_table:
+#       human: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt" 
 
   
    # scoring
-   score_reads: True
+   score_reads: False
    score_ints: True
    score_ints_window:  # window either side of simulated integrations to look for detected integrations
-    - 0
+#    - 0
     - 5
-    - 20
+#    - 20
 #    - 100
    score_ints_type:  
     - "coords_mean"
-    - "coords_min"
-    - "shortest"
-    - "midpoint"
+#    - "coords_min"
+#    - "shortest"
+#    - "midpoint"
 
 test-easier:
    int_num:

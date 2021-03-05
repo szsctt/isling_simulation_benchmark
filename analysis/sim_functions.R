@@ -599,14 +599,14 @@ importJaccardExperiment <- function(exp_path) {
     
 }
 
-importDistScoreExperiment <- function(exp_path, type, keep_window = "all", keep_score_type = "all") {
+importDistScoreExperiment <- function(exp_path, type) {
   if (type == "found") {
-    summary_suffix <- "_found-results.tsv"
-    score_type_sub <- '_found-results'
+    summary_suffix <- ".found-results.tsv"
+    score_type_sub <- '.found-results'
   }
   else {
-    summary_suffix <- "_sim-results.tsv"
-    score_type_sub <- '_sim-results'
+    summary_suffix <- ".sim-results.tsv"
+    score_type_sub <- '.sim-results'
   }
   scored_ints_folder <- "scored_ints"
   
@@ -639,20 +639,8 @@ importDistScoreExperiment <- function(exp_path, type, keep_window = "all", keep_
     mutate(replicate = as.double(str_extract(replicate, "\\d+"))) %>% 
     mutate(analysis_host = str_split(results_file, "\\.", simplify=TRUE)[,4]) %>% 
     mutate(analysis_virus = str_split(results_file, "\\.", simplify=TRUE)[,5]) %>% 
-    mutate(score_dist = as.numeric(str_split(results_file, "\\.", simplify=TRUE)[,6])) %>% 
-    mutate(score_type = str_split(results_file, "\\.", simplify=TRUE)[,7]) %>%  
-    mutate(score_type = sub(score_type_sub, '', score_type)) %>% 
     mutate(post = str_detect(results_file, "post")) %>% 
     ungroup()
-  
-  if (keep_window != "all") {
-    int_scores <- int_scores %>% 
-      filter(score_dist == keep_window)
-  }
-  if (keep_score_type != "all") {
-    int_scores <- int_scores %>% 
-      filter(score_type == keep_score_type)
-  }
   
   # import data
   int_scores <- int_scores %>% 
@@ -664,52 +652,33 @@ importDistScoreExperiment <- function(exp_path, type, keep_window = "all", keep_
 }
 
 importDistFile <- function(filename) {
-  colspec <- cols(
-    chr_1 = col_character(),
-    start_1 = col_integer(),
-    stop_1 = col_integer(),
-    chr_2 = col_character(),
-    start_2 = col_integer(),
-    stop_2 = col_integer(),
-    shortest = col_integer(),
-    coords_mean = col_double(),
-    coords_min = col_double(),
-    midpoint = col_double()
-  )
+  # colspec <- cols(
+  #   chr_1 = col_character(),
+  #   start_1 = col_integer(),
+  #   stop_1 = col_integer(),
+  #   chr_2 = col_character(),
+  #   start_2 = col_integer(),
+  #   stop_2 = col_integer(),
+  #   shortest = col_integer(),
+  #   coords_mean = col_double(),
+  #   coords_min = col_double(),
+  #   midpoint = col_double()
+  # )
   cat("importing file ", filename, "\n")
   
-  return(read_tsv(filename, col_types = colspec))
+  #return(read_tsv(filename, col_types = colspec))
+  return(read_tsv(filename))
   
 }
 
 
-importNearestSimToFound <- function(exp_path, keep_window, keep_score_type) {
-  dists <- importDistScoreExperiment(exp_path, "found", keep_window, keep_score_type)
-  
-  dists <- dists %>% 
-    rename(chr_found = chr_1) %>% 
-    rename(start_found = start_1) %>% 
-    rename(stop_found = stop_1) %>% 
-    rename(chr_sim = chr_2) %>% 
-    rename(start_sim = start_2) %>% 
-    rename(stop_sim = stop_2)
-  
-  return(dists)
+importNearestSimToFound <- function(exp_path) {
+  return(importDistScoreExperiment(exp_path, "found"))
 }
 
-importNearestFoundToSim <- function(exp_path, keep_window, keep_score_type) {
+importNearestFoundToSim <- function(exp_path) {
   
-  dists <- importDistScoreExperiment(exp_path, "sim", keep_window, keep_score_type)
-  
-  dists <- dists %>% 
-    rename(chr_sim = chr_1) %>% 
-    rename(start_sim = start_1) %>% 
-    rename(stop_sim = stop_1) %>% 
-    rename(chr_found = chr_2) %>% 
-    rename(start_found = start_2) %>% 
-    rename(stop_found = stop_2)
-  
-  return(dists)
+  return(importDistScoreExperiment(exp_path, "sim"))
 }
 
 #### plotting functions ####

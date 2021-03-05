@@ -1,0 +1,222 @@
+---
+title: "Comparing isling and VSeq-Toolkit parameters"
+output:
+  html_notebook:
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+---
+
+## Data
+
+I'm using simulated data here - there are two conditions, an "AAV" condition and an "OTC vctor" condition.  I used the following simulation parameters:
+
+
+|              Parameter             |        AAV        |     OTC    |
+|:----------------------------------:|:-----------------:|:----------:|
+|                Host                |        Chr1       |    Chr1    |
+|                Virus               | AAV2 (NC001401.2) | OTC vector |
+|       Number of integrations       |        1000       |    1000    |
+|         Number of episomes         |        100        |    1000    |
+|              p(whole)              |        0.3        |     0.3    |
+|           minimum length           |         20        |     20     |
+|            p(rearrange)            |         0         |     0.1    |
+|              p(delete)             |         0         |     0.1    |
+|            lambda(split)           |         1         |      1     |
+|               p(gap)               |        0.3        |     0.3    |
+|             p(overlap)             |        0.3        |     0.3    |
+|           lambda_junction          |         1         |      1     |
+|          p(host deletion)          |        0.5        |     0.5    |
+|        lambda(host deletion)       |        500        |     500    |
+|         minimum separation         |        100        |     100    |
+|            fold coverage           |         5         |     1.5    |
+|             read length            |        250        |     250    |
+|        mean fragment length        |        500        |     500    |
+| fragment length standard deviation |         30        |     30     |
+|         sequencing profile         |      MiSeq v3     |  MiSeq v3  |
+
+Although I only used chr1 for simulating integrations, I used all of hg38 for analysis.
+
+
+## Experiment setup
+
+Initially when running [VSeq-Toolkit](https://github.com/CompMeth/VSeq-Toolkit), I found that it output a lot of false positives.  When corresponding with the author of VSeq-Toolkit, she suggested that I adjust the parameters to get rid of those.
+
+There are many parameters for VSeq-Toolkit, which are set in the config file.  I tried ajusting several of them:  
+
+  - mode: either 'default' or 'sensitive'
+  - vecVecFusion: whether or not to look for vector rearrangments - these reads are then excluded from the integration site analysis
+  - stringencyVec: stringency when looking for vector arrangements - not clear what this actually means, but can be none/low/medium/high
+  - stringencyGenVec: stringency when looking for vector integration - not clear what this actually means, but can be none/low/medium/high
+  - minMapSpanVecGen: minimum amount of the read that must be mapped
+  - idenVecGen: minimum mapping identity
+  
+I also tried various combinations of parameters for isling:  
+
+  - bwa mem parameters:
+    - B (mismatch penalty): default is 4, previously was using 2, tried both 2 and 4
+    - T (minimum alignment score for output): default is 30, was previously using 10, tried 10, 20, 30
+    - U (Penalty for an unpaired read pair): default is 9, tried lowering this to 5 as well
+  - clip-cutoff: the minimum number of soft clipped/matched bases for a read to be considered as a possible integration - tried 20 and 25
+  - min-mapq: the minimum mapping quality (in both alignments) for a read to be considered
+
+Each combination of paramters gets a number.  I tried running both tools on the OTC and AAV2 conditions, with all the various parameter combinations.  Each condition had three replicates with different random seeds. For each replicate, tool, analysis condition and viral reference, I calculated the true positive rate and positive predictive value, and plotted it below.
+
+```{r}
+library(tidyverse)
+library(cowplot)
+
+source("/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/analysis/sim_functions.R")
+
+results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment1_OTC_chr1"
+
+score_window <- 5
+coords_score_type_plot <- "coords_mean"
+dist_plot_offset <- 0.5
+facet_scales <- "free_y"
+
+# https://stackoverflow.com/questions/11335836/increase-number-of-axis-ticks
+offset <- dist_plot_offset
+num_y_breaks <- 2
+
+
+#### figure 1 ####
+
+# import scored integrations
+exp_dir <- file.path(results_dir, "AAV-OTC_parameters")
+int_scores <- importIntScoreExperiment(exp_dir) 
+
+# only use postprocessed data from our pipeline
+int_scores <- int_scores %>% 
+  filter(case_when((tool.x != "pipeline") ~ TRUE,
+                   post ~ TRUE,
+                   TRUE ~ FALSE
+  )) %>% 
+  mutate(analysis_tool = str_replace(tool.x, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) 
+
+
+# check out the scores for the VSeq-Toolkit conditions  - there are many!
+
+
+```
+
+```{r}
+int_scores %>% 
+  select(condition, analysis_condition, analysis_tool, tp:fn)
+```
+
+
+## Results
+
+First, check out how all the conditions for the two tools fare:
+
+```{r}
+int_scores %>% 
+  filter(coords_score_type == coords_score_type_plot) %>% 
+  filter(window == score_window) %>% 
+  filter(str_detect(analysis_tool, "isling|vseq")) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape=analysis_tool)) +
+  geom_point(alpha=0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~experiment) +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL,
+    ),
+    legend.position = "none"
+  )
+```
+
+Each color is a different combination of parameters, the triangles are VSeq-toolkit, and the cirles are isling.  There's no legend here because there are too many colours to distinguish.
+
+Below are tables of the results.  Here I've calculated an overall TPR and PPV from the three replicates.  For each row, I calculated the distance to the point (1, 1) - this is in the `dist` column.
+
+## VSeq-Toolkit parameters
+
+We can explore the effect of each parameter a little more:
+
+```{r fig.height=10, fig.width=10}
+colour_vars <- c("mode", "vecVecFusion", "stringencyVec",
+         "stringencyVecGen", "minMapSpanVecGen", "idenVecGen", "replicate")
+plotlist <- list()
+for (var in colour_vars) {
+  plotlist[[var]] <- int_scores %>% 
+  filter(coords_score_type == coords_score_type_plot) %>% 
+  filter(window == score_window) %>% 
+  filter(str_detect(analysis_tool, "vseq")) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = factor(!!ensym(var)))) +
+  geom_point(alpha=0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~experiment) +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL,
+    ),
+    legend.position = "bottom"
+  )
+  
+}
+
+plot_grid(plotlist=plotlist)
+```
+
+From these graphss it's pretty clear that, at least for the simulated data, it's better to use minMapSpanVecGen 25, idenVecGen 95, stringencyVecGen 'medium', and the other parameters don't matter that much.
+
+
+## isling parameters
+
+We can do the same thing to explore the effect of different isling parameters.
+
+```{r fig.height=10, fig.width=10}
+plot_isling <- int_scores %>% 
+  filter(str_detect(analysis_tool, "isling")) %>% 
+  mutate(mismatch_penalty = str_extract(bwa_mem_params,  "(?<=-B\\s)\\d(?=\\s)")) %>% 
+  mutate(unpaired_pair_penalty = str_extract(bwa_mem_params,  "(?<=-U\\s)\\d(?=\\s)")) %>% 
+  mutate(unpaired_pair_penalty = ifelse(is.na(unpaired_pair_penalty), "9", unpaired_pair_penalty)) %>% 
+  mutate(output_score_min = str_extract(bwa_mem_params,  "(?<=-T\\s)\\d+(?=\\s)")) 
+
+colour_vars <- c("mismatch_penalty", "unpaired_pair_penalty", "output_score_min",
+         "clip_cutoff", "min_mapq", "replicate")
+plotlist <- list()
+for (var in colour_vars) {
+  plotlist[[var]] <- plot_isling %>% 
+  ggplot(aes(x = PPV, y = TPR, color = factor(!!ensym(var)))) +
+  geom_point(alpha=0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~experiment) +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL,
+    ),
+    legend.position = "bottom"
+  )
+  
+}
+
+plot_grid(plotlist=plotlist)
+```
+
+
+From these results it looks like it's better to have a mismatch penalty of 2, an unpaired pair penalty of 9, a clipping cutoff of 20, and the rest of the parameters don't matter too much.
+
+### Tables
+Here's a table with the results:
+
+```{r}
+int_scores %>% 
+  rowwise() %>% 
+  mutate(dist = sqrt((PPV-1)^2 + (TPR-1)^2)) %>% 
+  arrange(dist) %>% 
+  select(dist, PPV, TPR, experiment, analysis_condition, merge, bwa_mem_params, clip_cutoff, cigar_tol, min_mapq, )
+```
+
+

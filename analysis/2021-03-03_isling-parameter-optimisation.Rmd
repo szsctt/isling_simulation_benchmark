@@ -1,0 +1,334 @@
+---
+title: "Optimising isling parameters"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=F)
+library(tidyverse)
+
+source("sim_functions.R")
+
+exp_dir <- "../out/experiment1_OTC_chr1/AAV-OTC_isling-parameters/"
+score_window <- 5
+```
+
+
+## Experient setup
+
+I wanted to optimise the isling parameters, to get the best performance.  Specifically, I'd previously implmented a filtering step in R to remove integrations that don't meet the following criteria:  
+
+- Host alignment edit distance <= 5
+- Virus alignment edit distance <= 5
+- Discordant pair or number of ambiguous bases < 20
+- Not a vector rearrangement
+- Not a host translocation
+
+Seperately (while calling integration sites), I filtered for mapping quality of host and viral alignments. (Typically mapq > 20).  
+
+However, these criteria weren't based on anything other than my intuition.  It would be better to have some basis for chosing criteria, and it would also be desirable to consolidate these filtering steps. 
+
+To this end, I changed the filtering rule to allow filtering on any combination of the following columns:  
+
+- NoAmbiguousBases (integer)
+- OverlapType ('none', 'gap', 'overlap', 'discordant')
+- Orientation ('hv', 'vh')
+- ViralOrientation ('+', '-')
+- HostEditDist (integer)
+- ViralEditDist (integer)
+- TotalEditDist (integer)
+- PossibleHostTranslocation ('yes', 'no')
+- PossibleVectorRearrangement ('yes', 'no')
+- HostPossibleAmbiguous ('yes', 'no')
+- ViralPossibleAmbiguous ('yes', 'no')
+- Type ('chimeric', 'discordant')
+- HostMapQ (integer)
+- ViralMapQ (integer)
+
+It's also possible not to filter at all, by passing `True` as the filter.
+
+In order to check the best filtering parameters, I ran isling without any filtering, and a combination of other parameters.
+
+Data were simulated using the following parameters:
+
+```{r include=FALSE}
+files <- list.files(exp_dir, pattern="simulation_summary.tsv", recursive=TRUE)
+sim_params <- tibble(
+  file = file.path(exp_dir, files),
+  data = map(file, ~read_tsv(.))
+) %>% 
+  unnest(data) %>% 
+  select(-file)
+```
+
+
+```{r}
+sim_params
+```
+
+And the analysis paramters were as follows:
+
+```{r include=FALSE}
+files <- list.files(exp_dir, pattern="^analysis_conditions.tsv", recursive=TRUE)
+analysis_params <- tibble(
+  file = file.path(exp_dir, files),
+  data = map(file, ~read_tsv(.))
+) %>% 
+  unnest(data) %>% 
+  select(-file)
+
+```
+
+
+```{r}
+analysis_params %>% 
+  select(where(~length(unique(.)) > 1)) %>% 
+  select(-contains("fasta")) %>% 
+  select(-contains("folder")) %>% 
+  select(-contains("unique")) %>% 
+  select(-matches("^exp$"))
+```
+
+
+## Results
+
+### True and false positives
+
+```{r include=FALSE}
+# import scored integrations
+int_scores <- importIntScoreExperiment(exp_dir) %>% 
+  mutate(analysis_tool = str_replace(tool.x, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) 
+
+
+```
+
+```{r}
+int_scores %>% 
+  select(score_window, experiment, analysis_condition, condition, replicate, TPR, PPV, tp:fn, analysis_virus, merge, trim, dedup , clip_cutoff, cigar_tol)
+```
+
+The scoring window (the threshold for distance between tp and fp, and tp and fn) is either 0bp or 5bp.  Just use 5bp, for simplicity, and because this is a reasonable value to use.
+
+```{r}
+int_scores <- int_scores %>% 
+  filter(window == score_window)
+```
+
+
+First, plot the number of true and false positives for each analysis condition
+
+```{r}
+int_scores %>% 
+  ggplot(aes(x = PPV, y = TPR, color = analysis_condition)) + 
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  xlab("Positive predictive value") +
+  ylab("True positive rate") +
+  facet_wrap(~experiment)
+```
+
+
+First, check out which paramters result in which scores
+
+```{r fig.height=10, fig.width=10}
+colour_vars <-c("merge", "trim", "clip_cutoff", "cigar_tol")
+
+plotlist <- list()
+for (var in colour_vars) {
+  plotlist[[var]] <- int_scores %>% 
+  ggplot(aes(x = PPV, y = TPR, color = factor(!!ensym(var)))) +
+  geom_point(alpha=0.5) +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~experiment) +
+  theme_classic() +
+  theme(
+    strip.background = element_rect(
+      color = 'white', fill = "#f2f2f2", linetype = NULL,
+    ),
+    legend.position = "bottom"
+  )
+  
+}
+
+cowplot::plot_grid(plotlist=plotlist)
+```
+
+From these results it looks like the best choices are a clipping cutoff of 20, a cigar tolerance of 3 and to not do merging.  Trimming doesn't make a difference in this data, but I don't think `ART` actually adds adapters to reads that where the fragment length is shorter than the sum of the length of the reads.  If it doesn't, that would explain these results.
+
+### Filtering parameters
+
+In the results above, I haven't filtered the results at all.  Try to find the optimal filters that reduce the number of false positives and false negatives, using this best condition as a starting point.
+
+```{r}
+int_scores <- int_scores %>% 
+  filter(analysis_condition == "isling9")
+```
+
+```{r}
+int_scores %>% 
+  select(experiment, analysis_condition, replicate, TPR, PPV)
+```
+
+
+```{r include=FALSE}
+
+#import distances from each found integration to nearest simulated integration
+found_scores <- importNearestSimToFound(exp_dir) 
+
+# only use postprocessed data from our pipeline
+found_scores <- found_scores %>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(tool = str_replace(analysis_condition, "\\d+", "")) %>% 
+  filter(analysis_condition == "isling9")
+
+# import distances from each simulated integration to the nearest found integration
+sim_scores <- importNearestFoundToSim(exp_dir) 
+
+sim_scores <- sim_scores%>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>%  
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(tool = str_replace(analysis_condition, "\\d+", ""))  %>% 
+  filter(analysis_condition == "isling9")
+
+
+```
+
+```{r}
+# import data from before postprocessing, since the data after postprocessing don't have the columns that we want to filter on
+
+files <- list.files(exp_dir, pattern="integrations.txt", recursive=TRUE)
+files <- files[str_detect(files, "analysis9")]
+
+pre_filtering <- tibble(
+  file = file.path(exp_dir, files),
+  virus = str_split(basename(file), "\\.", simplify=TRUE)[,4],
+  replicate = str_split(basename(file), "\\.", simplify=TRUE)[,2],
+  condition = str_split(basename(file), "\\.", simplify=TRUE)[,1],
+  data = map(file, ~read_tsv(.))
+)
+
+pre_filtering <- pre_filtering %>% 
+  unnest(data) %>% 
+  mutate(replicate = as.integer(str_replace(replciate, "rep", "")))
+
+pre_filtering
+
+```
+
+
+```{r}
+score_dists <- function(dists, group_cols, above_threshold = "fp", score_col = "d_coords_mean", threshold = 5) {
+  print(glue("checking column {score_col} with threshold {threshold}"))
+  return(dists %>% 
+           mutate(score = case_when(
+             !!ensym(score_col) == -1 ~ above_threshold,
+             !!ensym(score_col) > threshold ~ above_threshold,
+             !!ensym(score_col) <= threshold ~ "tp",
+             TRUE ~ as.character(NA)
+           )) %>% 
+           group_by(across(one_of(c(group_cols, "score")))) %>% 
+           tally() %>% 
+           mutate(window = threshold) %>% 
+           mutate(score_type = score_col) %>% 
+           ungroup())
+  
+}
+
+all_scores <- function(found_dists, sim_dists, group_cols, threshold, score_col) {
+  
+  found <- score_dists(found_dists, group_cols, above_threshold ="fp", score_col, threshold) %>% 
+    filter(score == "fp")
+  sim <- score_dists(sim_dists, group_cols, above_threshold ="fn", score_col, threshold)
+  
+  
+  return(
+    bind_rows(found, sim) %>% 
+           pivot_wider(names_from = score, values_from = n, values_fill = 0) %>% 
+      ungroup() %>% 
+      rowwise() %>% 
+      mutate(PPV = tp / (tp + fp)) %>% 
+      mutate(TPR = tp / (tp + fn)) %>% 
+      ungroup()
+         )
+}
+
+group_cols<- c("unique", "analysis_condition", "experiment", "condition", "replicate",  "analysis_host", "analysis_virus", "post", "tool")
+
+all_scores(found_scores, sim_scores, group_cols = group_cols, 5, "d_coords_mean")
+```
+
+We have the following columns that we can filter on:
+
+- NoAmbiguousBases (integer)
+- OverlapType ('none', 'gap', 'overlap', 'discordant')
+- Orientation ('hv', 'vh')
+- ViralOrientation ('+', '-')
+- HostEditDist (integer)
+- ViralEditDist (integer)
+- TotalEditDist (integer)
+- PossibleHostTranslocation ('yes', 'no')
+- PossibleVectorRearrangement ('yes', 'no')
+- HostPossibleAmbiguous ('yes', 'no')
+- ViralPossibleAmbiguous ('yes', 'no')
+- Type ('chimeric', 'discordant')
+- HostMapQ (integer)
+- ViralMapQ (integer)
+
+Take these in turn, but no need to consider Orientation or ViralOrientation, because in theory there's no reason that all values coudn't be present in the datset.
+
+#### NoAmbiguousBases
+
+In the simulated data, I wouldn't expect there to be much gained by filtering on this column.  However, in real data we sometimes see quite long numbers of ambiuous bases, which may not be real.  So if filtering for less than some long number of ambiguous bases doesn't result in a loss of performance, it's probably a good idea.
+
+When filtering on this column, we need to keep in mind that discordant reads don't have a number of ambiguous bases (internally in the filtering script, it's `np.nan`), and so if we filter on this column we will always exclude any discordant pairs.  This isn't desirable, so make sure to include discordant pairs as well.
+
+```{bash}
+INTFILES="../out/experiment1_OTC_chr1/AAV-OTC_isling-parameters/*analysis9/ints/*integrations.txt"
+
+FILTER="../intvi_pipeline/scripts/filter.py"
+CLOSEST="../intvi_simulation/scripts/closest.py"
+SCORE="../intvi_simulation/scripts/score_integrations.py"
+
+OUTDIR=$(pwd)/"isling_paramters"
+mdkir -p $OUTDIR
+
+VALS="0 1 2 3 4 5 12 15 17 20"
+
+eval "$(conda shell.bash hook)"
+conda activate simvi
+python3 $CLOSEST
+
+for file in $INTFILES; do
+  BN=$(basename $file)
+  echo working on $BN
+  
+  for val in $VALS; do
+    FILT="${OUDIR}/${BN}.${val}"
+    BED="${FILT}.bed"
+    
+    echo python3 $FILTER \
+      -i $file \
+      -c "NoAmbiguousBases < $val or Type == discordant" \
+      -k "${OUDIR}/${BN}.${val}"
+    echo 
+    echo
+  done
+done
+
+
+```
+
+
+

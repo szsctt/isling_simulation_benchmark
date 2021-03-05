@@ -1,6 +1,11 @@
 ---
 title: "Simulalation results - padding and jaccard"
-output: html_notebook
+output: 
+  html_notebook:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
 ---
 
 ```{r include=F}
@@ -10,10 +15,9 @@ library(tidyverse)
 source("sim_functions.R")
 
 AAV_OTC_dir <- "../out/experiment1_OTC_chr1/AAV-OTC/"
-score_window <- 5
-coords_score_type_plot <- "coords_mean"
-
 score_types <- c("shortest", "coords_mean", "coords_min", "midpoint")
+
+OTC_conds_dir <-"../out/experiment1_OTC_chr1/OTC-condition-breakdown/"
 
 ```
 
@@ -76,7 +80,8 @@ For the runs where I only used chromosome 1, it's easy to see if integrations ar
 ```{r include=FALSE}
 
 #import distances from each found integration to nearest simulated integration
-found_scores <- importNearestSimToFound(AAV_OTC_dir, score_window, coords_score_type_plot) 
+found_scores <- importNearestSimToFound(AAV_OTC_dir) 
+
 
 # only use postprocessed data from our pipeline
 found_scores <- found_scores %>% 
@@ -89,7 +94,7 @@ found_scores <- found_scores %>%
   mutate(tool = str_replace(analysis_condition, "\\d+", ""))
 
 # import distances from each simulated integration to the nearest found integration
-sim_scores <- importNearestFoundToSim(AAV_OTC_dir, score_window, coords_score_type_plot) 
+sim_scores <- importNearestFoundToSim(AAV_OTC_dir) 
 
 sim_scores <- sim_scores%>% 
   filter(case_when(
@@ -105,7 +110,7 @@ sim_scores <- sim_scores%>%
 ```{r}
 found_scores %>% 
   filter(condition == "cond0") %>% 
-  mutate(correct_chr = (chr_found == "chr1")) %>% 
+  mutate(correct_chr = (chr == "chr2")) %>% 
   ggplot(aes(x = tool, fill = correct_chr)) +
   geom_bar() +
   facet_wrap(~experiment, scales="free")
@@ -115,6 +120,7 @@ found_scores %>%
 
 ```{r}
 sim_scores
+
 ```
 
 
@@ -127,7 +133,8 @@ First, plot the distribution of the sim-to-found distances.  Note that cond0 mea
 ```{r fig.height=10, fig.width=10}
 dist_add <- 0.5
 plotlist <- list()
-for (s in score_types) {
+plot_cols <- paste0("d_", score_types)
+for (s in plot_cols) {
   plotlist[[s]] <- sim_scores %>% 
    mutate(s := !!ensym(s)+dist_add) %>% 
    ggplot(aes(x = s, color = tool)) +
@@ -147,7 +154,7 @@ Next, the found-to-sim distances:
 ```{r fig.height=10, fig.width=10}
 dist_add <- 0.5
 plotlist <- list()
-for (s in score_types) {
+for (s in plot_cols) {
   plotlist[[s]] <- found_scores %>% 
    mutate(s := !!ensym(s)+dist_add) %>% 
    ggplot(aes(x = s, color = tool)) +
@@ -171,7 +178,7 @@ If we place a threshold on the distances, we can get a count of true positives, 
 We could define a true positive in either of two ways: a found integration with a simulated integration near it, or a simulated integration with a found integration near it.  If a tool outputs the same integration twice, this would count as two true positives in the former situation, but one in the latter.  Since there is no information gained by outputing the same integration twice, I don't want to reward this behaviour, so I chose the latter situation for scoring.  However, this scoring scheme doesn't penalise this behaviour either, since all that matters is that the two output integrations are both close to a simulated integration.
 
 ```{r}
-score_dists <- function(dists, group_cols, above_threshold = "fp", score_col = "coords_mean", threshold = 5) {
+score_dists <- function(dists, group_cols, above_threshold = "fp", score_col = "d_coords_mean", threshold = 5) {
   print(glue("checking column {score_col} with threshold {threshold}"))
   return(dists %>% 
            mutate(score = case_when(
@@ -207,9 +214,11 @@ all_scores <- function(found_dists, sim_dists, group_cols, threshold, score_col)
 }
 
 
-#all_scores(found_scores, sim_scores, group_cols = group_cols, threshold = 5, score_col = "midpoint")  %>% 
- arrange(experiment, condition, replicate)
+#all_scores(found_scores, sim_scores, group_cols = group_cols, threshold = 5, score_col = "d_midpoint")  %>%
+# arrange(experiment, condition, replicate)
 ```
+
+
 
 
 
@@ -221,7 +230,7 @@ dists = c(0, 2, 5, 10)
 
 int_scores <- tibble()
 
-for (s in score_types) {
+for (s in plot_cols) {
   
   for (t in dists) {
     
@@ -268,9 +277,11 @@ If we just look at the chr1 data (not hg38), don't pad for the Jaccard statistic
 ```{r}
 jaccard_pad <- 0
 scoring_dist <- 5
-score_type <- "coords_mean"
+dist_add <- 0.5
+plot_score_type <- "d_coords_mean"
 tool_order <- c("isling", "Polyidus", "Seeksv", "ViFi", "VSeq-Toolkit")
 condition_plot <- "cond0"
+num_y_breaks <- 2
 
 jac_plot <- jac %>% 
   filter(pad == jaccard_pad) %>% 
@@ -286,6 +297,19 @@ jac_plot <- jac %>%
   mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
   mutate(experiment = str_replace(experiment, "-harder", ""))
 
+jac_plots <- list()
+for (e in unique(jac_plot$experiment)) {
+  jac_plots[[e]] <- jac_plot %>% 
+    filter(experiment == e) %>% 
+    ggplot(aes(x = tool, y = jaccard, color = tool)) +
+    geom_boxplot(width=0.5) +
+    theme_classic() +
+    theme(axis.text.x = element_blank(),
+          legend.position = "none")  +
+    ylab("Jaccard") +
+    xlab("Tool")
+}
+
 sim_plot <- sim_scores %>% 
   filter(condition == condition_plot) %>% 
   mutate(tool = case_when(
@@ -299,6 +323,600 @@ sim_plot <- sim_scores %>%
   mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
   mutate(experiment = str_replace(experiment, "-harder", ""))
 
+sim_plots <- list()
+for (e in unique(sim_plot$experiment)) {
+  sim_plots[[e]] <- sim_plot %>% 
+    filter(experiment == e) %>% 
+    mutate(plot_score_type := !!ensym(plot_score_type) + dist_add) %>% 
+    ggplot(aes(x = !!ensym(plot_score_type), color = tool)) +
+    geom_freqpoly(bins = 100) +
+    geom_vline(xintercept = scoring_dist) +
+    theme_classic() +
+    theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          strip.background = element_blank(),
+          strip.text.y = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_x_log10() +
+    facet_grid(rows = vars(tool)) +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+    ylab("Count")
+}
+
+found_plot <- found_scores %>% 
+  filter(condition == condition_plot) %>% 
+  mutate(tool = case_when(
+    tool == "polyidus" ~ "Polyidus",
+    tool == "seeksv" ~ "Seeksv",
+    tool == "vifi" ~ "ViFi",
+    tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+    TRUE ~ tool
+  ))  %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  mutate(experiment = str_replace(experiment, "-harder", ""))
+
+found_plots <- list()
+for (e in unique(found_plot$experiment)) {
+  found_plots[[e]] <- found_plot %>% 
+    filter(experiment == e) %>% 
+    mutate(plot_score_type := !!ensym(plot_score_type) + dist_add) %>% 
+    ggplot(aes(x = !!ensym(plot_score_type), color = tool)) +
+    geom_freqpoly(bins = 100) +
+    geom_vline(xintercept = scoring_dist) +
+    theme_classic() +
+    theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          strip.background = element_blank(),
+          strip.text.y = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_x_log10() +
+    facet_grid(rows = vars(tool)) +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+    ylab("Count")
+}
+
+scores_plot <- int_scores %>% 
+  filter(condition == condition_plot) %>% 
+  filter(window == scoring_dist) %>% 
+  filter(score_type == plot_score_type) %>% 
+  mutate(tool = case_when(
+    tool == "polyidus" ~ "Polyidus",
+    tool == "seeksv" ~ "Seeksv",
+    tool == "vifi" ~ "ViFi",
+    tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+    TRUE ~ tool
+  )) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  mutate(experiment = str_replace(experiment, "-harder", "")) 
+
+scores_plots <- list()
+for (e in unique(scores_plot$experiment)) {
+  scores_plots[[e]] <- scores_plot %>% 
+    filter(experiment == e) %>% 
+    ggplot(aes(x = PPV, y = TPR, color = tool)) +
+    geom_point() +
+    theme_classic() +
+    theme(legend.position = "none",
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlim(0, 1) +
+    ylim(0, 1)
+  
+}
+
+experiments <- unique(scores_plot$experiment)
+
+plotlist <- list()
+for (e in experiments) {
+  plotlist[[glue("jac_{e}")]] <- jac_plots[[e]]
+  plotlist[[glue("sim_{e}")]] <- sim_plots[[e]]
+  plotlist[[glue("found_{e}")]] <- found_plots[[e]]
+  plotlist[[glue("score_{e}")]] <- scores_plots[[e]]
+}
+
+p <- cowplot::plot_grid(plotlist=plotlist, nrow = length(experiments), labels="AUTO")
+legend <- cowplot::get_legend(plotlist[[glue("score_{e}")]] + theme(legend.position = "bottom"))
+p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
+cowplot::save_plot("plots/figure1.0.pdf", p2)
+
+```
+```{r}
+print(p2)
+```
+
+We can also do a version with just the Jaccard and the scores
+
+```{r}
+
+plotlist <- list()
+for (e in experiments) {
+  plotlist[[glue("jac_{e}")]] <- jac_plots[[e]]
+  plotlist[[glue("score_{e}")]] <- scores_plots[[e]]  + theme(axis.text.x = element_text(angle = 0, hjust = 1))
+}
+
+p <- cowplot::plot_grid(plotlist=plotlist, nrow = length(experiments), labels="AUTO")
+legend <- cowplot::get_legend(plotlist[[glue("score_{e}")]] + theme(legend.position = "bottom"))
+p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
+cowplot::save_plot("plots/figure1.1.pdf", p2)
+print(p2)
+```
+
+
+## Results tables
+
+For writing the manuscript, here are the values plotted above
+
+### Jaccard
+Raw data:
+```{r}
+jac_plot %>% 
+  select(jaccard, intersection, union, n_intersections, experiment, analysis_condition, condition, replicate, analysis_tool, analysis_virus, pad)
+```
+
+Summary statistics:
+```{r}
+
+jac_plot %>% 
+  group_by(experiment, analysis_condition, condition, analysis_tool, analysis_virus, analysis_host, pad) %>% 
+  summarise(
+    n = n(),
+    mean_jac = mean(jaccard),
+    median_jac = median(jaccard),
+    sd_jac = sd(jaccard),
+    sem_jac = sd(jaccard)/sqrt(n)
+  )
+
+```
+
+### Scores
+
+Raw data:
+```{r}
+scores_plot %>% 
+  select(experiment, tool, analysis_condition, condition, replicate, window, score_type, fp:TPR)
+```
+
+```{r}
+scores_plot %>% 
+  group_by(experiment, tool, analysis_condition, condition,  window, score_type) %>% 
+  summarise(
+    n = n(),
+    sum_fp = sum(fp),
+    sum_fn = sum(fn),
+    sum_tp = sum(tp),
+    mean_PPV = mean(PPV),
+    sem_PPV = sd(PPV)/sqrt(n),
+    mean_TPR = mean(TPR),
+    sem_TPR = sd(TPR)/sqrt(n),
+    aggr_PPV = sum_tp/(sum_tp + sum_fp),
+    aggr_TPR = sum_tp/(sum_tp + sum_fn),
+  )
+```
+
+# Fold-coverage and chromosome
+
+Within the OTC condition, I also explored the effect of increasing fold coverage and changing the host chromsome.
+
+For this experiment I tried two different isling conditions - one had a minimum mapq of 20, and the other of 30.
+
+## Jaccard
+
+First looking at the effect of fold coverage and host chromosome on the jaccard statistic.
+
+```{r include=FALSE}
+jac <- importJaccardExperiment(OTC_conds_dir) %>% 
+  mutate(pad = as.integer(str_extract(sim_file, "(?<=pad)\\d+"))) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, "analysis", "isling"))
+
+jac <- jac %>% 
+  filter(pad != 2)
+
+jac
+```
+
+```{r}
+jac %>% 
+  group_by(condition, fcov, analysis_tool, analysis_condition, pad, host_name) %>% 
+  summarise(n = n(),
+            jac_mean = mean(jaccard),
+            jac_sem = sd(jaccard)/sqrt(n)) %>% 
+  ggplot(aes(x = fcov, y = jac_mean, color = analysis_condition)) +
+  geom_point() +
+  geom_line() +
+  facet_grid(rows = vars(host_name), cols = vars(pad)) +
+  scale_x_log10()
+```
+
+
+## Scoring
+
+We can also look at the effect on the positive predictive value and true positive rate
+
+
+```{r include=FALSE}
+
+#import distances from each found integration to nearest simulated integration
+int_scores <- importIntScoreExperiment(OTC_conds_dir)
+
+int_scores <- int_scores %>% 
+  mutate(tool = str_replace(tool.x, "pipeline", "isling")) %>% 
+  mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
+  mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
+  mutate(tool = str_replace(tool, "vifi", "ViFi")) %>% 
+  mutate(tool = str_replace(tool, "vseq_toolkit", "VSeq-Toolkit"))
+
+int_scores
+```
+
+
+
+```{r}
+int_scores %>% 
+  filter(window == 5) %>% 
+  group_by(fcov, analysis_condition, host_name, condition, window, coords_score_type) %>% 
+  summarise(n = n(),
+            mean_TPR = mean(TPR),
+            sem_TPR = sd(TPR)/sqrt(n),
+            min_TPR = mean_TPR - sem_TPR,
+            max_TPR = mean_TPR + sem_TPR
+            ) %>% 
+  ggplot(aes(x = fcov, y = mean_TPR, color = analysis_condition, group=analysis_condition)) +
+  geom_point() +
+  geom_line() +
+  geom_linerange(aes(ymin = min_TPR, ymax = max_TPR)) +
+  facet_wrap(~host_name) +
+  scale_x_log10()
+```
+
+```{r}
+int_scores %>% 
+  filter(window == 5) %>% 
+  group_by(fcov, analysis_condition, host_name, condition, window, coords_score_type) %>% 
+  summarise(n = n(),
+            mean_PPV = mean(PPV),
+            sem_PPV = sd(PPV)/sqrt(n),
+            min_PPV = mean_PPV - sem_PPV,
+            max_PPV = mean_PPV + sem_PPV
+            ) %>% 
+  ggplot(aes(x = fcov, y = mean_PPV, color = analysis_condition, group=analysis_condition)) +
+  geom_point() +
+  geom_line() +
+  geom_linerange(aes(ymin = min_PPV, ymax = max_PPV)) +
+  facet_wrap(~host_name) +
+  scale_x_log10()
+```
+
+## Figure 2
+
+If we combine the jaccard, PPV and TPR, we get the following:
+
+```{r include=FALSE}
+isling_condition <- "analysis0"
+
+jac_plot <- jac %>% 
+  filter(pad == jaccard_pad) %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "analysis") ~ str_detect(analysis_condition, isling_condition),
+    TRUE ~ TRUE
+  )) %>% 
+  mutate(analysis_tool = case_when(
+    analysis_tool == "polyidus" ~ "Polyidus",
+    analysis_tool == "seeksv" ~ "Seeksv",
+    analysis_tool == "vifi" ~ "ViFi",
+    analysis_tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+    TRUE ~ analysis_tool
+  )) %>% 
+  mutate(analysis_tool = as.factor(analysis_tool)) %>% 
+  mutate(analysis_tool = forcats::fct_relevel(analysis_tool, tool_order))  %>% 
+  group_by(condition, fcov, analysis_tool, analysis_condition, pad, host_name) %>% 
+  summarise(n = n(),
+            jac_mean = mean(jaccard),
+            jac_sem = sd(jaccard)/sqrt(n),
+            jac_min = jac_mean - jac_sem,
+            jac_max = jac_mean + jac_sem) %>% 
+  ggplot(aes(x = fcov, y = jac_mean, color = analysis_tool)) +
+  geom_point() +
+  geom_line() +
+  geom_linerange(aes(ymin = jac_min, ymax = jac_max)) +
+  facet_grid(cols = vars(host_name)) +
+  scale_x_log10() +
+  theme_classic() +
+  theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          strip.background = element_blank(),
+          strip.text.y = element_blank()) +
+  ylab("Jaccard")
+jac_plot
+
+PPV_plot <- int_scores %>% 
+  filter(window == score_window) %>% 
+  filter(coords_score_type == coords_score_type_plot) %>% 
+  filter(case_when(
+    str_detect(unique.x, "analysis") ~ str_detect(unique.x, isling_condition),
+    TRUE ~ TRUE
+  )) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(condition, fcov, tool, unique.x, host_name) %>% 
+  summarise(n = n(),
+            PPV_mean = mean(PPV),
+            PPV_sem = sd(PPV)/sqrt(n),
+            PPV_min = PPV_mean - PPV_sem,
+            PPV_max = PPV_mean + PPV_sem) %>% 
+  ggplot(aes(x = fcov, y = PPV_mean, color = tool)) +
+  geom_point() +
+  geom_line() +
+  geom_linerange(aes(ymin = PPV_min, ymax = PPV_max)) +
+  facet_grid(cols = vars(host_name)) +
+  scale_x_log10() +
+  theme_classic() +
+  theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          strip.background = element_blank(),
+          strip.text.y = element_blank(),
+          strip.text.x = element_blank()) +
+  ylab("PPV")
+PPV_plot
+
+TPR_plot <- int_scores %>% 
+  filter(window == score_window) %>% 
+  filter(coords_score_type == coords_score_type_plot) %>% 
+  filter(case_when(
+    str_detect(unique.x, "analysis") ~ str_detect(unique.x, isling_condition),
+    TRUE ~ TRUE
+  )) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(condition, fcov, tool, unique.x, host_name) %>% 
+  summarise(n = n(),
+            TPR_mean = mean(TPR),
+            TPR_sem = sd(TPR)/sqrt(n),
+            TPR_min = TPR_mean - TPR_sem,
+            TPR_max = TPR_mean + TPR_sem) %>% 
+  ggplot(aes(x = fcov, y = TPR_mean, color = tool)) +
+  geom_point() +
+  geom_line() +
+  geom_linerange(aes(ymin = TPR_min, ymax = TPR_max)) +
+  facet_grid(cols = vars(host_name)) +
+  scale_x_log10() +
+  theme_classic() +
+  theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          strip.background = element_blank(),
+          strip.text.y = element_blank(),
+          strip.text.x = element_blank()) +
+  ylab("TPR")
+TPR_plot
+
+p <- cowplot::plot_grid(jac_plot, PPV_plot, TPR_plot, labels="AUTO", ncol = 1)
+legend <- cowplot::get_legend(jac_plot + theme(legend.position = "bottom"))
+p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
+print(p2)
+cowplot::save_plot("plots/figure2.pdf", p2)
+```
+
+```{r}
+print(p2)
+```
+
+
+# Runtime
+
+I also looked at the runtime as I changed to variables: viral load and fold coverage
+
+```{r include=FALSE}
+results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment2_time/"
+experiments <- c("coverage", 'viral_load')
+
+files <- list.files(results_dir, recursive = TRUE, pattern="_runtime.tsv")
+
+files <- files[ basename(dirname(files)) %in% experiments]
+
+files <- files[dirname(dirname(files)) == "."]
+
+
+coltypes <- cols(
+  tool = col_character(),
+  dataset = col_character(),
+  sample = col_character(),
+  replicate = col_double(),
+  exit_value = col_double(),
+  user_time = col_double(),
+  system_time = col_double(),
+  elapsed_time = col_character(),
+  CPU = col_character(),
+  shared_text = col_double(),
+  unshared_data = col_double(),
+  max_rss = col_double(),
+  fs_inputs = col_double(),
+  fs_outputs = col_double(),
+  major_page_faults = col_double(),
+  minor_page_faults = col_double(),
+  swaps = col_double(),
+  command = col_character()
+)
+
+times <- tibble(
+  filename = file.path(results_dir, files),
+  experiment = dirname(files),
+  data = map(filename, ~read_tsv(., col_types=coltypes))
+) %>% 
+  unnest(data) %>% 
+  mutate(duration_elapsed_time = case_when(
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\.\\d{2}") ~ lubridate::as.duration(lubridate::ms(elapsed_time)),
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\:\\d{2}") ~ lubridate::as.duration(lubridate::hms(elapsed_time)),
+    TRUE ~ lubridate::as.duration(NA)
+  )) %>% 
+  rename(time_rep = replicate)
+
+# add simulation conditions
+conds <- importSimulationConditions(results_dir)
+
+times <- left_join(times, conds, by=c("experiment", "sample")) %>% 
+  mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
+  mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
+  mutate(tool = str_replace(tool, "vifi", "ViFi")) %>% 
+  mutate(tool = str_replace(tool, "vseq-toolkit", "VSeq-Toolkit"))  
+```
+
+First, check the exit values for each run, for each tool
+
+```{r}
+# how many times does each exit value occur?
+times %>% 
+  group_by(tool, exit_value) %>% 
+  summarise(n = n())
+```
+
+Also check the number of replicates for each experiment, sample and tool - should be 3.
+
+```{r}
+times %>% 
+  group_by(experiment, sample, tool) %>% 
+  summarise(n = n())
+```
+
+
+Are there any that aren't 3?
+
+```{r}
+times %>% 
+  group_by(experiment, sample, tool) %>% 
+  summarise(n = n()) %>% 
+  filter(n != 3)
+```
+## Runtime
+
+Plotting the runtime:
+
+```{r }
+
+times %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  ggplot(aes(x = condition, y = duration_elapsed_time, color=tool)) +
+  geom_boxplot() +  
+  facet_grid(rows = vars(experiment), scales = 'free') +
+  scale_y_log10() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_discrete(name='tool')
+```
+
+
+## Memory usage
+
+We can also look at the reported memory usage:
+
+```{r}
+times %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  ggplot(aes(x = condition, y = max_rss, color=tool)) +
+  geom_boxplot() +  
+  facet_grid(rows = vars(experiment), scales = 'free') +
+  scale_y_log10() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_discrete(name='tool')
+```
+
+
+```{r}
+times %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  ggplot(aes(x = condition, y = swaps, color=tool)) +
+  geom_boxplot() +  
+  facet_grid(rows = vars(experiment), scales = 'free') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_discrete(name='tool')
+```
+
+## CPU usage
+
+
+Also look at CPU usage (all jobs were given 20 cores):
+
+```{r}
+times %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(CPU = str_replace(CPU, "%", "")) %>% 
+  mutate(CPU = as.integer(CPU)) %>% 
+  ggplot(aes(x = condition, y = CPU, color=tool)) +
+  geom_boxplot() +  
+  facet_grid(rows = vars(experiment), scales = 'free') +
+  scale_y_log10() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_discrete(name='tool')
+```
+
+## Figure 3
+
+```{r}
+
+viral_load <- times %>% 
+  filter(experiment == "viral_load") %>% 
+  mutate(int_num = as_factor(int_num)) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(int_num, epi_num, tool) %>% 
+  summarise(n = n(),
+            mean_time = mean(duration_elapsed_time),
+            sem_time = sd(duration_elapsed_time)/sqrt(n),
+            min = mean_time - sem_time,
+            max = mean_time + sem_time) %>% 
+  ungroup() %>% 
+   ggplot(aes(x = int_num, y = mean_time, color=tool, group = tool)) +
+  geom_point()  +
+  geom_line() +
+  geom_linerange(aes(ymin = min, ymax = max)) +
+  facet_wrap(vars(epi_num)) +
+  theme_classic()  + 
+  theme(
+    strip.background = element_blank(),
+    strip.text.y = element_blank(),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    #    axis.title.y = element_blank(),
+  )  +
+  xlab("Number of integrations") +
+  ylab("Runtime (s)") +
+  scale_y_log10()
+
+
+#print(viral_load + theme(legend.position = "bottom"))
+
+coverage <- times %>% 
+  filter(experiment == "coverage") %>% 
+  mutate(fcov = as.factor(fcov)) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(fcov, tool) %>% 
+  summarise(n = n(),
+            mean_time = mean(duration_elapsed_time),
+            sem_time = sd(duration_elapsed_time)/sqrt(n),
+            min = mean_time - sem_time,
+            max = mean_time + sem_time) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = fcov, y = mean_time, color=tool, group = tool)) +
+  geom_point()  +
+  geom_line() +
+  geom_linerange(aes(ymin = min, ymax = max)) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  ) +
+  xlab("Fold coverage") +
+  ylab("Runtime (s)") +
+  scale_y_log10() 
+
+#print(coverage + theme(legend.position = "bottom"))
+
+legend <- cowplot::get_legend(coverage + theme(legend.position = "bottom"))
+
+figure_3 <- cowplot::plot_grid(coverage, viral_load, labels="AUTO")
+figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
+print(figure_3)
+
+cowplot::save_plot("plots/figure3.pdf", figure_3)
 
 ```
 

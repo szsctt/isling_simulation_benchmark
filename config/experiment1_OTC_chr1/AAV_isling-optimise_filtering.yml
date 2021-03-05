@@ -1,0 +1,251 @@
+global:
+   out_directory: "../../out/experiment1_OTC_chr1/AAV_isling-optimise_filtering"
+   
+   # integration simulation
+   replicates: 3 
+   hosts: 
+      chr2: "../../data/references/chrs/chr2.fa"
+   viruses:
+      AAV2 :  "../../data/references/NC_001401_2.fa"
+   
+   initial_seed: 1234567
+   seed_increment: 123 
+   
+   # genome variation
+   snp_count: 100000
+   indel_count: 1000
+   cnv_count: 0
+   inversion_count: 0
+   translocation_count: 0
+   
+   int_num: 
+       - 1000
+   epi_num:
+       - 5
+   p_whole:
+       - 0.3
+   p_rearrange:
+       - 0
+   p_delete:
+       - 0
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0.3
+   p_gap:
+       - 0.3
+   lambda_junction:
+       - 1
+   p_host_deletion:
+       - 0.5
+   lambda_host_deletion:
+       - 500
+   min_sep:
+       - 100
+   min_len:
+       - 20
+   # read simulation
+   read_len: 
+       - 250
+   fcov: 
+       - 5 
+   frag_len: 
+       - 500
+   frag_std: 
+       - 30
+   seq_sys: 
+       - "MSv3"
+
+   # analysis
+   analysis_hosts: 
+      hg38: "../../data/references/GRCh38.fa"
+   analysis_viruses:
+      AAV2 :  "../../data/references/NC_001401_2.fa"
+   merge: 
+       - False
+   trim: 
+       - True
+   dedup: 
+       - False   
+   bwa_mem:
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+         
+   bed-exclude:
+       -
+         -    
+   bed-include:
+       -  
+         - 
+   merge-method:
+       - 'common'
+   merge-n-min:
+       - 1
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
+       
+    # scoring
+   score_reads: False
+   score_ints: True
+   score_merged_ints: True
+   score_ints_window: 
+    - 0
+    - 5
+
+   score_ints_type: 
+    - "coords_mean"
+   
+   
+      
+NoAmbiguousBases:
+   filter:
+       -
+         - "NoAmbiguousBases < 0 or Type == discordant"
+       -
+         - "NoAmbiguousBases < 1 or Type == discordant"
+       -
+         - "NoAmbiguousBases < 3 or Type == discordant"
+       -
+         - "NoAmbiguousBases < 5 or Type == discordant"
+       -
+         - "NoAmbiguousBases < 10 or Type == discordant"
+       -
+         - "NoAmbiguousBases < 15 or Type == discordant"
+       -
+         - "NoAmbiguousBases < 20 or Type == discordant"
+
+HostEditDist:
+   filter:
+       -
+         - "HostEditDist == 0"
+       -
+         - "HostEditDist < 1"
+       -
+         - "HostEditDist < 2"      
+       -
+         - "HostEditDist < 3" 
+       -
+         - "HostEditDist < 4" 
+       -
+         - "HostEditDist < 5" 
+       -
+         - "HostEditDist < 7" 
+       -
+         - "HostEditDist < 10" 
+       -
+         - "HostEditDist >= 0" 
+         
+ViralEditDist:
+   filter:
+       -
+         - "ViralEditDist == 0"
+       -
+         - "ViralEditDist < 1"
+       -
+         - "ViralEditDist < 2"      
+       -
+         - "ViralEditDist < 3" 
+       -
+         - "ViralEditDist < 4" 
+       -
+         - "ViralEditDist < 5" 
+       -
+         - "ViralEditDist < 7" 
+       -
+         - "ViralEditDist < 10" 
+       -
+         - "ViralEditDist >= 0"
+         
+TotalEditDist:
+   filter:
+       -
+         - "TotalEditDist == 0"
+       -
+         - "TotalEditDist < 1"
+       -
+         - "TotalEditDist < 2"      
+       -
+         - "TotalEditDist < 3" 
+       -
+         - "TotalEditDist < 4" 
+       -
+         - "TotalEditDist < 5" 
+       -
+         - "TotalEditDist < 7" 
+       -
+         - "TotalEditDist < 10" 
+       -
+         - "TotalEditDist >= 0"
+         
+PossibleHostTranslocation:
+   filter:
+       -
+         - "PossibleHostTranslocation == no"
+       -
+         - "PossibleHostTranslocation == yes or PossibleHostTranslocation == no"
+         
+PossibleVectorRearrangement:
+   filter:
+       -
+         - "PossibleVectorRearrangement == no"
+       -
+         - "PossibleVectorRearrangement == yes or PossibleVectorRearrangement == no"
+
+HostPossibleAmbiguous:
+   filter:
+       -
+         - "HostPossibleAmbiguous == no"
+       -
+         - "HostPossibleAmbiguous == yes or HostPossibleAmbiguous == no"  
+
+ViralPossibleAmbiguous:
+   filter:
+       -
+         - "ViralPossibleAmbiguous == no"
+       -
+         - "ViralPossibleAmbiguous == yes or ViralPossibleAmbiguous == no"           
+                           
+HostMapQ:
+   filter:
+       -
+         - "HostMapQ > 0"
+       -
+         - "HostMapQ > 5"
+       -
+         - "HostMapQ > 10"
+       -
+         - "HostMapQ > 15"
+       -
+         - "HostMapQ > 20"         
+       -
+         - "HostMapQ > 25"            
+       -
+         - "HostMapQ > 30"         
+       -
+         - "HostMapQ > 40"          
+       -
+         - "HostMapQ > 50"  
+         
+ViralMapQ:
+   filter:
+       -
+         - "ViralMapQ > 0"
+       -
+         - "ViralMapQ > 5"
+       -
+         - "ViralMapQ > 10"
+       -
+         - "ViralMapQ > 15"
+       -
+         - "ViralMapQ > 20"         
+       -
+         - "ViralMapQ > 25"            
+       -
+         - "ViralMapQ > 30"         
+       -
+         - "ViralMapQ > 40"          
+       -
+         - "ViralMapQ > 50"          
+         
+                          

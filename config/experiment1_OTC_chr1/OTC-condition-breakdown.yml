@@ -5,13 +5,21 @@ global:
    # integration simulation
    replicates: 3 
    hosts: 
-      chr1 : "../../data/references/chrs/chr1.fa"
+      chr2 : "../../data/references/chrs/chr2.fa"
        
    viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    
-   initial_seed: 12345
+   initial_seed: 1234567
    seed_increment: 123 
+   
+   # genome variation
+   snp_count: 100000
+   indel_count: 1000
+   cnv_count: 10
+   inversion_count: 2
+   translocation_count: 1
+   
    int_num: 
        - 1000
    epi_num:
@@ -85,8 +93,8 @@ global:
    score_reads: False
    score_ints: True
    score_merged_ints: True
-   score_ints_window: 
-    - 2
+   score_ints_window:
+    - 0
     - 5
    score_ints_type: 
     - "coords_mean"

@@ -4,10 +4,18 @@ global:
    # integration simulation
    replicates: 3 
    hosts: 
-      chr1 : "../../data/references/chrs/chr1.fa"
+      chr2 : "../../data/references/chrs/chr2.fa"
    
-   initial_seed: 12345
+   initial_seed: 1234567
    seed_increment: 123 
+   
+   # genome variation
+   snp_count: 100000
+   indel_count: 1000
+   cnv_count: 10
+   inversion_count: 2
+   translocation_count: 1
+   
    int_num: 
        - 1000
    epi_num:
@@ -53,30 +61,32 @@ global:
        
    merge: 
        - False
-       - True
    trim: 
        - True
    dedup: 
        - False
-   post:
+   filter:
        -
-         - filter
-         - mask-exclude:
-           - "../../data/references/hg38_homologoustoOTCvec.bed"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostPossibleAmbiguous == no"
+         - "PossibleVectorRearrangement == no"
    bwa_mem:
        - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 20 -h 200"
-   merge-dist:
-       - 1000
+   merge-method:
+       - 'common'
    merge-n-min:
        - 1
    cigar-tol:
        - 2
    clip-cutoff:
        - 20
-   min-mapq:
-       - 10
-       - 20
-       - 30
+   bed-exclude:
+       -
+         - "../../data/references/hg38_homologoustoOTCvec.bed" 
+   bed-include:
+       -
+         - 
+
        
     # scoring
    score_reads: False

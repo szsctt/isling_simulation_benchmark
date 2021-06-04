@@ -1,0 +1,301 @@
+---
+title: "Paper figures: runtime"
+output: html_notebook
+---
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=F)
+library(tidyverse)
+```
+
+
+Re-ran isling runtime benchmarking after changing to python implmentation of finding integrations.
+
+
+Results:
+
+# Runtime
+
+I also looked at the runtime as I changed to variables: viral load and fold coverage
+
+```{r include=FALSE}
+results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment2_time/"
+experiments <- c("coverage", 'viral_load')
+
+files <- list.files(results_dir, recursive = TRUE, pattern="_runtime.tsv")
+
+files <- files[ basename(dirname(files)) %in% experiments]
+
+files <- files[dirname(dirname(files)) == "."]
+
+
+coltypes <- cols(
+  tool = col_character(),
+  dataset = col_character(),
+  sample = col_character(),
+  replicate = col_double(),
+  exit_value = col_double(),
+  user_time = col_double(),
+  system_time = col_double(),
+  elapsed_time = col_character(),
+  CPU = col_character(),
+  shared_text = col_double(),
+  unshared_data = col_double(),
+  max_rss = col_double(),
+  fs_inputs = col_double(),
+  fs_outputs = col_double(),
+  major_page_faults = col_double(),
+  minor_page_faults = col_double(),
+  swaps = col_double(),
+  command = col_character()
+)
+
+times <- tibble(
+  filename = file.path(results_dir, files),
+  experiment = dirname(files),
+  data = map(filename, ~read_tsv(., col_types=coltypes))
+) %>% 
+  unnest(data) %>% 
+  mutate(duration_elapsed_time = case_when(
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\.\\d{2}") ~ lubridate::as.duration(lubridate::ms(elapsed_time)),
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\:\\d{2}") ~ lubridate::as.duration(lubridate::hms(elapsed_time)),
+    TRUE ~ lubridate::as.duration(NA)
+  )) %>% 
+  rename(time_rep = replicate)
+
+# add simulation conditions
+conds <- importSimulationConditions(results_dir)
+
+times <- left_join(times, conds, by=c("experiment", "sample")) %>% 
+  mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
+  mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
+  mutate(tool = str_replace(tool, "vifi", "ViFi")) %>% 
+  mutate(tool = str_replace(tool, "vseq-toolkit", "VSeq-Toolkit"))  
+```
+
+
+```{r}
+times <- times %>% 
+  mutate(base_filename = basename(filename)) %>% 
+  filter(base_filename %in% c( "coverage_runtime.tsv", "viral_load_runtime.tsv"))
+
+```
+
+First, check the exit values for each run, for each tool
+
+```{r}
+# how many times does each exit value occur?
+times %>% 
+  group_by(tool, exit_value) %>% 
+  summarise(n = n())
+```
+
+
+
+Also check the number of replicates for each experiment, sample and tool - should be 3.
+
+```{r}
+times %>% 
+  group_by(experiment, sample, tool) %>% 
+  summarise(n = n())
+```
+
+
+
+
+Are there any that aren't 3?
+
+```{r}
+times %>% 
+  group_by(experiment, sample, tool) %>% 
+  summarise(n = n()) %>% 
+  filter(n != 3)
+```
+
+
+
+## Runtime
+
+Plotting the runtime ('elapsed time'):
+
+```{r }
+
+times %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  ggplot(aes(x = condition, y = duration_elapsed_time, color=tool)) +
+  geom_boxplot() +  
+  facet_grid(rows = vars(experiment), scales = 'free') +
+  scale_y_log10() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_discrete(name='tool')
+```
+
+What about user + sys time
+
+```{r}
+times <- times %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(user_sys_time = user_time + system_time)  %>% 
+  ungroup()
+
+times %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  ggplot(aes(x = condition, y = user_sys_time, color=tool)) +
+  geom_boxplot() +  
+  facet_grid(rows = vars(experiment), scales = 'free') +
+  scale_y_log10() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_discrete(name='tool')
+
+
+```
+
+
+## Figure 3
+
+If we look at user + system time:
+
+```{r}
+tool_order <- c("isling", "Polyidus", "Seeksv", "ViFi", "VSeq-Toolkit")
+
+viral_load <- times %>% 
+  filter(experiment == "viral_load") %>% 
+  mutate(int_num = as_factor(int_num)) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(int_num, epi_num, tool) %>% 
+  summarise(n = n(),
+            mean_time = mean(user_sys_time),
+            sem_time = sd(user_sys_time)/sqrt(n),
+            min = mean_time - sem_time,
+            max = mean_time + sem_time) %>% 
+  ungroup() %>% 
+   ggplot(aes(x = int_num, y = mean_time, color=tool, group = tool)) +
+  geom_point()  +
+  geom_line() +
+  geom_linerange(aes(ymin = min, ymax = max)) +
+  facet_wrap(vars(epi_num)) +
+  theme_classic()  + 
+  theme(
+    strip.background = element_blank(),
+    strip.text.y = element_blank(),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    #    axis.title.y = element_blank(),
+  )  +
+  xlab("Number of integrations") +
+  ylab("Runtime (s)") +
+  scale_y_log10()
+
+
+#print(viral_load + theme(legend.position = "bottom"))
+
+coverage <- times %>% 
+  filter(experiment == "coverage") %>% 
+  mutate(fcov = as.factor(fcov)) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(fcov, tool) %>% 
+  summarise(n = n(),
+            mean_time = mean(user_sys_time),
+            sem_time = sd(user_sys_time)/sqrt(n),
+            min = mean_time - sem_time,
+            max = mean_time + sem_time) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = fcov, y = mean_time, color=tool, group = tool)) +
+  geom_point()  +
+  geom_line() +
+  geom_linerange(aes(ymin = min, ymax = max)) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  ) +
+  xlab("Fold coverage") +
+  ylab("Runtime (s)") +
+  scale_y_log10()
+
+#print(coverage + theme(legend.position = "bottom"))
+
+legend <- cowplot::get_legend(coverage + theme(legend.position = "bottom"))
+
+figure_3 <- cowplot::plot_grid(coverage, viral_load, labels="AUTO")
+figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
+print(figure_3)
+
+cowplot::save_plot("plots/figure3_usr_plus_sys.pdf", figure_3)
+
+```
+
+
+```{r}
+tool_order <- c("isling", "Polyidus", "Seeksv", "ViFi", "VSeq-Toolkit")
+
+viral_load <- times %>% 
+  filter(experiment == "viral_load") %>% 
+  mutate(int_num = as_factor(int_num)) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(int_num, epi_num, tool) %>% 
+  summarise(n = n(),
+            mean_time = mean(duration_elapsed_time),
+            sem_time = sd(duration_elapsed_time)/sqrt(n),
+            min = mean_time - sem_time,
+            max = mean_time + sem_time) %>% 
+  ungroup() %>% 
+   ggplot(aes(x = int_num, y = mean_time, color=tool, group = tool)) +
+  geom_point()  +
+  geom_line() +
+  geom_linerange(aes(ymin = min, ymax = max)) +
+  facet_wrap(vars(epi_num)) +
+  theme_classic()  + 
+  theme(
+    strip.background = element_blank(),
+    strip.text.y = element_blank(),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    #    axis.title.y = element_blank(),
+  )  +
+  xlab("Number of integrations") +
+  ylab("Runtime (s)") +
+  scale_y_log10()
+
+
+#print(viral_load + theme(legend.position = "bottom"))
+
+coverage <- times %>% 
+  filter(experiment == "coverage") %>% 
+  mutate(fcov = as.factor(fcov)) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(fcov, tool) %>% 
+  summarise(n = n(),
+            mean_time = mean(duration_elapsed_time),
+            sem_time = sd(duration_elapsed_time)/sqrt(n),
+            min = mean_time - sem_time,
+            max = mean_time + sem_time) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = fcov, y = mean_time, color=tool, group = tool)) +
+  geom_point()  +
+  geom_line() +
+  geom_linerange(aes(ymin = min, ymax = max)) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  ) +
+  xlab("Fold coverage") +
+  ylab("Runtime (s)") +
+  scale_y_log10()
+
+#print(coverage + theme(legend.position = "bottom"))
+
+legend <- cowplot::get_legend(coverage + theme(legend.position = "bottom"))
+
+figure_3 <- cowplot::plot_grid(coverage, viral_load, labels="AUTO")
+figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
+print(figure_3)
+
+cowplot::save_plot("plots/figure3_elapsed.pdf", figure_3)
+
+```

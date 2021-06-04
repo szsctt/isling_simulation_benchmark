@@ -1,12 +1,9 @@
 ---
-title: "Simulalation results - padding and jaccard"
-output: 
-  html_notebook:
-    toc: true
-    toc_float:
-      collapsed: false
-      smooth_scroll: false
+title: "R Notebook"
+output: html_notebook
 ---
+
+After making some (hopefully final) changes, I re-ran the simulation and benchmarking analysis.
 
 ```{r include=F}
 knitr::opts_chunk$set(echo = FALSE, warning=F)
@@ -14,42 +11,39 @@ library(tidyverse)
 
 source("sim_functions.R")
 
-AAV_OTC_dir <- "../out/experiment1_OTC_chr1/AAV-OTC/"
+AAV_OTC_dir <- "../out/experiment1_OTC_chr1/AAV-OTC"
 score_types <- c("shortest", "coords_mean", "coords_min", "midpoint")
-
 OTC_conds_dir <-"../out/experiment1_OTC_chr1/OTC-condition-breakdown/"
 
 ```
+
 
 # AAV and OTC integration
 
 I simulated data as before - with an OTC and AAV condition - and compared the performance of various viral integration tools in various ways.  I simulated integrations into either chromosome 1, or all of hg38.  I used hg38 for analysis in the intergration tools.
 
-On the analysis side, we had the following analysis conditions
+For simulation, we had the following conditions:
+```{r include=FALSE}
+sim_conds <- importSimulationConditions(AAV_OTC_dir)
+```
+
 ```{r}
-importAnalysisConditions(AAV_OTC_dir) %>% 
-  select(-one_of("adapter_1", "adapter_2"))
+sim_conds
 ```
 
 
+On the analysis side, we had the following analysis conditions
+```{r include=FALSE}
+analysis_conds <- importAnalysisConditions(AAV_OTC_dir) %>% 
+  select(-one_of("adapter_1", "adapter_2"))
+```
+
+```{r}
+analysis_conds 
+```
+
 ## Jaccard
 
-The first is the Jaccard statistic - the ratio of the intersection and union of the simulated and output integrations.   I
-
-
-I converted the location of the simulated integrations, as well as the output of the various tools to bed format.  For the various tools:  
-
-- ViFi: use the output file `output.clusters.txt.range.bed`, and change commas to tabs.  These intervals are often long - can be hundreds of bp.
-- Polyidus: use the output file `exactHpvIntegrations.simple.bed`, take the first three columns.  This is a one-length interval
-- Seeksv: used script `write_seeksv_bed.py`, which takes a list of chromosomes for the host, as well as the Seeksv output file.  This script identifies lines with viral integrations (rather than other kinds of structural variation), and then uses the 'position' (either `left_pos` or `right_pos`, depending on if host is left or right) as the start coordinate, and start + microhomology_length as the stop coordinate.
-- VSeq-Toolkit: used script `write_vseq_bed.py`, which uses the `GenomicPosition` column as the start coordinate, and uses `GenomicPosition + OverlapFusion + DistanceFusion` as the stop coordinate.  I used the `ISGenomeVector.UniqueGenome.csv` file. 
-
-For Seeksv and VSeq-Toolkit, it's not entirley clear that this is the right way to calculate a start and stop, since I couldn't find a detailed description of what the data in the columns I'm using actually means.  For Seeksv, the microhomology length column was either negative or positive, so I assumed that positive meant homology and negative means a gap.  I think this is a fair assumption.  For VSeq-Toolkit, the description from an [issue on github](https://github.com/CompMeth/VSeq-Toolkit/issues/4) of these columns is:  
-
-> OverlapFusion - the analysis strategy depends on finding a fusion between vector and genome mapped regions of the read. This column indicates how many bases at the fusion site were overlapped between genomic and vector mapped regions.
-DistanceFusion - similarly it indicates if there were any bases at the fusion site between vector and genome that were not mapped.
-
-I also added various amounts of padding to all intervals - 0, 2 or 5 bp.
 
 ```{r include=FALSE}
 jac <- importJaccardExperiment(AAV_OTC_dir) %>% 
@@ -60,15 +54,15 @@ jac <- importJaccardExperiment(AAV_OTC_dir) %>%
 
 jac <- jac %>% 
   filter(!is.na(host_name))
-```
 
+unique(jac$condition)
+```
 
 
 ```{r}
 jac %>% 
   select(host_name, virus_name, analysis_tool, replicate, pad, jaccard, intersection, union, n_intersections, experiment, analysis_condition, analysis_condition_short)
 ```
-
 
 
 ```{r fig.height=10, fig.width=10}
@@ -86,12 +80,8 @@ for (p in unique(jac$pad)) {
 cowplot::plot_grid(plotlist=plotlist)
 ```
 
-We don't HAVE to pad the intervals for the Jaccard statistic.  Indeed, doing so may create intersections, where none existed before padding. The argument for padding is that not all tools acknowledge that the integration site is an interval, not just a point. 
 
-## Chromosomes
-
-For the runs where I only used chromosome 1, it's easy to see if integrations are output on the correct chromosome, because if they're not on chromosome 1, they're wrong.
-
+## sim-to-found distances
 ```{r include=FALSE}
 
 #import distances from each found integration to nearest simulated integration
@@ -124,30 +114,6 @@ sim_scores <- sim_scores%>%
 
 ```
 
-```{r}
-found_scores %>% 
-  filter(condition == "cond0") %>% 
-  mutate(correct_chr = (chr == "chr2")) %>% 
-  ggplot(aes(x = analysis_condition, fill = correct_chr)) +
-  geom_bar() +
-  facet_wrap(~experiment, scales="free") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-## Distances
-
-```{r}
-sim_scores
-
-```
-
-
-I also calculated the distance from each simulated integration to the nearest output one, which indicates false negatives (if the distance is large), and from each output integration to the nearest simulated one, which indicates false positives (if the distance is large).
-
-There are four types of distances that I used.  "shortest" is the shortest distance between the starts and stop of the two intervals, or 0 if they overlap.  "coords_mean" is the mean of $abs(start_1 - start_2)$ and $abs(stop_1 - stop_2)$, "coords_min" is the minimum of $abs(start_1 - start_2)$ and $abs(stop_1 - stop_2)$, and "midpoint" is the distance between the midpoints of the two intervals.  To calculate these, I used `bedtools closest` to find the closest output integration for each simulated integration (or vice versa), and also to calculate the shortest distance, and then I calcualted the other distances using this output. 
-
-First, plot the distribution of the sim-to-found distances.  Note that cond0 means chr1 as reference for simulation, and cond1 means hg38.
-
 ```{r fig.height=10, fig.width=10}
 dist_add <- 0.5
 plotlist <- list()
@@ -168,7 +134,8 @@ legend <- cowplot::get_legend(plotlist[[s]] + theme(legend.position = "bottom"))
 cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.1))
 ```
 
-Next, the found-to-sim distances:
+## found-to-sim distances
+
 ```{r fig.height=10, fig.width=10}
 dist_add <- 0.5
 plotlist <- list()
@@ -189,11 +156,7 @@ cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.1))
 ```
 
 
-## Scores
 
-If we place a threshold on the distances, we can get a count of true positives, false positives and false negatives.  A true positive is a simulated integration for which there is a found integration within this threshold, a false positive is an ouput integration for which there is nost a simulated integration within this threshold, and a false negative is a simulated integration for which there is not a found integration within this threshold.  
-
-We could define a true positive in either of two ways: a found integration with a simulated integration near it, or a simulated integration with a found integration near it.  If a tool outputs the same integration twice, this would count as two true positives in the former situation, but one in the latter.  Since there is no information gained by outputing the same integration twice, I don't want to reward this behaviour, so I chose the latter situation for scoring.  However, this scoring scheme doesn't penalise this behaviour either, since all that matters is that the two output integrations are both close to a simulated integration.
 
 ```{r}
 score_dists <- function(dists, group_cols, above_threshold = "fp", score_col = "d_coords_mean", threshold = 5) {
@@ -237,13 +200,10 @@ all_scores <- function(found_dists, sim_dists, group_cols, threshold, score_col)
 ```
 
 
-
-
-
 ```{r include=FALSE}
 group_cols<- c("unique", "analysis_condition", "experiment", "condition", "replicate",  "analysis_host", "analysis_virus", "post", "tool")
 
-dists = c(0, 2, 5, 10)
+dists = c(0, 2, 5, 10, 30, 60, 100)
 
 
 int_scores <- tibble()
@@ -268,7 +228,7 @@ int_scores %>%
   select(analysis_host, analysis_virus, tool, window, score_type, replicate, PPV, TPR, tp:fp, experiment)
 ```
 
-And a plot:
+
 ```{r fig.height=10, fig.width=10}
 plotlist <- list()
 for (w in unique(int_scores$window)) {
@@ -288,25 +248,26 @@ p <- cowplot::plot_grid(plotlist=plotlist)
 cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.1))
 ```
 
-```{r}
+```{r fig.height=8, fig.width=8}
 int_scores %>% 
-    filter(window == 5) %>% 
+    filter(window == 60) %>% 
     filter(condition == "cond0") %>% 
-  filter(score_type == "d_coords_mean") %>% 
     ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape = score_type)) +
     geom_point() +
     xlim(0, 1) +
     ylim(0, 1) +
-    facet_wrap(condition~analysis_virus) +
+    facet_grid(score_type~analysis_virus) +
     theme(legend.position = "bottom") +
-    ggtitle(glue("dist threshold: {5}"))
+    ggtitle(glue("dist threshold: {100}"))
 ```
+
 
 ```{r}
 int_scores %>% 
     filter(window == 5) %>% 
     filter(condition == "cond0") %>% 
   filter(score_type == "d_shortest") %>% 
+  filter(ifelse(str_detect(analysis_condition, 'isling'), analysis_condition=='isling2', TRUE)) %>% 
     ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape = score_type)) +
     geom_point() +
     xlim(0, 1) +
@@ -316,80 +277,30 @@ int_scores %>%
     ggtitle(glue("dist threshold: {5}"))
 ```
 
-```{r}
-importAnalysisConditions(AAV_OTC_dir) %>% 
-  select(analysis_condition, filter) %>% 
-  distinct() %>% 
-  filter(str_detect(analysis_condition, "analysis"))
-```
-
-
-It doesn't make sense to me that in the OTC data, a more stringent filter (isling1) results in more false positives (isling2).
 
 ```{r}
-sim_scores %>% 
-  filter(unique == "OTC_analysis1" | unique == "OTC_analysis2") %>% 
-  filter(d_coords_mean > 5) %>% 
-  ggplot(aes(x = d_coords_mean, color = unique)) +
-  geom_freqpoly(bins = 2000) +
-  scale_x_log10()
-```
-
-
-```{r}
-group_cols<- c("unique", "analysis_condition", "experiment", "condition", "replicate",  "analysis_host", "analysis_virus", "post", "tool")
-
-dists = c(0, 1, 2, 3, 4, 5, 8, 
-          10, 20, 30, 40, 50, 80, 100, 
-          120, 150, 180, 200, 300, 500, 800, 
-          1000, 2000, 3000, 4000, 5000, 8000, 
-          10000, 20000, 30000, 40000, 50000, 80000,
-          100000, 200000, 300000, 400000, 500000, 800000,
-          1000000, 2000000, 4000000, 8000000,
-          10000000, 20000000, 40000000, 80000000,
-          100000000, 200000000)
-
-
-int_scores_ROC <- tibble()
-
-  for (t in dists) {
-    
-    int_scores_ROC <- bind_rows(
-      int_scores, all_scores(found_scores, sim_scores, 
-                             group_cols = group_cols, threshold = t, score_col = "d_coords_mean") 
-    )
-  }
-
-
-
+int_scores %>% 
+    filter(window == 60) %>% 
+    filter(condition == "cond0") %>% 
+  filter(score_type == "d_shortest") %>% 
+  filter(ifelse(str_detect(analysis_condition, 'isling'), analysis_condition=='isling2', TRUE)) %>% 
+    ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape = score_type)) +
+    geom_point() +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    facet_wrap(condition~analysis_virus) +
+    theme(legend.position = "bottom") +
+    ggtitle(glue("dist threshold: {100}"))
 ```
 
 
 
 ```{r}
-int_scores_ROC %>% 
-  filter(condition == "cond0") %>% 
-  group_by(analysis_condition, window, experiment) %>% 
-  summarise(TPR = sum(tp)/(sum(tp) + sum(fn)),
-            PPV = sum(tp)/(sum(tp) + sum(fp))
-            ) %>% 
-  ggplot(aes(x = PPV, y = TPR, color = analysis_condition)) +
-  geom_line() +
-  geom_point(alpha = 0.5) +
-  facet_wrap(~experiment)
-```
-
-
-## Figure 1
-
-If we just look at the chr1 data (not hg38), don't pad for the Jaccard statistic, and we use a distance threshold of 5 and the 'coords_mean' metric for scoring, then our figure would look something like this:
-
-```{r}
-scoring_dist <- 5
-jaccard_pad <- scoring_dist
+scoring_dist <- 60
+jaccard_pad <- 0
 dist_add <- 0.5
-plot_score_type <- "d_coords_mean"
-analysis_condition_plot <- "isling2"
+plot_score_type <- "d_shortest"
+analysis_condition_plot <- "isling1"
 tool_order <- c("isling", "Polyidus", "Seeksv", "ViFi", "VSeq-Toolkit")
 condition_plot <- "cond0"
 num_y_breaks <- 2
@@ -550,81 +461,88 @@ for (e in experiments) {
 p <- cowplot::plot_grid(plotlist=plotlist, nrow = length(experiments), labels="AUTO")
 legend <- cowplot::get_legend(plotlist[[glue("score_{e}")]] + theme(legend.position = "bottom"))
 p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
-cowplot::save_plot("plots/figure1.0.pdf", p2)
+cowplot::save_plot("plots/figure1.60dist.pdf", p2)
 
 ```
+
+
+
 ```{r}
 print(p2)
 ```
 
-We can also do a version with just the Jaccard and the scores
+
+Make some tables so we can pull some numbers for the text
+
+## Jaccard
 
 ```{r}
+jac_table <- jac_plot %>% 
+  select(experiment, tool, condition, replicate,jaccard, intersection, union, host_name, virus_name, analysis_host, analysis_virus, analysis_condition)
 
-plotlist <- list()
-for (e in experiments) {
-  plotlist[[glue("jac_{e}")]] <- jac_plots[[e]]
-  plotlist[[glue("score_{e}")]] <- scores_plots[[e]]  + theme(axis.text.x = element_text(angle = 0, hjust = 1))
-}
+jac_table
 
-p <- cowplot::plot_grid(plotlist=plotlist, nrow = length(experiments), labels="AUTO")
-legend <- cowplot::get_legend(plotlist[[glue("score_{e}")]] + theme(legend.position = "bottom"))
-p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
-cowplot::save_plot("plots/figure1.1.pdf", p2)
-print(p2)
+jac_table %>% 
+  write_tsv("tables/AAV_OTC_jaccard.tsv")
 ```
 
-
-## Results tables
-
-For writing the manuscript, here are the values plotted above
-
-### Jaccard
-Raw data:
 ```{r}
-jac_plot %>% 
-  select(jaccard, intersection, union, n_intersections, experiment, analysis_condition, condition, replicate, analysis_tool, analysis_virus, pad)
-```
-
-Summary statistics:
-```{r}
-
-jac_plot %>% 
-  group_by(experiment, analysis_condition, condition, analysis_tool, analysis_virus, analysis_host, pad) %>% 
+jac_summary <- jac_plot %>% 
+  group_by(experiment, tool, condition, host_name, virus_name, analysis_host, analysis_virus, analysis_condition) %>% 
   summarise(
     n = n(),
     mean_jac = mean(jaccard),
-    median_jac = median(jaccard),
     sd_jac = sd(jaccard),
-    sem_jac = sd(jaccard)/sqrt(n)
-  )
+    sem_jac = sd(jaccard)/sqrt(n()),
+    mean_intersect = mean(intersection),
+    sd_intersect = sd(intersection),
+    sem_intersect = sd(intersection)/sqrt(n()),
+    mean_union = mean(union),
+    sd_union = sd(union),
+    sem_union = sd(union)/sqrt(n())
+  ) 
+
+jac_summary
+
+jac_summary %>% 
+  write_tsv("tables/AAV_OTC_jaccard_summary.tsv")
+```
+
+
+## TPR, PPV
+
+```{r}
+scores_table <- scores_plot %>% 
+  select(experiment, tool, replicate, fp:TPR, window, condition, analysis_host, analysis_virus, analysis_condition)
+
+scores_table
+
+jac_table %>% 
+  write_tsv("tables/AAV_OTC_scores.tsv")
 
 ```
 
-### Scores
-
-Raw data:
-```{r}
-scores_plot %>% 
-  select(experiment, tool, analysis_condition, condition, replicate, window, score_type, fp:TPR)
-```
 
 ```{r}
-scores_plot %>% 
-  group_by(experiment, tool, analysis_condition, condition,  window, score_type) %>% 
+scores_summary <- scores_plot %>% 
+  group_by(experiment, tool, window, condition, analysis_host, analysis_virus, analysis_condition) %>% 
   summarise(
     n = n(),
-    sum_fp = sum(fp),
-    sum_fn = sum(fn),
-    sum_tp = sum(tp),
-    mean_PPV = mean(PPV),
-    sem_PPV = sd(PPV)/sqrt(n),
     mean_TPR = mean(TPR),
-    sem_TPR = sd(TPR)/sqrt(n),
-    aggr_PPV = sum_tp/(sum_tp + sum_fp),
-    aggr_TPR = sum_tp/(sum_tp + sum_fn),
+    sd_TPR = sd(TPR),
+    sem_TPR = sd(TPR)/sqrt(n()),
+    mean_PPV = mean(PPV),
+    sd_PPV = sd(PPV),
+    sem_PPV = sd(PPV)/sqrt(n())
   )
+
+scores_summary
+
+scores_summary %>% 
+  write_tsv("tables/AAV_OTC_scores_summary.tsv")
 ```
+
+
 
 # Fold-coverage and chromosome
 
@@ -652,13 +570,14 @@ jac %>%
   group_by(condition, fcov, analysis_tool, analysis_condition, pad, host_name) %>% 
   summarise(n = n(),
             jac_mean = mean(jaccard),
-            jac_sem = sd(jaccard)/sqrt(n)) %>% 
+            jac_sd = sd(jaccard)) %>% 
   ggplot(aes(x = fcov, y = jac_mean, color = analysis_condition)) +
   geom_point() +
   geom_line() +
   facet_grid(rows = vars(host_name), cols = vars(pad)) +
   scale_x_log10()
 ```
+
 
 
 ## Scoring
@@ -682,10 +601,16 @@ int_scores
 ```
 
 
+```{r}
+int_scores %>% 
+  filter(is.na(analysis_condition))
+```
+
 
 ```{r}
 int_scores %>% 
   filter(window == 5) %>% 
+  filter(coords_score_type == "coords_mean") %>% 
   group_by(fcov, analysis_condition, host_name, condition, window, coords_score_type) %>% 
   summarise(n = n(),
             mean_TPR = mean(TPR),
@@ -701,9 +626,31 @@ int_scores %>%
   scale_x_log10()
 ```
 
+
 ```{r}
 int_scores %>% 
   filter(window == 5) %>% 
+  filter(coords_score_type == "shortest") %>% 
+  group_by(fcov, analysis_condition, host_name, condition, window, coords_score_type) %>% 
+  summarise(n = n(),
+            mean_TPR = mean(TPR),
+            sem_TPR = sd(TPR)/sqrt(n),
+            min_TPR = mean_TPR - sem_TPR,
+            max_TPR = mean_TPR + sem_TPR
+            ) %>% 
+  ggplot(aes(x = fcov, y = mean_TPR, color = analysis_condition, group=analysis_condition)) +
+  geom_point() +
+  geom_line() +
+  geom_linerange(aes(ymin = min_TPR, ymax = max_TPR)) +
+  facet_wrap(~host_name) +
+  scale_x_log10()
+```
+
+
+```{r}
+int_scores %>% 
+  filter(window == 60) %>% 
+  filter(coords_score_type == "shortest") %>% 
   group_by(fcov, analysis_condition, host_name, condition, window, coords_score_type) %>% 
   summarise(n = n(),
             mean_PPV = mean(PPV),
@@ -719,14 +666,19 @@ int_scores %>%
   scale_x_log10()
 ```
 
+
 ## Figure 2
 
 If we combine the jaccard, PPV and TPR, we get the following:
 
 ```{r include=FALSE}
-isling_condition <- "analysis2|isling2"
-plot_score_type <- "coords_mean"
 
+
+
+makeFigue2 <- function(isling_condition, plot_score_type, scoring_dist) {
+  jaccard_pad <- scoring_dist
+  
+  
 jac_plot <- jac %>% 
   filter(pad == jaccard_pad) %>% 
   filter(case_when(
@@ -826,230 +778,25 @@ p <- cowplot::plot_grid(jac_plot, PPV_plot, TPR_plot, labels="AUTO", ncol = 1)
 legend <- cowplot::get_legend(jac_plot + theme(legend.position = "bottom"))
 p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
 print(p2)
-cowplot::save_plot("plots/figure2.pdf", p2)
+cowplot::save_plot(glue::glue("plots/figure2{scoring_dist}.pdf"), p2)
+
+return(p2)
+
+  
+}
+
+
+
+p2 <- makeFigue2("analysis1|isling1", "shortest", 60)
+
 ```
 
 ```{r}
 print(p2)
 ```
 
-
-# Runtime
-
-I also looked at the runtime as I changed to variables: viral load and fold coverage
-
-```{r include=FALSE}
-results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment2_time/"
-experiments <- c("coverage", 'viral_load')
-
-files <- list.files(results_dir, recursive = TRUE, pattern="_runtime.tsv")
-
-files <- files[ basename(dirname(files)) %in% experiments]
-
-files <- files[dirname(dirname(files)) == "."]
-
-
-coltypes <- cols(
-  tool = col_character(),
-  dataset = col_character(),
-  sample = col_character(),
-  replicate = col_double(),
-  exit_value = col_double(),
-  user_time = col_double(),
-  system_time = col_double(),
-  elapsed_time = col_character(),
-  CPU = col_character(),
-  shared_text = col_double(),
-  unshared_data = col_double(),
-  max_rss = col_double(),
-  fs_inputs = col_double(),
-  fs_outputs = col_double(),
-  major_page_faults = col_double(),
-  minor_page_faults = col_double(),
-  swaps = col_double(),
-  command = col_character()
-)
-
-times <- tibble(
-  filename = file.path(results_dir, files),
-  experiment = dirname(files),
-  data = map(filename, ~read_tsv(., col_types=coltypes))
-) %>% 
-  unnest(data) %>% 
-  mutate(duration_elapsed_time = case_when(
-    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\.\\d{2}") ~ lubridate::as.duration(lubridate::ms(elapsed_time)),
-    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\:\\d{2}") ~ lubridate::as.duration(lubridate::hms(elapsed_time)),
-    TRUE ~ lubridate::as.duration(NA)
-  )) %>% 
-  rename(time_rep = replicate)
-
-# add simulation conditions
-conds <- importSimulationConditions(results_dir)
-
-times <- left_join(times, conds, by=c("experiment", "sample")) %>% 
-  mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
-  mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
-  mutate(tool = str_replace(tool, "vifi", "ViFi")) %>% 
-  mutate(tool = str_replace(tool, "vseq-toolkit", "VSeq-Toolkit"))  
-```
-
-First, check the exit values for each run, for each tool
-
 ```{r}
-# how many times does each exit value occur?
-times %>% 
-  group_by(tool, exit_value) %>% 
-  summarise(n = n())
-```
-
-Also check the number of replicates for each experiment, sample and tool - should be 3.
-
-```{r}
-times %>% 
-  group_by(experiment, sample, tool) %>% 
-  summarise(n = n())
-```
-
-
-Are there any that aren't 3?
-
-```{r}
-times %>% 
-  group_by(experiment, sample, tool) %>% 
-  summarise(n = n()) %>% 
-  filter(n != 3)
-```
-## Runtime
-
-Plotting the runtime:
-
-```{r }
-
-times %>% 
-  mutate(tool = as.factor(tool)) %>% 
-  ggplot(aes(x = condition, y = duration_elapsed_time, color=tool)) +
-  geom_boxplot() +  
-  facet_grid(rows = vars(experiment), scales = 'free') +
-  scale_y_log10() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_color_discrete(name='tool')
-```
-
-
-## Memory usage
-
-We can also look at the reported memory usage:
-
-```{r}
-times %>% 
-  mutate(tool = as.factor(tool)) %>% 
-  ggplot(aes(x = condition, y = max_rss, color=tool)) +
-  geom_boxplot() +  
-  facet_grid(rows = vars(experiment), scales = 'free') +
-  scale_y_log10() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_color_discrete(name='tool')
-```
-
-
-```{r}
-times %>% 
-  mutate(tool = as.factor(tool)) %>% 
-  ggplot(aes(x = condition, y = swaps, color=tool)) +
-  geom_boxplot() +  
-  facet_grid(rows = vars(experiment), scales = 'free') +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_color_discrete(name='tool')
-```
-
-## CPU usage
-
-
-Also look at CPU usage (all jobs were given 20 cores):
-
-```{r}
-times %>% 
-  mutate(tool = as.factor(tool)) %>% 
-  mutate(CPU = str_replace(CPU, "%", "")) %>% 
-  mutate(CPU = as.integer(CPU)) %>% 
-  ggplot(aes(x = condition, y = CPU, color=tool)) +
-  geom_boxplot() +  
-  facet_grid(rows = vars(experiment), scales = 'free') +
-  scale_y_log10() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_color_discrete(name='tool')
-```
-
-## Figure 3
-
-```{r}
-
-viral_load <- times %>% 
-  filter(experiment == "viral_load") %>% 
-  mutate(int_num = as_factor(int_num)) %>% 
-  mutate(tool = as.factor(tool)) %>% 
-  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
-  group_by(int_num, epi_num, tool) %>% 
-  summarise(n = n(),
-            mean_time = mean(duration_elapsed_time),
-            sem_time = sd(duration_elapsed_time)/sqrt(n),
-            min = mean_time - sem_time,
-            max = mean_time + sem_time) %>% 
-  ungroup() %>% 
-   ggplot(aes(x = int_num, y = mean_time, color=tool, group = tool)) +
-  geom_point()  +
-  geom_line() +
-  geom_linerange(aes(ymin = min, ymax = max)) +
-  facet_wrap(vars(epi_num)) +
-  theme_classic()  + 
-  theme(
-    strip.background = element_blank(),
-    strip.text.y = element_blank(),
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    #    axis.title.y = element_blank(),
-  )  +
-  xlab("Number of integrations") +
-  ylab("Runtime (s)") +
-  scale_y_log10()
-
-
-#print(viral_load + theme(legend.position = "bottom"))
-
-coverage <- times %>% 
-  filter(experiment == "coverage") %>% 
-  mutate(fcov = as.factor(fcov)) %>% 
-  mutate(tool = as.factor(tool)) %>% 
-  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
-  group_by(fcov, tool) %>% 
-  summarise(n = n(),
-            mean_time = mean(duration_elapsed_time),
-            sem_time = sd(duration_elapsed_time)/sqrt(n),
-            min = mean_time - sem_time,
-            max = mean_time + sem_time) %>% 
-  ungroup() %>% 
-  ggplot(aes(x = fcov, y = mean_time, color=tool, group = tool)) +
-  geom_point()  +
-  geom_line() +
-  geom_linerange(aes(ymin = min, ymax = max)) +
-  theme_classic() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "none"
-  ) +
-  xlab("Fold coverage") +
-  ylab("Runtime (s)") +
-  scale_y_log10()
-
-#print(coverage + theme(legend.position = "bottom"))
-
-legend <- cowplot::get_legend(coverage + theme(legend.position = "bottom"))
-
-figure_3 <- cowplot::plot_grid(coverage, viral_load, labels="AUTO")
-figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
-print(figure_3)
-
-cowplot::save_plot("plots/figure3.pdf", figure_3)
-
+p2 <- makeFigue2("analysis1|isling1", "shortest", 5)
+print(p2)
 ```
 

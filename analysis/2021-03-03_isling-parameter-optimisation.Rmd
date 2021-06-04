@@ -14,7 +14,7 @@ score_window <- 5
 ```
 
 
-## Experient setup
+## Experiment setup
 
 I wanted to optimise the isling parameters, to get the best performance.  Specifically, I'd previously implmented a filtering step in R to remove integrations that don't meet the following criteria:  
 
@@ -160,114 +160,36 @@ From these results it looks like the best choices are a clipping cutoff of 20, a
 
 ### Filtering parameters
 
-In the results above, I haven't filtered the results at all.  Try to find the optimal filters that reduce the number of false positives and false negatives, using this best condition as a starting point.
 
 ```{r}
-int_scores <- int_scores %>% 
-  filter(analysis_condition == "isling9")
-```
+AAV_filt_path <- "../out/experiment1_OTC_chr1/AAV_isling-optimise_filtering/"
 
-```{r}
-int_scores %>% 
-  select(experiment, analysis_condition, replicate, TPR, PPV)
-```
+# import scored integrations
+AAV_filt <- importIntScoreExperiment(AAV_filt_path) %>% 
+  mutate(analysis_tool = str_replace(tool.x, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) 
+  
 
+AAV_filt
 
-```{r include=FALSE}
+OTC_filt_path <- "../out/experiment1_OTC_chr1/OTC_isling-optimise_filtering/"
 
-#import distances from each found integration to nearest simulated integration
-found_scores <- importNearestSimToFound(exp_dir) 
+# import scored integrations
+OTC_filt <- importIntScoreExperiment(OTC_filt_path) %>% 
+  mutate(analysis_tool = str_replace(tool.x, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) 
 
-# only use postprocessed data from our pipeline
-found_scores <- found_scores %>% 
-  filter(case_when(
-    !str_detect(analysis_condition, "pipeline") ~ TRUE,
-    post ~ TRUE,
-    TRUE ~ FALSE
-  )) %>% 
-  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
-  mutate(tool = str_replace(analysis_condition, "\\d+", "")) %>% 
-  filter(analysis_condition == "isling9")
+OTC_filt
 
-# import distances from each simulated integration to the nearest found integration
-sim_scores <- importNearestFoundToSim(exp_dir) 
-
-sim_scores <- sim_scores%>% 
-  filter(case_when(
-    !str_detect(analysis_condition, "pipeline") ~ TRUE,
-    post ~ TRUE,
-    TRUE ~ FALSE
-  )) %>%  
-  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
-  mutate(tool = str_replace(analysis_condition, "\\d+", ""))  %>% 
-  filter(analysis_condition == "isling9")
-
+filt_scores <- bind_rows(AAV_filt, OTC_filt) %>% 
+  filter(window == score_window)
 
 ```
 
 ```{r}
-# import data from before postprocessing, since the data after postprocessing don't have the columns that we want to filter on
-
-files <- list.files(exp_dir, pattern="integrations.txt", recursive=TRUE)
-files <- files[str_detect(files, "analysis9")]
-
-pre_filtering <- tibble(
-  file = file.path(exp_dir, files),
-  virus = str_split(basename(file), "\\.", simplify=TRUE)[,4],
-  replicate = str_split(basename(file), "\\.", simplify=TRUE)[,2],
-  condition = str_split(basename(file), "\\.", simplify=TRUE)[,1],
-  data = map(file, ~read_tsv(.))
-)
-
-pre_filtering <- pre_filtering %>% 
-  unnest(data) %>% 
-  mutate(replicate = as.integer(str_replace(replciate, "rep", "")))
-
-pre_filtering
-
+filt_scores
 ```
 
-
-```{r}
-score_dists <- function(dists, group_cols, above_threshold = "fp", score_col = "d_coords_mean", threshold = 5) {
-  print(glue("checking column {score_col} with threshold {threshold}"))
-  return(dists %>% 
-           mutate(score = case_when(
-             !!ensym(score_col) == -1 ~ above_threshold,
-             !!ensym(score_col) > threshold ~ above_threshold,
-             !!ensym(score_col) <= threshold ~ "tp",
-             TRUE ~ as.character(NA)
-           )) %>% 
-           group_by(across(one_of(c(group_cols, "score")))) %>% 
-           tally() %>% 
-           mutate(window = threshold) %>% 
-           mutate(score_type = score_col) %>% 
-           ungroup())
-  
-}
-
-all_scores <- function(found_dists, sim_dists, group_cols, threshold, score_col) {
-  
-  found <- score_dists(found_dists, group_cols, above_threshold ="fp", score_col, threshold) %>% 
-    filter(score == "fp")
-  sim <- score_dists(sim_dists, group_cols, above_threshold ="fn", score_col, threshold)
-  
-  
-  return(
-    bind_rows(found, sim) %>% 
-           pivot_wider(names_from = score, values_from = n, values_fill = 0) %>% 
-      ungroup() %>% 
-      rowwise() %>% 
-      mutate(PPV = tp / (tp + fp)) %>% 
-      mutate(TPR = tp / (tp + fn)) %>% 
-      ungroup()
-         )
-}
-
-group_cols<- c("unique", "analysis_condition", "experiment", "condition", "replicate",  "analysis_host", "analysis_virus", "post", "tool")
-
-all_scores(found_scores, sim_scores, group_cols = group_cols, 5, "d_coords_mean")
-```
 
 We have the following columns that we can filter on:
 
@@ -294,41 +216,290 @@ In the simulated data, I wouldn't expect there to be much gained by filtering on
 
 When filtering on this column, we need to keep in mind that discordant reads don't have a number of ambiguous bases (internally in the filtering script, it's `np.nan`), and so if we filter on this column we will always exclude any discordant pairs.  This isn't desirable, so make sure to include discordant pairs as well.
 
-```{bash}
-INTFILES="../out/experiment1_OTC_chr1/AAV-OTC_isling-parameters/*analysis9/ints/*integrations.txt"
+```{r}
+filt_scores %>% 
+  pull(experiment) %>% 
+  unique()
+```
 
-FILTER="../intvi_pipeline/scripts/filter.py"
-CLOSEST="../intvi_simulation/scripts/closest.py"
-SCORE="../intvi_simulation/scripts/score_integrations.py"
+#### HostEditDist
 
-OUTDIR=$(pwd)/"isling_paramters"
-mdkir -p $OUTDIR
+In principle, we should exclude any integrations that have a large edit distance, since these may come from inaccurate mapping.  However, in practice the aligner may not output inaccuratley mapped alignments, so this might acutally make things worse.
 
-VALS="0 1 2 3 4 5 12 15 17 20"
+The graph below shows the performance of isling when we only retain integrations with an edit distnace indicated by the colors.
 
-eval "$(conda shell.bash hook)"
-conda activate simvi
-python3 $CLOSEST
+```{r}
+filt_scores %>% 
+  filter(experiment == "HostEditDist") %>% 
+  mutate(host_edit_dist = str_match(filter, "HostEditDist (.+)\\)")[,2]) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = host_edit_dist)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
 
-for file in $INTFILES; do
-  BN=$(basename $file)
-  echo working on $BN
-  
-  for val in $VALS; do
-    FILT="${OUDIR}/${BN}.${val}"
-    BED="${FILT}.bed"
-    
-    echo python3 $FILTER \
-      -i $file \
-      -c "NoAmbiguousBases < $val or Type == discordant" \
-      -k "${OUDIR}/${BN}.${val}"
-    echo 
-    echo
-  done
-done
+#### ViralEditDist
 
+We can do the same thing with the edit distance for virus/vector alignments.
 
+The graph below shows the performance of isling when we only retain integrations with an edit distnace indicated by the colors.
+
+```{r}
+filt_scores %>% 
+  filter(experiment == "ViralEditDist") %>% 
+  mutate(viral_edit_dist = str_match(filter, "ViralEditDist (.+)\\)")[,2]) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = viral_edit_dist)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
 ```
 
 
+#### Total edit distance
+
+Instead of filtering on viral or host edit distance, we can filter on both at the same time by using the 'total edit distance'.  The total edit distance is defined as the sum of the edit distances for the host and viral alignments, the number of bases in the gap between these (if there are any).  Filtering on this column has the side-effect of penalising gaps between the two alignments, which may or may not be desirable (depending on if we expect to see such a gap or not).
+```{r}
+filt_scores %>% 
+  filter(experiment == "TotalEditDist") %>% 
+  mutate(total_edit_dist = str_match(filter, "TotalEditDist (.+)\\)")[,2]) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = total_edit_dist)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
+
+This curvature is kind of interesting - as the allowed total edit distance increases, we'd expect fewer false positives (or to move upwards on the y-axis), and perhaps more false positives (to to move left on the x-axis).  But we see two different trends in different parts of the total edit distance range.  As we decrease the allowed total edit distnace from anything through to 3-4, we decrease the number of false positives, but increase the number of false negatives.  This is the kind of trade-off that we expect to see.  However, as we decrease the total edit distance further, we have both more false negatives AND more false positives.  I'm not really sure why this would be yet...
+
+#### Number of ambiguous bases
+
+Instead of using total edit distance, we can remove integrations that have gaps (or overlaps) by filtering out those with a large number of ambiguous bases.  When filtering on this column, we need to still include discordant pairs, because these have an ambiguous base count of 'NaN', and therefore filtering on this column will always exclude these rows.
+
+
+```{r}
+filt_scores %>% 
+  filter(experiment == "NoAmbiguousBases") %>% 
+  mutate(ambig_bases = str_match(filter, "NoAmbiguousBases (.+) or")[,2]) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = ambig_bases)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
+
+Because in this dataset we have lots of integrations with ambiguous bases, if we don't allow any ambiguous bases then we basically don't see any true positive integrations.
+
+
+#### HostMapQ
+
+We can also filter on mapping quality - in theory, reads that cannot be localised uniquely will have a low mapping quality.  If we only want reads that map uniquely in the host genome, we can filter on this column
+
+```{r}
+filt_scores %>% 
+  filter(experiment == "HostMapQ") %>% 
+  mutate(host_mapq = str_match(filter, "HostMapQ (.+)\\)")[,2]) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = host_mapq)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
+
+#### Location ambiguity in host
+ 
+Instead of using mapping quality, we can, in theory, get a similar result by retaining integrations that have a unique location in the host.  This is a little less descriminatory than mapping quality, though, because an integration is considered to have an ambiguous location only if there is a secondary alignemnt which has an indential CIGAR string to the primary alignment.   Mapping quality will be low (0?) in the case of an indentical secondary CIGAR, but will also be lower for an alignment with a similar secondary CIGAR (whereas this isn't considered for location ambiguity).
+
+
+```{r}
+filt_scores %>% 
+  filter(experiment == "HostPossibleAmbiguous") %>% 
+  mutate(host_ambiguous_allowed = str_detect(filter, "yes")) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = host_ambiguous_allowed)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
+ 
+ 
+#### ViralMapQ
+
+We can do the same thing for the viral alignment.  However, we need to be careful with this when using multiple viral references that have homology - any reads aligning to these homologous regions will be filtered out, which is probably not what we want.
+
+```{r}
+filt_scores %>% 
+  filter(experiment == "ViralMapQ") %>% 
+  mutate(viral_mapq = str_match(filter, "ViralMapQ (.+)\\)")[,2]) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = viral_mapq)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
+
+#### Location ambiguity in virus
+ 
+We can do the same thing with the viral alignment, but again we have to be careful in the case of multiple viral references
+
+```{r}
+filt_scores %>% 
+  filter(experiment == "ViralPossibleAmbiguous") %>% 
+  mutate(virus_ambiguous_allowed = str_detect(filter, "yes")) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = virus_ambiguous_allowed)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
+
+
+#### Possible host translocation
+
+We may also have some reads that look like they contain two different parts of the host genome.  These can also result from vector rearrangements, where the vector genome has some homology with the host.  I don't think there's any reason to include reads that look like host translocations.
+
+```{r}
+filt_scores %>% 
+  filter(experiment == "PossibleHostTranslocation") %>% 
+  mutate(host_translocation_allowed = str_detect(filter, "yes")) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = host_translocation_allowed)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
+
+#### Possible vector rearrangment
+
+Similarly, we may also see reads that look like two pices of the vector/virus right next to each other, which again can cause artifacts.  
+
+```{r}
+filt_scores %>% 
+  filter(experiment == "PossibleVectorRearrangement") %>% 
+  mutate(vec_rearrange_allowed = str_detect(filter, "yes")) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = vec_rearrange_allowed)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
+
+#### Excluding homology
+
+We also have the option of excluding all integrations that fall within regions of homology between the host and vector (because these tend to be artifacts).  
+
+```{r}
+filt_scores %>% 
+  filter(experiment == "exclude_homology") %>%
+  rowwise() %>% 
+  mutate(exclude_homology = str_length(bed_include) > 2) %>% 
+  ggplot(aes(x = PPV, y = TPR, color = exclude_homology)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  facet_wrap(~virus)
+```
+
+## Filter combinations
+
+It would also be useful to examine these filters in various combinations, to find the best combination.
+
+```{r include=FALSE}
+filt_path <- "../out/experiment1_OTC_chr1/AAV-OTC_isling-optimise_filtering/"
+
+# import scored integrations
+filt_scores <- importIntScoreExperiment(filt_path) %>% 
+  mutate(analysis_tool = str_replace(tool.x, 'analysis|pipeline', 'isling')) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis|pipeline', 'isling')) 
+
+filt_scores <- filt_scores %>% 
+  rowwise() %>% 
+  filter(virus == virus_name) %>% 
+  ungroup()
+
+```
+
+```{r}
+filt_scores
+```
+
+
+Since these filters are long strings, I number them.  The filters used were:
+```{r}
+filters <- unique(filt_scores$filter)
+
+
+filt_scores <- filt_scores %>% 
+  rowwise() %>% 
+ mutate(number = which(filters == filter)) %>% 
+  ungroup()
+
+
+filt_scores %>% 
+  select(number, filter) %>% 
+  distinct() %>% 
+  arrange(number)
+  
+  
+for (i in seq(length(filters))) {
+  print(glue::glue("filter number {i}: {filters[i]}"))
+  print(glue::glue("\n"))
+}
+```
+
+
+
+
+```{r}
+filt_scores %>% 
+  ggplot(aes(x = PPV, y = TPR, color = as.factor(number))) +
+  geom_point(alpha = 0.7) +
+  theme(legend.position = "bottom") +
+  facet_wrap(~experiment) +
+  xlim(0, 1) +
+  ylim(0, 1) 
+```
+
+```{r fig.height=10, fig.width=10}
+filt_scores %>% 
+  ggplot(aes(x = PPV, y = TPR)) +
+  geom_point(alpha = 0.7) +
+  theme(legend.position = "bottom") +
+  facet_wrap(number~experiment) +
+  xlim(0, 1) +
+  ylim(0, 1) 
+```
+
+```{r include=FALSE}
+ plot <- filt_scores %>% 
+  ggplot(aes(x = PPV, y = TPR)) +
+  geom_point() +
+  theme(legend.position = "bottom") +
+  facet_wrap(~experiment) +
+  xlim(0, 1) +
+  ylim(0, 1)  +
+  gganimate::transition_states(
+    number,
+    transition_length = 5,
+    state_length = 10
+  ) +
+  gganimate::enter_fade() + 
+  gganimate::exit_shrink() +
+  gganimate::ease_aes('sine-in-out') +
+  labs(title = 'filter {closest_state}')
+
+gganimate::anim_save("plots/filters.gif", plot)
+```
+
+
+![](plots/filters.gif)
+
+
+
+## Session info
+
+```{r}
+sessionInfo()
+```
 

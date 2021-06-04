@@ -1,0 +1,64 @@
+---
+title: "Paper figures and data"
+output: html_notebook
+---
+```{r include=F}
+knitr::opts_chunk$set(echo = FALSE, warning=F)
+library(tidyverse)
+
+source("sim_functions.R")
+
+AAV_OTC_dir <- "../out/experiment1_OTC_chr1/AAV-OTC/"
+score_types <- c("shortest", "coords_mean", "coords_min", "midpoint")
+
+OTC_conds_dir <-"../out/experiment1_OTC_chr1/OTC-condition-breakdown/"
+
+```
+
+# AAV and OTC integration
+
+I simulated data as before - with an OTC and AAV condition - and compared the performance of various viral integration tools in various ways.  I simulated integrations into either chromosome 1, or all of hg38.  I used hg38 for analysis in the intergration tools.
+
+On the analysis side, we had the following analysis conditions
+```{r}
+importAnalysisConditions(AAV_OTC_dir) %>% 
+  select(-one_of("adapter_1", "adapter_2"))
+```
+
+## Jaccard
+
+The first is the Jaccard statistic - the ratio of the intersection and union of the simulated and output integrations.   I
+
+
+I converted the location of the simulated integrations, as well as the output of the various tools to bed format.  For the various tools:  
+
+- ViFi: use the output file `output.clusters.txt.range.bed`, and change commas to tabs.  These intervals are often long - can be hundreds of bp.
+- Polyidus: use the output file `exactHpvIntegrations.simple.bed`, take the first three columns.  This is a one-length interval
+- Seeksv: used script `write_seeksv_bed.py`, which takes a list of chromosomes for the host, as well as the Seeksv output file.  This script identifies lines with viral integrations (rather than other kinds of structural variation), and then uses the 'position' (either `left_pos` or `right_pos`, depending on if host is left or right) as the start coordinate, and start + microhomology_length as the stop coordinate.
+- VSeq-Toolkit: used script `write_vseq_bed.py`, which uses the `GenomicPosition` column as the start coordinate, and uses `GenomicPosition + OverlapFusion + DistanceFusion` as the stop coordinate.  I used the `ISGenomeVector.UniqueGenome.csv` file. 
+
+For Seeksv and VSeq-Toolkit, it's not entirley clear that this is the right way to calculate a start and stop, since I couldn't find a detailed description of what the data in the columns I'm using actually means.  For Seeksv, the microhomology length column was either negative or positive, so I assumed that positive meant homology and negative means a gap.  I think this is a fair assumption.  For VSeq-Toolkit, the description from an [issue on github](https://github.com/CompMeth/VSeq-Toolkit/issues/4) of these columns is:  
+
+> OverlapFusion - the analysis strategy depends on finding a fusion between vector and genome mapped regions of the read. This column indicates how many bases at the fusion site were overlapped between genomic and vector mapped regions.
+DistanceFusion - similarly it indicates if there were any bases at the fusion site between vector and genome that were not mapped.
+
+I also added various amounts of padding to all intervals - 0, 2 or 5 bp.
+
+```{r include=FALSE}
+jac <- importJaccardExperiment(AAV_OTC_dir) %>% 
+  mutate(pad = as.integer(str_extract(sim_file, "(?<=pad)\\d+"))) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, "analysis", "isling")) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, "analysis", "isling")) %>% 
+  mutate(analysis_condition_short = str_replace(analysis_condition_short, "analysis", "isling"))
+
+jac <- jac %>% 
+  filter(!is.na(host_name))
+```
+
+
+```{r}
+jac %>% 
+  select(host_name, virus_name, analysis_tool, replicate, pad, jaccard, intersection, union, n_intersections, experiment, analysis_condition, analysis_condition_short)
+```
+
+

@@ -1,0 +1,291 @@
+---
+title: "Exploring results from new isling"
+output: html_notebook
+---
+
+I re-wrote the perl scripts that identify integrations in python.  Check out the performance of the new isling.
+
+
+```{r include=F}
+knitr::opts_chunk$set(echo = FALSE, warning=F)
+library(tidyverse)
+
+source("sim_functions.R")
+
+AAV_OTC_dir <- "../out/experiment1_OTC_chr1/2021-05-25_AAV-OTC"
+score_types <- c("shortest", "coords_mean", "coords_min", "midpoint")
+
+```
+# AAV and OTC integration
+
+I simulated data as before - with an OTC and AAV condition - and compared the performance of various viral integration tools in various ways.  I simulated integrations into either chromosome 1, or all of hg38.  I used hg38 for analysis in the intergration tools.
+
+For simulation, we had the following conditions:
+```{r include=FALSE}
+sim_conds <- importSimulationConditions(AAV_OTC_dir)
+```
+
+```{r}
+sim_conds
+```
+
+
+On the analysis side, we had the following analysis conditions
+```{r include=FALSE}
+analysis_conds <- importAnalysisConditions(AAV_OTC_dir) %>% 
+  select(-one_of("adapter_1", "adapter_2"))
+```
+
+```{r}
+analysis_conds 
+```
+
+
+## Jaccard
+
+
+```{r include=FALSE}
+jac <- importJaccardExperiment(AAV_OTC_dir) %>% 
+  mutate(pad = as.integer(str_extract(sim_file, "(?<=pad)\\d+"))) %>% 
+  mutate(analysis_tool = str_replace(analysis_tool, "analysis", "isling")) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, "analysis", "isling")) %>% 
+  mutate(analysis_condition_short = str_replace(analysis_condition_short, "analysis", "isling"))
+
+jac <- jac %>% 
+  filter(!is.na(host_name))
+```
+
+
+
+```{r}
+jac %>% 
+  select(host_name, virus_name, analysis_tool, replicate, pad, jaccard, intersection, union, n_intersections, experiment, analysis_condition, analysis_condition_short)
+```
+
+
+```{r fig.height=10, fig.width=10}
+plotlist <- list()
+for (p in unique(jac$pad)) {
+  plotlist[[glue("{p}")]] <- jac %>% 
+    filter(pad == p) %>% 
+    ggplot(aes(x = analysis_condition_short, y = jaccard)) +
+    geom_boxplot() +
+    geom_point() +
+    facet_wrap(experiment~host_name, scales="free") +
+    ggtitle(glue("padding {p}")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+cowplot::plot_grid(plotlist=plotlist)
+```
+
+
+
+## sim-to-found distances
+```{r include=FALSE}
+
+#import distances from each found integration to nearest simulated integration
+found_scores <- importNearestSimToFound(AAV_OTC_dir) 
+
+
+# only use postprocessed data from our pipeline
+found_scores <- found_scores %>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(tool = str_replace(analysis_condition, "\\d+", "")) %>% 
+  filter(experiment == "AAV" | experiment == "OTC")
+
+# import distances from each simulated integration to the nearest found integration
+sim_scores <- importNearestFoundToSim(AAV_OTC_dir) 
+
+sim_scores <- sim_scores%>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>%  
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(tool = str_replace(analysis_condition, "\\d+", "")) %>% 
+  filter(experiment == "AAV" | experiment == "OTC")
+
+```
+
+```{r fig.height=10, fig.width=10}
+dist_add <- 0.5
+plotlist <- list()
+plot_cols <- paste0("d_", score_types)
+for (s in plot_cols) {
+  plotlist[[s]] <- sim_scores %>% 
+   mutate(s := !!ensym(s)+dist_add) %>% 
+   ggplot(aes(x = s, color = analysis_condition)) +
+    geom_freqpoly(bins = 100) +
+    scale_x_log10() +
+    facet_wrap(experiment~condition, scales="free_y") +
+    ggtitle(s) +
+    xlab("distance") +
+    theme(legend.position = "none")
+}
+p <- cowplot::plot_grid(plotlist=plotlist)
+legend <- cowplot::get_legend(plotlist[[s]] + theme(legend.position = "bottom"))
+cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.1))
+```
+
+## found-to-sim distances
+
+```{r fig.height=10, fig.width=10}
+dist_add <- 0.5
+plotlist <- list()
+for (s in plot_cols) {
+  plotlist[[s]] <- found_scores %>% 
+   mutate(s := !!ensym(s)+dist_add) %>% 
+   ggplot(aes(x = s, color = analysis_condition)) +
+    geom_freqpoly(bins = 100) +
+    scale_x_log10() +
+    facet_wrap(experiment~condition, scales="free_y") +
+    ggtitle(s) +
+    xlab("distance") +
+    theme(legend.position = "none")
+}
+p <- cowplot::plot_grid(plotlist=plotlist)
+legend <- cowplot::get_legend(plotlist[[s]] + theme(legend.position = "bottom"))
+cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.1))
+```
+
+
+```{r}
+score_dists <- function(dists, group_cols, above_threshold = "fp", score_col = "d_coords_mean", threshold = 5) {
+  print(glue("checking column {score_col} with threshold {threshold}"))
+  return(dists %>% 
+           mutate(score = case_when(
+             !!ensym(score_col) == -1 ~ above_threshold,
+             !!ensym(score_col) > threshold ~ above_threshold,
+             !!ensym(score_col) <= threshold ~ "tp",
+             TRUE ~ as.character(NA)
+           )) %>% 
+           group_by(across(one_of(c(group_cols, "score")))) %>% 
+           tally() %>% 
+           mutate(window = threshold) %>% 
+           mutate(score_type = score_col) %>% 
+           ungroup())
+  
+}
+
+all_scores <- function(found_dists, sim_dists, group_cols, threshold, score_col) {
+  
+  found <- score_dists(found_dists, group_cols, above_threshold ="fp", score_col, threshold) %>% 
+    filter(score == "fp")
+  sim <- score_dists(sim_dists, group_cols, above_threshold ="fn", score_col, threshold)
+  
+  
+  return(
+    bind_rows(found, sim) %>% 
+           pivot_wider(names_from = score, values_from = n, values_fill = 0) %>% 
+      ungroup() %>% 
+      rowwise() %>% 
+      mutate(PPV = tp / (tp + fp)) %>% 
+      mutate(TPR = tp / (tp + fn)) %>% 
+      ungroup()
+         )
+}
+
+
+#all_scores(found_scores, sim_scores, group_cols = group_cols, threshold = 5, score_col = "d_midpoint")  %>%
+# arrange(experiment, condition, replicate)
+```
+
+
+```{r include=FALSE}
+group_cols<- c("unique", "analysis_condition", "experiment", "condition", "replicate",  "analysis_host", "analysis_virus", "post", "tool")
+
+dists = c(0, 2, 5, 10)
+
+
+int_scores <- tibble()
+
+for (s in plot_cols) {
+  
+  for (t in dists) {
+    
+    int_scores <- bind_rows(
+      int_scores, all_scores(found_scores, sim_scores, 
+                             group_cols = group_cols, threshold = t, score_col = s) 
+    )
+  }
+  
+}
+
+```
+
+
+```{r}
+int_scores %>% 
+  select(analysis_host, analysis_virus, tool, window, score_type, replicate, PPV, TPR, tp:fp, experiment)
+```
+
+
+```{r fig.height=10, fig.width=10}
+plotlist <- list()
+for (w in unique(int_scores$window)) {
+  plotlist[[glue("{w}")]] <- int_scores %>% 
+    filter(window == w) %>% 
+    ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape = score_type)) +
+    geom_point() +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    facet_wrap(condition~analysis_virus) +
+    theme(legend.position = "none") +
+    ggtitle(glue("dist threshold: {w}"))
+}
+
+legend <- cowplot::get_legend(plotlist[["0"]] + theme(legend.position = "bottom"))
+p <- cowplot::plot_grid(plotlist=plotlist)
+cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.1))
+```
+
+```{r}
+int_scores %>% 
+    filter(window == 5) %>% 
+    filter(condition == "cond0") %>% 
+  filter(score_type == "d_coords_mean") %>% 
+    ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape = score_type)) +
+    geom_point() +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    facet_wrap(condition~analysis_virus) +
+    theme(legend.position = "bottom") +
+    ggtitle(glue("dist threshold: {5}"))
+```
+
+
+```{r}
+int_scores %>% 
+    filter(window == 5) %>% 
+    filter(condition == "cond0") %>% 
+  filter(score_type == "d_coords_mean") %>% 
+  filter(ifelse(str_detect(analysis_condition, 'isling'), analysis_condition=='isling2', TRUE)) %>% 
+    ggplot(aes(x = PPV, y = TPR, color = analysis_condition, shape = score_type)) +
+    geom_point() +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    facet_wrap(condition~analysis_virus) +
+    theme(legend.position = "bottom") +
+    ggtitle(glue("dist threshold: {5}"))
+```
+
+So the results aren't amazing: the jaccard is low, the TPR isn't much better than vseq-tookit and the PPV is lower.
+
+What is missed?
+
+
+```{r}
+sim_scores %>% 
+  filter(d_coords_mean > 5) %>% 
+  filter(str_detect(unique, "analysis")) %>% 
+  select(d_coords_mean, chr, start, stop, closest_chr_coords_mean, closest_start_coords_mean, closest_stop_coords_mean, unique, condition)
+```
+
+
+

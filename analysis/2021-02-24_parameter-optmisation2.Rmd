@@ -41,7 +41,7 @@ Although I only used chr1 for simulating integrations, I used all of hg38 for an
 
 
 ## Experiment setup
-
+samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o
 Initially when running [VSeq-Toolkit](https://github.com/CompMeth/VSeq-Toolkit), I found that it output a lot of false positives.  When corresponding with the author of VSeq-Toolkit, she suggested that I adjust the parameters to get rid of those.
 
 There are many parameters for VSeq-Toolkit, which are set in the config file.  I tried ajusting several of them:  

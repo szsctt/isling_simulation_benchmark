@@ -508,6 +508,10 @@ importIntScoresFromSummaries <- function(exp_path) {
   folders <- list.dirs(exp_path)
   folders <- folders[str_detect(folders, scored_ints_folder)]
   
+  if (length(folders) == 0) {
+    stop(glue("no results found for experiment path {exp_path}"))
+  }
+  
   # get files for each folder
   filenames <- c()
   for (dir in folders) {

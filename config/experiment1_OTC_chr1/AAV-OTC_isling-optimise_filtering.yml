@@ -1,0 +1,280 @@
+global:
+   out_directory: "../../out/experiment1_OTC_chr1/AAV-OTC_isling-optimise_filtering"
+   
+   # integration simulation
+   replicates: 3 
+   
+   # seed
+   initial_seed: 1234567
+   seed_increment: 123 
+   
+   # genome variation
+   snp_count: 100000
+   indel_count: 1000
+   cnv_count: 0
+   inversion_count: 0
+   translocation_count: 0
+   
+   # integration parameters
+   int_num: 
+       - 1000
+   # read simulation
+   read_len: 
+       - 250
+   frag_len: 
+       - 500
+   frag_std: 
+       - 30
+   seq_sys: 
+       - "MSv3"
+
+   # analysis
+   analysis_hosts: 
+      hg38: "../../data/references/GRCh38.fa"
+   merge: 
+       - False
+   trim: 
+       - True
+   dedup: 
+       - False   
+   bwa_mem:
+       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+   merge-method:
+       - 'common'
+   merge-n-min:
+       - 1
+   cigar-tol:
+       - 3
+   clip-cutoff:
+       - 20
+   filter:
+       -
+         - "HostEditDist <= 5 and ViralEditDist <= 5"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 20"
+         - "HostPossibleAmbiguous == no"
+         - "PossibleVectorRearrangement == no"
+         - "PossibleHostTranslocation == no"
+       -
+         - "HostEditDist <= 7 and ViralEditDist <= 7"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 20"
+         - "HostPossibleAmbiguous == no"
+         - "PossibleVectorRearrangement == no"
+         - "PossibleHostTranslocation == no"
+       -
+         - "HostEditDist <= 7 and ViralEditDist <= 7"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 20"
+         - "HostPossibleAmbiguous == no"
+         - "PossibleVectorRearrangement == no"
+       -
+         - "HostEditDist <= 7 and ViralEditDist <= 7"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 20"
+         - "HostPossibleAmbiguous == no"
+         - "PossibleHostTranslocation == no"
+       -
+         - "HostEditDist <= 7 and ViralEditDist <= 7"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 20"
+         - "PossibleVectorRearrangement == no"
+         - "PossibleHostTranslocation == no"
+       -
+         - "HostEditDist <= 7 and ViralEditDist <= 7"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 10"
+         - "HostPossibleAmbiguous == no"
+         - "PossibleVectorRearrangement == no"
+         - "PossibleHostTranslocation == no"
+       -
+         - "HostEditDist <= 7 and ViralEditDist <= 7"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 20"
+       -
+         - "True"
+       -
+         - "HostEditDist <= 10 and ViralEditDist <= 10"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 20"
+         - "HostPossibleAmbiguous == no"
+         - "PossibleVectorRearrangement == no"
+       -
+         - "HostEditDist <= 5 and ViralEditDist <= 5"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 20"
+         - "HostPossibleAmbiguous == no"
+         - "PossibleVectorRearrangement == no"
+       -
+         - "HostEditDist <= 7 and ViralEditDist <= 7"
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 10"
+       -
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "HostMapQ > 20"
+         - "HostPossibleAmbiguous == no"
+         - "PossibleVectorRearrangement == no"
+
+
+   bed-exclude:
+       -
+         - "../../data/references/hg38_homologoustoOTCvec.bed" 
+   bed-include:
+       -
+         - 
+       
+    # scoring
+   score_reads: False
+   score_ints: True
+   score_merged_ints: True
+   score_ints_window: 
+    - 5
+
+   score_ints_type: 
+    - "coords_mean"
+
+
+AAV-harder:
+   hosts: 
+      chr2 : "../../data/references/chrs/chr2.fa"
+   viruses:
+      AAV2 :  "../../data/references/NC_001401_2.fa"
+   epi_num:
+       - 100
+   p_whole:
+       - 0.3
+   p_rearrange:
+       - 0
+   p_delete:
+       - 0
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0.3
+   p_gap:
+       - 0.3
+   lambda_junction:
+       - 1
+   p_host_deletion:
+       - 0.5
+   lambda_host_deletion:
+       - 500
+   min_sep:
+       - 100
+   min_len:
+       - 20
+   # read simulation
+   fcov: 
+       - 5
+   analysis_viruses:
+      AAV2 :  "../../data/references/NC_001401_2.fa"
+      
+   
+OTC-harder:
+   hosts: 
+      chr2 : "../../data/references/chrs/chr2.fa"
+   viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   epi_num:
+       - 1000
+   p_whole:
+       - 0.3
+   p_rearrange:
+       - 0.1
+   p_delete:
+       - 0.1
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0.3
+   p_gap:
+       - 0.3
+   lambda_junction:
+       - 1
+   p_host_deletion:
+       - 0.5
+   lambda_host_deletion:
+       - 500
+   min_sep:
+       - 100
+   min_len:
+       - 20
+   # read simulation
+   fcov: 
+       - 1.5
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+      
+      
+OTC-highCoverage:
+   hosts: 
+      chr2 : "../../data/references/chrs/chr2.fa"
+   viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   epi_num:
+       - 1000
+   p_whole:
+       - 0.3
+   p_rearrange:
+       - 0.1
+   p_delete:
+       - 0.1
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0.3
+   p_gap:
+       - 0.3
+   lambda_junction:
+       - 1
+   p_host_deletion:
+       - 0.5
+   lambda_host_deletion:
+       - 500
+   min_sep:
+       - 100
+   min_len:
+       - 20
+   # read simulation
+   fcov: 
+       - 20
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+      
+OTC-moreIntegrations:
+   hosts:
+      hg38: "../../data/references/GRCh38.fa"
+   viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+   int_num:
+       - 100000
+       - 1000000
+   epi_num:
+       - 1000
+   p_whole:
+       - 0.3
+   p_rearrange:
+       - 0.1
+   p_delete:
+       - 0.1
+   lambda_split:
+       - 1
+   p_overlap:
+       - 0.3
+   p_gap:
+       - 0.3
+   lambda_junction:
+       - 1
+   p_host_deletion:
+       - 0.5
+   lambda_host_deletion:
+       - 500
+   min_sep:
+       - 100
+   min_len:
+       - 20
+   # read simulation
+   fcov: 
+       - 20
+   analysis_viruses:
+      OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"

@@ -4,8 +4,6 @@ global:
    
    # integration simulation
    replicates: 3 
-   hosts: 
-      chr2 : "../../data/references/chrs/chr2.fa"
        
    viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
@@ -67,27 +65,48 @@ global:
    merge: 
        - False
    trim: 
-       - True
+       - False
    dedup: 
        - False
-   post:
-       -
-         - filter
-         - mask-exclude:
-           - "../../data/references/hg38_homologoustoOTCvec.bed"
    bwa_mem:
-       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 20 -h 200"
-   merge-dist:
-       - 1000
+       - "-a -Y -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 1,200"
    merge-n-min:
        - 1
+   merge-method:
+       - "common"
    cigar-tol:
-       - 2
+       - 3
    clip-cutoff:
        - 20
-   min-mapq:
+   mapq-threshold:
        - 20
-       - 30
+   alt-edit-dist-thresh:
+       - 3
+   alt-edit-dist-thresh-pc:
+       - null
+   filter:
+       -
+         - "True"
+       -
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "PossibleVectorRearrangement == False"
+       -
+         - "PossibleVectorRearrangement == False" 
+       -
+         - "PossibleVectorRearrangement == False" 
+         - "PossibleHostTranslocation == False" 
+       -
+         - "NoAmbiguousBases < 20 or Type == discordant"
+         - "PossibleVectorRearrangement == False"
+         - "PossibleHostTranslocation == False" 
+         - "HostEditDist <= 7 or ViralEditDist <= 7"
+   
+   bed-exclude:
+       -
+         - "../../data/references/hg38_homologoustoOTCvec.bed" 
+   bed-include:
+       -
+         - 
        
     # scoring
    score_reads: False
@@ -96,15 +115,17 @@ global:
    score_ints_window:
     - 0
     - 5
+    - 60
    score_ints_type: 
     - "coords_mean"
+    - "shortest"
    
    # other tools 
    polyidus_params:
      aligner:
       - "bowtie2"
      trim:
-       - True
+       - False
 
    vifi_params:
      host_info:
@@ -118,11 +139,11 @@ global:
          conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
          segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
      trim:
-       - True
+       - False
 
    seeksv_params:
      trim:
-      - True
+      - False
      dedup:
       - False
      min_reads:

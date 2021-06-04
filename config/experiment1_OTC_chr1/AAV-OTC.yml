@@ -4,8 +4,7 @@ global:
    # integration simulation
    replicates: 3 
    hosts: 
-      chr2 : "../../data/references/chrs/chr2.fa"
-      hg38 : "../../data/references/GRCh38_main.fa" 
+      chr1 : "../../data/references/GRCh38/chrs/chr1.fa" 
    
    # seed
    initial_seed: 1234567
@@ -21,35 +20,9 @@ global:
    # integration parameters
    int_num: 
        - 1000
-   epi_num:
-       - 0
-   p_whole:
-       - 1
-   p_rearrange:
-       - 0
-   p_delete:
-       - 0
-   lambda_split:
-       - 1
-   p_overlap:
-       - 0
-   p_gap:
-       - 0
-   lambda_junction:
-       - 5
-   p_host_deletion:
-       - 0
-   lambda_host_deletion:
-       - 500
-   min_sep:
-       - 500
-   min_len:
-       - 500
    # read simulation
    read_len: 
        - 250
-   fcov: 
-       - 5 
    frag_len: 
        - 500
    frag_std: 
@@ -64,37 +37,44 @@ global:
    merge: 
        - False
    trim: 
-       - True
+       - False
    dedup: 
        - False
 
    bwa_mem:
-       - "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 20 -h 200"
+       - "-a -Y -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 1,200"
    merge-method:
        - 'common'
    merge-n-min:
        - 1
    cigar-tol:
-       - 2
+       - 3
    clip-cutoff:
        - 20
+   mapq-threshold:
+       - 20
+   alt-edit-dist-thresh:
+       - 3
+   alt-edit-dist-thresh-pc:
+       - null
 
    filter:
        -
-         - "HostEditDist <= 5 and ViralEditDist <= 5"
-         - "NoAmbiguousBases < 20 or Type == discordant"
-         - "HostMapQ > 20"
-         - "HostPossibleAmbiguous == no"
-         - "PossibleVectorRearrangement == no"
+         - "True"
        -
          - "NoAmbiguousBases < 20 or Type == discordant"
-         - "HostPossibleAmbiguous == no"
-         - "PossibleVectorRearrangement == no"
+         - "PossibleVectorRearrangement == False"
+       -
+         - "PossibleVectorRearrangement == False" 
+       -
+         - "PossibleVectorRearrangement == False" 
+         - "PossibleHostTranslocation == False" 
        -
          - "NoAmbiguousBases < 20 or Type == discordant"
-         - "HostPossibleAmbiguous == no"
-         - "PossibleVectorRearrangement == no"
-   
+         - "PossibleVectorRearrangement == False"
+         - "PossibleHostTranslocation == False" 
+         - "HostEditDist <= 7 or ViralEditDist <= 7"
+         
    bed-exclude:
        -
          - "../../data/references/hg38_homologoustoOTCvec.bed" 
@@ -108,9 +88,8 @@ global:
    score_merged_ints: True
    score_ints_window: 
     - 0
-    - 2
     - 5
-    - 10
+    - 60
 
    score_ints_type: 
     - "coords_mean"
@@ -123,7 +102,7 @@ global:
      aligner:
       - "bowtie2"
      trim:
-       - True
+       - False
 
    vifi_params:
      host_info:
@@ -137,7 +116,7 @@ global:
          conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
          segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
      trim:
-       - True
+       - False
          
    # run verse
    # https://bioinfo.uth.edu/VirusFinder/VirusFinder-manual.pdf?csrt=2093584511125027598
@@ -161,53 +140,16 @@ global:
 
    seeksv_params:
      trim:
-      - True
+      - False
      dedup:
       - False
      min_reads:
       - 1
      merge_dist:
       - 100
-      
-   vseq_toolkit_params:
-     qua: 
-      - 20
-     lenPer: 
-      - 50
-     mode: 
-      - default
-     vecVecFusion: 
-      - 'true'
-     stringencyVec: 
-      - 'medium'
-     UMthresholdVec: 
-      - 0.95
-     minMapSpanVec: 
-      - 20
-     distVecVec: 
-      - 10
-     opVecVec: 
-      - 5
-     idenVecVec: 
-      - 95
-     stringencyVecGen: 
-      - 'medium'
-     UMthresholdVecGen: 
-      - 0.95
-     minMapSpanVecGen: 
-      - 25
-     distVecGen: 
-      - 10
-     opVecGen: 
-      - 5
-     idenVecGen: 
-      - 95
-     clusterRange: 
-      - 3
-     host_table:
-       hg38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"      
+        
 
-AAV-harder:
+AAV:
    viruses:
       AAV2 :  "../../data/references/NC_001401_2.fa"
    epi_num:
@@ -278,7 +220,7 @@ AAV-harder:
      host_table:
        hg38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"  
    
-OTC-harder:
+OTC:
    viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
    epi_num:
@@ -310,3 +252,41 @@ OTC-harder:
        - 1.5
    analysis_viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
+      
+   vseq_toolkit_params:
+     qua: 
+      - 20
+     lenPer: 
+      - 50
+     mode: 
+      - default
+     vecVecFusion: 
+      - 'true'
+     stringencyVec: 
+      - 'medium'
+     UMthresholdVec: 
+      - 0.95
+     minMapSpanVec: 
+      - 20
+     distVecVec: 
+      - 10
+     opVecVec: 
+      - 5
+     idenVecVec: 
+      - 95
+     stringencyVecGen: 
+      - 'medium'
+     UMthresholdVecGen: 
+      - 0.95
+     minMapSpanVecGen: 
+      - 25
+     distVecGen: 
+      - 10
+     opVecGen: 
+      - 5
+     idenVecGen: 
+      - 95
+     clusterRange: 
+      - 3
+     host_table:
+       hg38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"    

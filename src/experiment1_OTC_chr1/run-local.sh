@@ -13,7 +13,7 @@ snakemake \
  --jobs 1 \
  --restart-times 3 \
  --keep-going \
- --resources mem_mb=28000 \
+ --resources mem_mb=20000 \
  --use-singularity \
  --singularity-args '-B $(realpath ../..)' \
  --rerun-incomplete 

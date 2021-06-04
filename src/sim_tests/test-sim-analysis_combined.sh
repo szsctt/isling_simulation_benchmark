@@ -1,15 +1,21 @@
 #!/bin/bash
 set -e
 
+date
 
 eval "$(conda shell.bash hook)"
 conda activate snakemake
 
 module load singularity
 
+
+
 cd ../snakemake_sim_analysis 
 
 mkdir -p ../../out/test
+
+date
+
 #snakemake --configfile ../../config/test/sim_and_detect.yml --snakefile combined_snakefile --dag | dot -Tsvg > ../../out/test/test_combined.dag.svg
 
 #snakemake \

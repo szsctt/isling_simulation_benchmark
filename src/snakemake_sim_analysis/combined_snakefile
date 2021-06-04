@@ -126,6 +126,9 @@ for dataset in config:
 	assert hasattr(config[dataset]['merge-n-min'], '__iter__')
 	assert hasattr(config[dataset]['clip-cutoff'], '__iter__')
 	assert hasattr(config[dataset]['cigar-tol'], '__iter__')
+	assert hasattr(config[dataset]['mapq-threshold'], '__iter__')
+	assert hasattr(config[dataset]['alt-edit-dist-thresh'], '__iter__')
+	assert hasattr(config[dataset]['alt-edit-dist-thresh-pc'], '__iter__')
 	assert hasattr(config[dataset]['filter'], '__iter__')
 	assert hasattr(config[dataset]['bed-exclude'], '__iter__')
 	assert hasattr(config[dataset]['bed-include'], '__iter__')
@@ -144,7 +147,7 @@ for dataset in config:
 	# each combination of these are a unique 'analysis condition' for our pipeline
 	i = 0
 	for (merge, trim, dedup,  bwa_mem_params, seq_sys, host, virus, 
-				merge_method, merge_n_min, clip_cutoff, cigar_tol, post_filter, bed_include, bed_exclude) in itertools.product(
+				merge_method, merge_n_min, clip_cutoff, cigar_tol, post_filter, bed_include, bed_exclude, mapq_thresh, nm_diff, nm_pc) in itertools.product(
 																		config[dataset]['merge'], 
 																		config[dataset]['trim'], 
 																		config[dataset]['dedup'],
@@ -158,7 +161,11 @@ for dataset in config:
 																		config[dataset]['cigar-tol'],
 																		config[dataset]['filter'],
 																		config[dataset]['bed-exclude'],
-																		config[dataset]['bed-include']
+																		config[dataset]['bed-include'],
+																		config[dataset]['mapq-threshold'],
+																		config[dataset]['alt-edit-dist-thresh'],
+																		config[dataset]['alt-edit-dist-thresh-pc'],
+																																																						
 																		):
 		
 		condition = f"analysis{i}"
@@ -205,6 +212,9 @@ for dataset in config:
 			'bed_include': bed_include,
 			'merge_method' : merge_method,
 			'merge_n_min': merge_n_min,
+			'mapq_thresh': mapq_thresh,
+			'nm_diff': nm_diff,
+			'nm_pc': nm_pc,
 			'tool'			 : 'pipeline',
 			'score_ints_window' : score_ints_window,
 			**scoring
@@ -268,7 +278,7 @@ analysis_df['score_ints_type'] = score_ints_type
 
 ## our pipeline also requires a dataframe called 'toDo', containing the analysis paramters for each sample in each dataset.  Build this using sim_df (from simulation) and analysis_df (analysis parameters).  This must have the following columns:
 
-column_names =columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include']
+column_names =columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include', 'mapq_thresh', 'nm_diff', 'nm_pc']
 rows = []
 
 # build rows of toDo
@@ -402,9 +412,9 @@ for i, row in analysis_df.iterrows():
 	samples = sim_df[sim_df['experiment'] == row['experiment']]['sample']
 
 		
-	for samp, post in itertools.product(samples, (".post", "")):
+	for samp in samples:
 		merged_targets.add(
-			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.txt"
+			f"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.unique.merged.txt"
 		)
 
 # targets for other tools
@@ -444,6 +454,11 @@ for i, row in analysis_df.iterrows():
 	if row['tool'] == 'pipeline':
 		scored_summaries.add(f"{row['outdir']}/{row['experiment']}/{row['experiment']}.jaccard_summary.tsv")
 
+# bedtools results
+bedtools_output = set()
+for i, row in analysis_df.iterrows():
+	bedtools_output.add(f"{row['outdir']}/{row['experiment']}/bedtools_done")
+
 rule all:
 	input: 
 		set(sim_targets),
@@ -451,7 +466,8 @@ rule all:
 		set(analysis_summaries),
 #		merged_targets,
 		scored_summaries,
-		other_tool_targets
+		other_tool_targets,
+		bedtools_output
 
 
 #####################################################
@@ -903,9 +919,10 @@ rule combine_int_scores:
 # jaccard
 rule make_isling_bed:
 	input:
-		merged = rules.merged_bed.output.merged
+		merged = rules.merged_bed.output.merged,
+		host_unique = rules.separate_unique_locations.output.virus_ambig
 	output:
-		bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
+		bed = "{outpath}/{dset}/ints_for_scoring/{samp}.{host}.{virus}.integrations.post.merged.bed",
 	container:
 		"docker://ubuntu:18.04"	
 	resources:
@@ -916,7 +933,7 @@ rule make_isling_bed:
 		dset = ".+_analysis\d+"
 	shell:
 		"""
-		awk '(NR != 1) {{print $1"\t"$2"\t"$3}}' {input.merged} | sort -k1,1 -k2,2n > {output.bed}
+		awk '(FNR != 1) {{print $1"\t"$2"\t"$3}}' {input} | sort -k1,1 -k2,2n > {output.bed}
 		"""
 
 rule make_vifi_bed:
@@ -1034,8 +1051,8 @@ rule pad_bed:
 				bed_line[1] = str(int(bed_line[1]) - int(wildcards.pad_len))
 				bed_line[2] = str(int(bed_line[2]) + int(wildcards.pad_len))
 				out_file.write("\t".join(bed_line) + "\n")				
-				
 	
+
 rule jaccard:
 	input:
 		results_bed = lambda wildcards: get_bed_result(wildcards, padding = wildcards.pad_len),
@@ -1069,3 +1086,100 @@ rule combine_jaccard:
 		echo "results_bed\tsim_bed\t"
 		cat {input} > {output}
 		"""	
+		
+		
+# bedtools closest
+
+rule bedtools_closest:
+	input:
+		results_bed = lambda wildcards: get_bed_result(wildcards, padding = 0),
+		sim_bed = rules.sim_bed.output.bed
+	output:
+		closest = "{outpath}/{exp}/bedtools_closest/{dset}.{samp}.{host}.{virus}{post}.{type}-results.tsv"
+	wildcard_constraints:
+		type = "found|sim",
+	container:
+		"docker://szsctt/bedtools:1"	
+	resources:
+		mem_mb= lambda wildcards, attempt, input: 1000,
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1	
+	params:
+		a_file = lambda wildcards, input: input.results_bed if wildcards.type == "found" else input.sim_bed,
+		b_file = lambda wildcards, input: input.sim_bed if wildcards.type == "found" else input.results_bed,
+	shell:
+		"""
+		bedtools closest -d -t first -a {params.a_file} -b {params.b_file} > {output.closest}
+		"""	
+		
+rule bedtools_intersect:
+	input:
+		results_bed = lambda wildcards: get_bed_result(wildcards, padding = 0),
+		sim_bed = rules.sim_bed.output.bed
+	output:
+		intersect = "{outpath}/{exp}/bedtools_intersect/{dset}.{samp}.{host}.{virus}{post}.{type}-results.tsv"
+	wildcard_constraints:
+		type = "found|sim",
+	container:
+		"docker://szsctt/bedtools:1"	
+	resources:
+		mem_mb= lambda wildcards, attempt, input: 1000,
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1	
+	params:
+		a_file = lambda wildcards, input: input.results_bed if wildcards.type == "found" else input.sim_bed,
+		b_file = lambda wildcards, input: input.sim_bed if wildcards.type == "found" else input.results_bed,
+	shell:
+		"""
+		bedtools intersect -u -a {params.a_file} -b {params.b_file} > {output.intersect}
+		"""	
+
+
+def bedtools_all(wildcards):
+
+	scored_files = []
+	for i, row in analysis_df.iterrows():
+		
+		# get information for this row
+		exp = row['experiment']
+
+		if exp !=  wildcards.exp:
+			continue
+		outpath = row['outdir']
+		unique = row['unique']
+		host = row['host']
+		virus = row['virus']
+		dset = f"{row['experiment']}_{row['analysis_condition']}"
+	
+		# get samples for this experiment
+		samples = set(sim_df[sim_df['experiment'] == exp]['sample'])
+		
+		# we only have postprocessed data for our pipeline
+		if re.search("analysis", unique):
+			post = '.post'
+		else:
+			post = ''
+
+			
+		# get score types for this experiment
+		types = ('found', 'sim')
+			
+		# add bedtools output
+		scored_files += [
+		f"{outpath}/{exp}/bedtools_intersect/{dset}.{samp}.{host}.{virus}{post}.{type}-results.tsv"
+				for samp, type in itertools.product(samples, types)
+			]
+		scored_files += [
+			f"{outpath}/{exp}/bedtools_closest/{dset}.{samp}.{host}.{virus}{post}.{type}-results.tsv"
+				for samp, type in itertools.product(samples, types)
+			]
+
+	
+	return scored_files
+
+	
+rule bedtools_done:
+	input: lambda wildcards: bedtools_all(wildcards)
+	output: "{outpath}/{exp}/bedtools_done"
+ 	shell: "touch {output}"
+		

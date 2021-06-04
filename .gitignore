@@ -91,4 +91,12 @@ src/snakemake_sim_analysis/results-summary.tsv
 data/references/NC_001401_2.fa
 data/references/NC_003977_2.fa
 vseq_test/
-
+data/references/GRCh38.fa*
+data/references/GRCh38_main.fa
+*.sif
+analysis/tables
+data/references/human_g1k_v37.fasta
+data/references/test_human_variation/
+src/experiment1_OTC_chr1/.snakemake/
+src/snakemake_sim_analysis/*.out
+src/experiment1_OTC_chr1/plots/

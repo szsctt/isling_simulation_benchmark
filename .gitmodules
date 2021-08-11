@@ -13,7 +13,3 @@
 [submodule "intvi_other-tools"]
 	path = intvi_other-tools
 	url = https://github.com/szsctt/intvi_other-tools.git
-
-[submodule "inspiired/INSPIIRED"]
-	path = inspiired/INSPIIRED
-	url = https://github.com/szsctt/INSPIIRED.git

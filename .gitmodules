@@ -1,19 +1,6 @@
-[submodule "intvi_pipeline"]
-	path = intvi_pipeline
-	url = https://github.com/szsctt/intvi_pipeline.git
 [submodule "intvi_simultion"]
 	path = intvi_simulation
 	url = https://github.com/szsctt/intvi_simulation.git
-[submodule "polyidus"]
-	path = polyidus
-	url = https://github.com/szsctt/polyidus.git
-[submodule "ViFi"]
-	path = ViFi
-	url = https://github.com/szsctt/ViFi.git
 [submodule "intvi_other-tools"]
 	path = intvi_other-tools
 	url = https://github.com/szsctt/intvi_other-tools.git
-
-[submodule "inspiired/INSPIIRED"]
-	path = inspiired/INSPIIRED
-	url = https://github.com/szsctt/INSPIIRED.git

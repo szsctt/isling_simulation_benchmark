@@ -2,6 +2,7 @@ library(glue)
 library(tidyverse)
 
 
+
 importReadScoreExperiment <- function(experiment_path) {
   
   # expected filenames of anaysis, simulated and read score files
@@ -759,4 +760,69 @@ shortCombinedVarNames <- function(df, exp_name) {
   
   
   return(names_df$short_label)
+}
+
+get_readids_column <- function(column) {
+  column <- column[!is.na(column)]
+  return(str_split(column, ";") %>% flatten_chr())
+}
+
+# compare readIDs of output integrations to simulated ones
+# include all integraitons, not just uniquely localised ones
+compareIslingOutputSim <- function(output_file, sim_file) {
+  
+  out <- read_tsv(output_file)
+  sim <- read_tsv(sim_file)
+  
+  sim_chimeric <- c(
+    get_readids_column(sim$left_chimeric),
+    get_readids_column(sim$right_chimeric)
+  )
+  
+  sim_chimeric
+  
+  sim_discordant <- c(
+    get_readids_column(sim$left_discord),
+    get_readids_column(sim$right_discord)   
+  )
+  
+
+  out <- out %>% 
+    rowwise() %>% 
+    mutate(out_in_sim = case_when(
+      Type == "chimeric" ~ ReadID %in% sim_chimeric,
+      Type == "short" ~ ReadID %in% sim_chimeric,
+      Type == "discordant" ~ ReadID %in% sim_discordant
+    )) %>% 
+    mutate(sim_in_out = case_when (
+      Type == "chimeric" ~ sim_chimeric %in% ReadID,
+      Type == "short" ~ sim_chimeric %in% ReadID,
+      Type == "discordant" ~ sim_discordant %in% ReadID      
+    ))
+  
+  return(out)
+  
+}
+
+compareAllIslingOutputSim <- function(exp_dir) {
+  
+  results <- tibble(
+    out = list.files(exp_dir, pattern="integrations.post.txt", full.names = T, recursive=T),
+    experiment = basename(dirname(dirname(dirname(out)))),
+    analysis_condition = basename(dirname(dirname(out))),
+    sim_experiment = str_split(analysis_condition, "_", simplify=T)[,1],
+    condition = str_extract(basename(out), "cond\\d+"),
+    replicate = as.double(str_extract(str_extract(basename(out), "rep\\d+"), "\\d")),
+    sim = file.path(exp_dir, sim_experiment, "sim_ints", glue::glue("{condition}.rep{replicate}.int-info.annotated.tsv")),
+    data = map2(out, sim, ~compareIslingOutputSim(.x, .y)),
+    tp = map_dbl(data, ~sum(.$out_in_sim)),
+    fp = map_dbl(data, ~sum(!.$out_in_sim)),
+    PPV = tp / (tp + fp)
+  )
+  
+  
+  sim_conds <- importSimulationConditions(exp_dir)
+  
+  return(left_join(results, sim_conds,by=c("condition", "replicate", "sim_experiment"="experiment")))
+  
 }

@@ -296,7 +296,7 @@ int_scores %>%
 
 
 ```{r}
-scoring_dist <- 60
+scoring_dist <- 5
 jaccard_pad <- 0
 dist_add <- 0.5
 plot_score_type <- "d_shortest"
@@ -461,7 +461,7 @@ for (e in experiments) {
 p <- cowplot::plot_grid(plotlist=plotlist, nrow = length(experiments), labels="AUTO")
 legend <- cowplot::get_legend(plotlist[[glue("score_{e}")]] + theme(legend.position = "bottom"))
 p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
-cowplot::save_plot("plots/figure1.60dist.pdf", p2)
+cowplot::save_plot("plots/figure1.5dist.pdf", p2)
 
 ```
 
@@ -540,6 +540,21 @@ scores_summary
 
 scores_summary %>% 
   write_tsv("tables/AAV_OTC_scores_summary.tsv")
+```
+
+```{r}
+# we also want to know the lengths of output intervals to show that they're really long for ViFi
+
+found_scores %>% 
+  mutate(interval_len = stop-start) %>% 
+  group_by(experiment, analysis_condition, condition, analysis_host, analysis_virus, tool) %>% 
+  summarise(mean = mean(interval_len),
+            sd = sd(interval_len),
+            n = n()) %>% 
+  write_tsv("tables/AAV_OTC_lengths_summary.tsv")
+  
+
+
 ```
 
 
@@ -676,10 +691,11 @@ If we combine the jaccard, PPV and TPR, we get the following:
 
 
 makeFigue2 <- function(isling_condition, plot_score_type, scoring_dist) {
-  jaccard_pad <- scoring_dist
+  
+  jaccard_pad <- 0
   
   
-jac_plot <- jac %>% 
+jac_summary <- jac %>% 
   filter(pad == jaccard_pad) %>% 
   filter(case_when(
     str_detect(analysis_condition, "analysis") ~ str_detect(analysis_condition, isling_condition),
@@ -699,7 +715,9 @@ jac_plot <- jac %>%
             jac_mean = mean(jaccard),
             jac_sem = sd(jaccard)/sqrt(n),
             jac_min = jac_mean - jac_sem,
-            jac_max = jac_mean + jac_sem) %>% 
+            jac_max = jac_mean + jac_sem) 
+
+jac_plot <- jac_summary %>% 
   ggplot(aes(x = fcov, y = jac_mean, color = analysis_tool)) +
   geom_point() +
   geom_line() +
@@ -711,10 +729,11 @@ jac_plot <- jac %>%
           axis.title.x = element_blank(),
           strip.background = element_blank(),
           strip.text.y = element_blank()) +
+    ylim(0, 1) +
   ylab("Jaccard")
-jac_plot
 
-PPV_plot <- int_scores %>% 
+
+PPV_summary <- int_scores %>% 
   filter(window == scoring_dist) %>% 
   filter(coords_score_type == plot_score_type) %>% 
   filter(case_when(
@@ -728,7 +747,9 @@ PPV_plot <- int_scores %>%
             PPV_mean = mean(PPV),
             PPV_sem = sd(PPV)/sqrt(n),
             PPV_min = PPV_mean - PPV_sem,
-            PPV_max = PPV_mean + PPV_sem) %>% 
+            PPV_max = PPV_mean + PPV_sem) 
+
+PPV_plot <- PPV_summary %>% 
   ggplot(aes(x = fcov, y = PPV_mean, color = tool)) +
   geom_point() +
   geom_line() +
@@ -741,10 +762,11 @@ PPV_plot <- int_scores %>%
           strip.background = element_blank(),
           strip.text.y = element_blank(),
           strip.text.x = element_blank()) +
+    ylim(0, 1) +
   ylab("PPV")
-PPV_plot
 
-TPR_plot <- int_scores %>% 
+
+TPR_summary <- int_scores %>% 
   filter(window == scoring_dist) %>% 
   filter(coords_score_type == plot_score_type) %>% 
   filter(case_when(
@@ -758,7 +780,9 @@ TPR_plot <- int_scores %>%
             TPR_mean = mean(TPR),
             TPR_sem = sd(TPR)/sqrt(n),
             TPR_min = TPR_mean - TPR_sem,
-            TPR_max = TPR_mean + TPR_sem) %>% 
+            TPR_max = TPR_mean + TPR_sem) 
+
+TPR_plot <- TPR_summary %>% 
   ggplot(aes(x = fcov, y = TPR_mean, color = tool)) +
   geom_point() +
   geom_line() +
@@ -767,20 +791,21 @@ TPR_plot <- int_scores %>%
   scale_x_log10() +
   theme_classic() +
   theme(legend.position = "none",
-          axis.title.x = element_blank(),
           strip.background = element_blank(),
           strip.text.y = element_blank(),
           strip.text.x = element_blank()) +
-  ylab("TPR")
-TPR_plot
+    ylim(0, 1) +
+  ylab("TPR") +
+  xlab("Fold coverage")
+
 
 p <- cowplot::plot_grid(jac_plot, PPV_plot, TPR_plot, labels="AUTO", ncol = 1)
 legend <- cowplot::get_legend(jac_plot + theme(legend.position = "bottom"))
 p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
 print(p2)
-cowplot::save_plot(glue::glue("plots/figure2{scoring_dist}.pdf"), p2)
+cowplot::save_plot(glue::glue("plots/figure2.{scoring_dist}dist.pdf"), p2)
 
-return(p2)
+return(list(p2, jac_summary, PPV_summary, TPR_summary))
 
   
 }
@@ -792,18 +817,143 @@ p2 <- makeFigue2("analysis1|isling1", "shortest", 60)
 ```
 
 ```{r}
-print(p2)
+print(p2[[1]])
 ```
 
 ```{r}
 p2 <- makeFigue2("analysis1|isling1", "shortest", 5)
-print(p2)
+print(p2[[1]])
+
+p2[[2]] %>% 
+  write_tsv("tables/OTC_condions_jaccard_5bp.tsv")
+p2[[3]] %>% 
+  write_tsv("tables/OTC_condions_PPV_5bp.tsv")
+p2[[4]] %>% 
+  write_tsv("tables/OTC_condions_TPR_5bp.tsv")
 ```
 
 
-It looks much better at 60bp than at 5, but check one of the results at 100X coverage to see what some of the false positives are.
+Check one of the results at 100X coverage to see what some of the false positives are - my guess is that they're just discordant pairs with a long fragment length
 
 ```{r}
 
+high_fcov_ground_truth <- read_tsv('../out/experiment1_OTC_chr1/OTC-condition-breakdown/chr-fcov/sim_ints/cond27.rep0.int-info.annotated.tsv')
+
+
+high_fcov_ground_truth
 ```
+
+
+```{r}
+
+high_fcov_found <- read_tsv('../out/experiment1_OTC_chr1/OTC-condition-breakdown/chr-fcov/scored_ints/chr-fcov_analysis1.cond27.rep0.hg38.OTC.post.found-results.tsv')
+
+high_fcov_found %>% 
+  filter(d_shortest > 5)
+
+high_fcov_found %>% 
+  filter(d_shortest > 5)
+
+```
+
+Most of these distances are short.   Maybe just make a table with the median distance for each contition/tool.  This is likely becaues of discordant pairs - can also make a table with how many output integrations have same read ID as a simulated integration.  First do the median thing.
+
+```{r include=FALSE}
+
+#import distances from each found integration to nearest simulated integration
+found_scores <- importNearestSimToFound(OTC_conds_dir) 
+
+
+# only use postprocessed data from our pipeline
+found_scores <- found_scores %>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>% 
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(tool = str_replace(analysis_condition, "\\d+", "")) 
+
+# import distances from each simulated integration to the nearest found integration
+sim_scores <- importNearestFoundToSim(OTC_conds_dir) 
+
+sim_scores <- sim_scores%>% 
+  filter(case_when(
+    !str_detect(analysis_condition, "pipeline") ~ TRUE,
+    post ~ TRUE,
+    TRUE ~ FALSE
+  )) %>%  
+  mutate(analysis_condition = str_replace(analysis_condition, 'analysis', 'isling')) %>% 
+  mutate(tool = str_replace(analysis_condition, "\\d+", "")) 
+
+```
+
+
+
+```{r}
+found_scores_summary <- found_scores %>% 
+  group_by(unique, analysis_condition, experiment, condition, tool) %>% 
+  summarise(
+    mean_found_to_sim = mean(d_shortest),
+    median_found_to_sim = median(d_shortest),
+    sd_found_to_sim = sd(d_shortest)
+  )
+
+sim_scores_summary <- sim_scores %>% 
+    group_by(unique, analysis_condition, experiment, condition, tool) %>% 
+   summarise(
+    mean_sim_to_found = mean(d_shortest),
+    median_sim_to_found = median(d_shortest),
+    sd_sim_to_found = sd(d_shortest)
+  ) 
+
+dist_summary <- left_join(found_scores_summary, sim_scores_summary, by=c("analysis_condition", "unique", "experiment", "condition", "tool"))
+
+dist_summary
+```
+
+
+```{r}
+
+read_id_scoring <- compareAllIslingOutputSim(AAV_OTC_dir) %>% 
+  select(-data)
+
+
+write_tsv(read_id_scoring, "tables/read-id-scoring_AAV-OTC.tsv")
+
+read_id_summary <- read_id_scoring %>% 
+  group_by(experiment, analysis_condition, sim_experiemnt, condition, host_name, virus_name, fcov) %>% 
+  summarise(
+    mean_PPV = mean(PPV),
+    sd_PPV = sd(PPV),
+    sem_PPV = sd_PPV/sqrt(n()),
+    n = n()
+  )
+
+read_id_summary
+
+read_id_summary %>% 
+  write_tsv("tables/read-id-summary_AAV-OTC.tsv")
+
+read_id_scoring <- compareAllIslingOutputSim(OTC_conds_dir) %>% 
+  select(-data)
+
+write_tsv(read_id_scoring, "tables/read-id-scoring_OTC-conds.tsv")
+
+read_id_summary <- read_id_scoring %>% 
+  group_by(experiment, analysis_condition, sim_experiemnt, condition, host_name, virus_name, fcov) %>% 
+  summarise(
+    mean_PPV = mean(PPV),
+    sd_PPV = sd(PPV),
+    sem_PPV = sd_PPV/sqrt(n()),
+    n = n()
+  )
+
+read_id_summary
+
+read_id_summary %>% 
+  write_tsv("tables/read-id-summary_OTC-conds.tsv")
+
+```
+
 

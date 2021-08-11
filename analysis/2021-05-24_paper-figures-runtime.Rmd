@@ -223,7 +223,7 @@ figure_3 <- cowplot::plot_grid(coverage, viral_load, labels="AUTO")
 figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
 print(figure_3)
 
-cowplot::save_plot("plots/figure3_usr_plus_sys.pdf", figure_3)
+cowplot::save_plot("plots/figure5_usr_plus_sys.pdf", figure_3)
 
 ```
 
@@ -296,6 +296,17 @@ figure_3 <- cowplot::plot_grid(coverage, viral_load, labels="AUTO")
 figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
 print(figure_3)
 
-cowplot::save_plot("plots/figure3_elapsed.pdf", figure_3)
+cowplot::save_plot("plots/figure5_elapsed.pdf", figure_3)
 
 ```
+
+```{r}
+times %>% 
+  group_by(dataset, int_num, fcov, epi_num, tool) %>% 
+    summarise(n = n(),
+            mean_time = mean(duration_elapsed_time),
+            sem_time = sd(duration_elapsed_time)/sqrt(n),
+            ) %>% 
+  write_tsv("tables/runtimes.tsv")
+```
+

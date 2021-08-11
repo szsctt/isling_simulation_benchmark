@@ -4,7 +4,7 @@ set -e
 # make symbolic links 
 
 SIM=../../intvi_simulation
-ANALYSIS=../../intvi_pipeline
+ANALYSIS=../../../..
 TOOLS=../../intvi_other-tools
 
 LNK="-sf"

@@ -24,9 +24,9 @@ global:
    read_len: 
        - 250
    frag_len: 
-       - 500
+       - 450
    frag_std: 
-       - 30
+       - 25
    seq_sys: 
        - "MSv3"
 

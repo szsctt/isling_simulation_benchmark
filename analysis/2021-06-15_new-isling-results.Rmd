@@ -520,7 +520,7 @@ scores_table <- scores_plot %>%
 
 scores_table
 
-jac_table %>% 
+scores_table %>% 
   write_tsv("../tables/AAV_OTC_scores.tsv")
 
 ```
@@ -546,6 +546,24 @@ scores_summary %>%
 ```
 
 ```{r}
+colnames(scores_summary)
+colnames(jac_summary)
+
+scores_summary
+jac_summary
+
+jac_summary %>% 
+  left_join(scores_summary, by=c("experiment", "tool",  "condition", "analysis_host", "analysis_virus", "n")) %>% 
+  rename(Tool = tool) %>% 
+  rename(Virus = virus_name) %>% 
+  rename(`Host (simulation)` = host_name) %>% 
+  rename(`Host (analysis)` = analysis_host) %>% 
+  select(Tool, Virus, `Host (simulation)`, `Host (analysis)`, n, mean_jac :sem_union, mean_TPR:sem_PPV) %>% 
+  write_tsv("../tables/supp-table-2.tsv")
+  
+```
+
+```{r}
 # we also want to know the lengths of output intervals to show that they're really long for ViFi
 
 found_scores %>% 
@@ -554,7 +572,13 @@ found_scores %>%
   summarise(mean = mean(interval_len),
             sd = sd(interval_len),
             n = n()) %>% 
-  write_tsv("../tables/AAV_OTC_lengths_summary.tsv")
+  rename(Virus = analysis_virus) %>% 
+  rename(Tool = tool) %>% 
+  rename(`Mean length (bp)` = mean) %>% 
+  rename(`Length standard deviation (bp)` = sd) %>% 
+  rename(`Number of integration sites` = n) %>% 
+  select(Virus, Tool, `Mean length (bp)`, `Length standard deviation (bp)`,`Number of integration sites`) %>% 
+  write_tsv("../tables/supp-table-3.tsv")
   
 
 

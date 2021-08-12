@@ -3,17 +3,18 @@
 # ./run_sim.sh <config yml> <local>
 
 CONFIG=$1
+CORES=$2
 
 WD=$(pwd)
 
-if [ -z "$2" ]
+if [ -z "$3" ]
 	then
 		eval "$(conda shell.bash hook)"
 		conda activate snakemake
 		module load singularity
-		SNAKEARGS="--profile slurm --latency-wait 120 --jobs 100"
+		SNAKEARGS="--profile slurm --latency-wait 120 --jobs ${CORES}"
 else
-	SNAKEARGS="--resources mem_mb=60000 --cores 15"
+	SNAKEARGS="--resources mem_mb=60000 --cores ${CORES}"
 fi
 
 cd ../../intvi_simulation

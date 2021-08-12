@@ -1,9 +1,12 @@
 #!/bin/bash
 set -e
 
-#CONFIG="../config/experiment2_time/simulation.yml"
+# pass in number of cores to use
+CORES=$1
+
+CONFIG="../config/experiment2_time/simulation.yml"
 #CONFIG="../config/experiment2_time/simulation_100x.yml"
-CONFIG="../config/experiment2_time/test_sim.yml"
+#CONFIG="../config/experiment2_time/test_sim.yml"
 CLUSTER="../config/experiment2_time/cluster.json"
 VIFI_REPO="../data/references/data_repo"
 
@@ -16,12 +19,11 @@ VSEQ="docker://szsctt/vseq:1"
 
 
 # simulate data
-bash run_sim.sh ${CONFIG} local
+bash run_sim.sh ${CONFIG} ${CORES} "local"
 
 # bwa index host and virus for tools
-bash run_index.sh ${CONFIG} ${CLUSTER} ${VIFI_REPO} local
+bash run_index.sh ${CONFIG} ${CLUSTER} ${VIFI_REPO} "local"
 
 # run tools
-bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO} ${VSEQ} 1 local
-
+bash run_tools.sh ${CONFIG} ${ISLING} ${SEEKSV} ${POLYIDUS} ${VIFI} ${VIFI_REPO} ${VSEQ} ${CORES} "local"
 

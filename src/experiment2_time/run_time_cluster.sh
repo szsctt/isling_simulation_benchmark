@@ -14,7 +14,7 @@ VSEQ="docker://szsctt/vseq:1"
 
 
 # simulate data
-bash run_sim.sh ${CONFIG}
+bash run_sim.sh ${CONFIG} 100
 
 # bwa index host and virus for isling
 bash run_index.sh ${CONFIG} ${CLUSTER} ${VIFI_REPO}

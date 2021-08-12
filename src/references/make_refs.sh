@@ -11,14 +11,17 @@ conda activate sim_isling
 cd data/references
 
 # get human reference and split into chromosomes
-mkdir GRCh38 && cd GRCh38
+mkdir -p GRCh38
+cd GRCh38
 
-wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz
+if [ ! -e GCA_000001405.15_GRCh38_no_alt_analysis_set.fna ] ; then
+	wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz
 
-gunzip GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz
+	gunzip GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz
+fi
 
 # https://stackoverflow.com/questions/11818495/split-a-fasta-file-and-rename-on-the-basis-of-first-line
-mkdir chrs
+mkdir -p chrs
 perl -pe 's/^>(\w+?) .+/>$1/' GCA_000001405.15_GRCh38_no_alt_analysis_set.fna | awk '/^>chr/ {OUT=substr($0,2) ".fa"}; OUT {print >OUT}'
 mv chr*.fa chrs
 
@@ -35,11 +38,17 @@ mv chr*.fa chrs
 cd ..
 # get AAV2 sequence (NCBI Reference Sequence: NC_001401.2)
 #conda activate eutils
-esearch -db nucleotide -query NC_001401.2 | efetch -format fasta > NC_001401.2.fa
+if [ ! -e NC_001401.2.fa ] ; then
+	esearch -db nucleotide -query NC_001401.2 | efetch -format fasta > NC_001401.2.fa
+fi
 
 # get HBV sequence (NCBI Refernece sequence: NC_003977.2)
-esearch -db nucleotide -query NC_003977.2 | efetch -format fasta > NC_003977.2.fa
+if [ ! -e NC_003977.2.fa ] ; then
+	esearch -db nucleotide -query NC_003977.2 | efetch -format fasta > NC_003977.2.fa
+fi
 
 # get HBV sequence (NCBI Refernece sequence: NC_027779.1)
-esearch -db nucleotide -query NC_027779.1 | efetch -format fasta > NC_027779.1.fa
+if [ ! -e NC_027779.1.fa ] ; then
+	esearch -db nucleotide -query NC_027779.1 | efetch -format fasta > NC_027779.1.fa
+fi
 

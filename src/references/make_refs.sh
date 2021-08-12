@@ -6,7 +6,7 @@
 set -e
 
 eval "$(conda shell.bash hook)"
-#conda activate sim_isling
+conda activate sim_isling
 
 cd data/references
 

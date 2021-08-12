@@ -25,3 +25,6 @@ bash src/experiment1_OTC_chr1/make_figures.sh
 # do runtime stuff
 cd src/experiment2_time
 ./run_time_local.sh $CORES
+
+# make runtime figures
+

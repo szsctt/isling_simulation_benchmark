@@ -58,7 +58,7 @@ global:
 
    # analysis
    analysis_hosts: 
-      hg38: "../../data/references/GRCh38.fa"
+      hg38: "../../data/references/GRCh38/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
        
    analysis_viruses:
       OTC :  "../../data/references/OTC-vec_rAAV-genome-only.fa"
@@ -130,14 +130,14 @@ global:
    vifi_params:
      host_info:
        hg38: 
-         mappability: "../../data/references/data_repo/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
-         mappability_exclude: "../../data/references/data_repo/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
-         genes:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
-         exons:  "../../data/references/data_repo/GRCh38/Genes_hg38.gff"
-         oncogenes:  "../../data/references/data_repo/GRCh38/cancer/oncogenes/Census_oncomerge_hg38.gff"
-         centromeres:  "../../data/references/data_repo/GRCh38/GRCh38_centromere.bed"
-         conserved_regions:  "../../data/references/data_repo/GRCh38/conserved_gain5_hg38.bed"
-         segdup:  "../../data/references/data_repo/GRCh38/annotations/hg38GenomicSuperDup.tab"
+         mappability: "../../../Release/GRCh38/hg38full_k35_noMM.mappability.bedgraph"
+         mappability_exclude: "../../../Release/GRCh38/exclude.cnvnator_100bp.GRCh38.20170403.bed"
+         genes:  "../../../Release/GRCh38/Genes_hg38.gff"
+         exons:  "../../../Release/GRCh38/Genes_hg38.gff"
+         oncogenes:  "../../../Release/GRCh38/cancer/oncogenes/Census_oncomerge_hg38.gff"
+         centromeres:  "../../../Release/GRCh38/GRCh38_centromere.bed"
+         conserved_regions:  "../../../Release/GRCh38/conserved_gain5_hg38.bed"
+         segdup:  "../../../Release/GRCh38/annotations/hg38GenomicSuperDup.tab"
      trim:
        - False
 
@@ -201,10 +201,10 @@ global:
 
 chr-fcov:
    hosts: 
-      chr1 : "../../data/references/chrs/chr1.fa"
-      chr8 : "../../data/references/chrs/chr8.fa"
-      chr14: "../../data/references/chrs/chr14.fa"
-      chrX : "../../data/references/chrs/chrX.fa"
+      chr1 : "../../data/references/GRCh38/chrs/chr1.fa"
+      chr8 : "../../data/references/GRCh38/chrs/chr8.fa"
+      chr14: "../../data/references/GRCh38/chrs/chr14.fa"
+      chrX : "../../data/references/GRCh38/chrs/chrX.fa"
    fcov: 
        - 0.75
        - 1.5

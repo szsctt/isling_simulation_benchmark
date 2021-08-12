@@ -3,10 +3,10 @@
 set -euo pipefail
 
 # set number of cores to use
-CORES="1"
+CORES="30"
 
 # dependencies for running
-conda list -n sim_isling || conda create -n sim_isling -c bioconda -c conda-forge entrez-direct=13.9 snakemake=6.6
+conda list -n sim_isling || mamba create -n sim_isling -c bioconda -c conda-forge entrez-direct=13.9 snakemake=6.6
 
 # download references
 bash src/references/make_refs.sh

@@ -14,7 +14,7 @@ if [ -z "$3" ]
 		module load singularity
 		SNAKEARGS="--profile slurm --latency-wait 120 --jobs ${CORES}"
 else
-	SNAKEARGS="--resources mem_mb=60000 --cores ${CORES}"
+	SNAKEARGS="--resources mem_mb=20000 --cores ${CORES}"
 fi
 
 cd ../../intvi_simulation

@@ -5,6 +5,10 @@ output: html_notebook
 ```{r include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning=F)
 library(tidyverse)
+source("sim_functions.R")
+
+dir.create("../figures")
+dir.create("../tables")
 ```
 
 
@@ -18,7 +22,7 @@ Results:
 I also looked at the runtime as I changed to variables: viral load and fold coverage
 
 ```{r include=FALSE}
-results_dir <- "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment2_time/"
+results_dir <- "../out/experiment2_time/"
 experiments <- c("coverage", 'viral_load')
 
 files <- list.files(results_dir, recursive = TRUE, pattern="_runtime.tsv")
@@ -215,7 +219,7 @@ coverage <- times %>%
   ylab("Runtime (s)") +
   scale_y_log10()
 
-#print(coverage + theme(legend.position = "bottom"))
+print(coverage + theme(legend.position = "bottom"))
 
 legend <- cowplot::get_legend(coverage + theme(legend.position = "bottom"))
 
@@ -223,7 +227,7 @@ figure_3 <- cowplot::plot_grid(coverage, viral_load, labels="AUTO")
 figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
 print(figure_3)
 
-cowplot::save_plot("plots/figure5_usr_plus_sys.pdf", figure_3)
+#cowplot::save_plot("plots/figure5_usr_plus_sys.pdf", figure_3)
 
 ```
 
@@ -296,7 +300,7 @@ figure_3 <- cowplot::plot_grid(coverage, viral_load, labels="AUTO")
 figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
 print(figure_3)
 
-cowplot::save_plot("plots/figure5_elapsed.pdf", figure_3)
+cowplot::save_plot("../figures/figure5.pdf", figure_3)
 
 ```
 
@@ -307,6 +311,6 @@ times %>%
             mean_time = mean(duration_elapsed_time),
             sem_time = sd(duration_elapsed_time)/sqrt(n),
             ) %>% 
-  write_tsv("tables/runtimes.tsv")
+  write_tsv("../tables/runtimes.tsv")
 ```
 

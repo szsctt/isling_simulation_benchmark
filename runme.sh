@@ -30,4 +30,4 @@ cd src/experiment2_time
 ./run_time_local.sh $CORES
 
 # make runtime figures
-
+bash src/experiment2_time/make_figures.sh

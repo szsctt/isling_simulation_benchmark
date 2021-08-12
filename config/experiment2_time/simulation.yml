@@ -4,7 +4,7 @@ global:
    # integration simulation
    replicates: 3 
    hosts: 
-      chr1 : "../data/references/chrs/chr1.fa"
+      chr1 : "../data/references/GRCh38/chrs/chr1.fa"
    viruses: 
       OTC : "../data/references/OTC-vec_rAAV-genome-only.fa"
    

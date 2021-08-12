@@ -6,7 +6,7 @@ set -e
 CORES="15"
 
 # dependencies for running
-conda list -n sim_isling || mamba create -n sim_isling -c bioconda -c conda-forge entrez-direct>=11 snakemake=6.6 -y
+conda list -n sim_isling || mamba create -n sim_isling -c bioconda -c conda-forge entrez-direct>=11 snakemake=6.1 -y
 
 eval "$(conda shell.bash hook)"
 conda activate sim_isling

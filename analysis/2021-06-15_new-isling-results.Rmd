@@ -11,6 +11,9 @@ library(tidyverse)
 
 source("sim_functions.R")
 
+dir.create("../figures")
+dir.create("../tables")
+
 AAV_OTC_dir <- "../out/experiment1_OTC_chr1/AAV-OTC"
 score_types <- c("shortest", "coords_mean", "coords_min", "midpoint")
 OTC_conds_dir <-"../out/experiment1_OTC_chr1/OTC-condition-breakdown/"
@@ -461,7 +464,7 @@ for (e in experiments) {
 p <- cowplot::plot_grid(plotlist=plotlist, nrow = length(experiments), labels="AUTO")
 legend <- cowplot::get_legend(plotlist[[glue("score_{e}")]] + theme(legend.position = "bottom"))
 p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
-cowplot::save_plot("plots/figure1.5dist.pdf", p2)
+cowplot::save_plot("../figures/figure1.5dist.pdf", p2)
 
 ```
 
@@ -483,7 +486,7 @@ jac_table <- jac_plot %>%
 jac_table
 
 jac_table %>% 
-  write_tsv("tables/AAV_OTC_jaccard.tsv")
+  write_tsv("../tables/AAV_OTC_jaccard.tsv")
 ```
 
 ```{r}
@@ -505,7 +508,7 @@ jac_summary <- jac_plot %>%
 jac_summary
 
 jac_summary %>% 
-  write_tsv("tables/AAV_OTC_jaccard_summary.tsv")
+  write_tsv("../tables/AAV_OTC_jaccard_summary.tsv")
 ```
 
 
@@ -518,7 +521,7 @@ scores_table <- scores_plot %>%
 scores_table
 
 jac_table %>% 
-  write_tsv("tables/AAV_OTC_scores.tsv")
+  write_tsv("../tables/AAV_OTC_scores.tsv")
 
 ```
 
@@ -539,7 +542,7 @@ scores_summary <- scores_plot %>%
 scores_summary
 
 scores_summary %>% 
-  write_tsv("tables/AAV_OTC_scores_summary.tsv")
+  write_tsv("../tables/AAV_OTC_scores_summary.tsv")
 ```
 
 ```{r}
@@ -551,7 +554,7 @@ found_scores %>%
   summarise(mean = mean(interval_len),
             sd = sd(interval_len),
             n = n()) %>% 
-  write_tsv("tables/AAV_OTC_lengths_summary.tsv")
+  write_tsv("../tables/AAV_OTC_lengths_summary.tsv")
   
 
 
@@ -803,7 +806,7 @@ p <- cowplot::plot_grid(jac_plot, PPV_plot, TPR_plot, labels="AUTO", ncol = 1)
 legend <- cowplot::get_legend(jac_plot + theme(legend.position = "bottom"))
 p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
 print(p2)
-cowplot::save_plot(glue::glue("plots/figure2.{scoring_dist}dist.pdf"), p2)
+cowplot::save_plot(glue::glue("../figures/figure3.{scoring_dist}dist.pdf"), p2)
 
 return(list(p2, jac_summary, PPV_summary, TPR_summary))
 
@@ -825,11 +828,11 @@ p2 <- makeFigue2("analysis1|isling1", "shortest", 5)
 print(p2[[1]])
 
 p2[[2]] %>% 
-  write_tsv("tables/OTC_condions_jaccard_5bp.tsv")
+  write_tsv("../tables/OTC_condions_jaccard_5bp.tsv")
 p2[[3]] %>% 
-  write_tsv("tables/OTC_condions_PPV_5bp.tsv")
+  write_tsv("../tables/OTC_condions_PPV_5bp.tsv")
 p2[[4]] %>% 
-  write_tsv("tables/OTC_condions_TPR_5bp.tsv")
+  write_tsv("../tables/OTC_condions_TPR_5bp.tsv")
 ```
 
 
@@ -915,44 +918,44 @@ dist_summary
 
 ```{r}
 
-read_id_scoring <- compareAllIslingOutputSim(AAV_OTC_dir) %>% 
-  select(-data)
-
-
-write_tsv(read_id_scoring, "tables/read-id-scoring_AAV-OTC.tsv")
-
-read_id_summary <- read_id_scoring %>% 
-  group_by(experiment, analysis_condition, sim_experiemnt, condition, host_name, virus_name, fcov) %>% 
-  summarise(
-    mean_PPV = mean(PPV),
-    sd_PPV = sd(PPV),
-    sem_PPV = sd_PPV/sqrt(n()),
-    n = n()
-  )
-
-read_id_summary
-
-read_id_summary %>% 
-  write_tsv("tables/read-id-summary_AAV-OTC.tsv")
-
-read_id_scoring <- compareAllIslingOutputSim(OTC_conds_dir) %>% 
-  select(-data)
-
-write_tsv(read_id_scoring, "tables/read-id-scoring_OTC-conds.tsv")
-
-read_id_summary <- read_id_scoring %>% 
-  group_by(experiment, analysis_condition, sim_experiemnt, condition, host_name, virus_name, fcov) %>% 
-  summarise(
-    mean_PPV = mean(PPV),
-    sd_PPV = sd(PPV),
-    sem_PPV = sd_PPV/sqrt(n()),
-    n = n()
-  )
-
-read_id_summary
-
-read_id_summary %>% 
-  write_tsv("tables/read-id-summary_OTC-conds.tsv")
+# read_id_scoring <- compareAllIslingOutputSim(AAV_OTC_dir) %>% 
+#   select(-data)
+# 
+# 
+# write_tsv(read_id_scoring, "../tables/read-id-scoring_AAV-OTC.tsv")
+# 
+# read_id_summary <- read_id_scoring %>% 
+#   group_by(experiment, analysis_condition, sim_experiemnt, condition, host_name, virus_name, fcov) %>% 
+#   summarise(
+#     mean_PPV = mean(PPV),
+#     sd_PPV = sd(PPV),
+#     sem_PPV = sd_PPV/sqrt(n()),
+#     n = n()
+#   )
+# 
+# read_id_summary
+# 
+# read_id_summary %>% 
+#   write_tsv("../tables/read-id-summary_AAV-OTC.tsv")
+# 
+# read_id_scoring <- compareAllIslingOutputSim(OTC_conds_dir) %>% 
+#   select(-data)
+# 
+# write_tsv(read_id_scoring, "../tables/read-id-scoring_OTC-conds.tsv")
+# 
+# read_id_summary <- read_id_scoring %>% 
+#   group_by(experiment, analysis_condition, sim_experiemnt, condition, host_name, virus_name, fcov) %>% 
+#   summarise(
+#     mean_PPV = mean(PPV),
+#     sd_PPV = sd(PPV),
+#     sem_PPV = sd_PPV/sqrt(n()),
+#     n = n()
+#   )
+# 
+# read_id_summary
+# 
+# read_id_summary %>% 
+#   write_tsv("../tables/read-id-summary_OTC-conds.tsv")
 
 ```
 

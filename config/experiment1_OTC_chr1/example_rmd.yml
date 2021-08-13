@@ -1,0 +1,43 @@
+example_dataset:
+  # read information
+  read_folder: "benchmark/simulated_data/out/experiment1_OTC_chr1/AAV-OTC/AAV/sim_reads"
+  out_dir: "benchmark/simulated_data/out"
+  R1_suffix: "1.fq"
+  R2_suffix: "2.fq"
+  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  split: 3
+  mean-frag-len: "estimate"
+  
+  # read preprocessing options
+  merge: False
+  trim: False
+  dedup: False
+  dedup-subs: 2
+  
+  # alignment options
+  host_name: "GRCh38"
+  host_fasta: "benchmark/simulated_data/data/references/GRCh38/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+  virus_name: "AAV2"
+  virus_fasta: "benchmark/simulated_data/data/references/NC_001401.2.fa"
+  bwa-mem: "-a -Y -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+  align-cpus: 1
+  
+  # integration detection options
+  clip-cutoff: 20
+  cigar-tol: 3
+  alt-edit-dist-thresh: 2
+  alt-edit-dist-thresh-pc: 0.6
+
+  # postprocessing options
+  filter: 
+    - "NoAmbiguousBases < 20 or Type == discordant"
+    - "PossibleVectorRearrangement == False"
+    - "PossibleHostTranslocation == False"
+  
+  merge-method: 'common'
+  merge-n-min: 1
+  mapq-threshold: 20
+
+  
+

@@ -14,7 +14,6 @@ snakemake \
  --jobs 1 \
  --restart-times 3 \
  --keep-going \
- --resources mem_mb=100000 \
  --use-singularity \
  --scheduler greedy \
  --singularity-args '-B $(realpath ../../..)' \

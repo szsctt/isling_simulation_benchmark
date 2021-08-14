@@ -25,7 +25,7 @@ echo "simulating and analysing data"
 bash src/experiment1_OTC_chr1/run_exp1_local.sh $CORES
 
 # generate example rmd report
-bash src/experiment1_OTC_chr1/example_rmd.sh
+bash src/experiment1_OTC_chr1/example_rmd.sh $CORES
 
 # generate figures and tables
 echo "generating tables and figures"

@@ -7,7 +7,7 @@ example_dataset:
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
   split: 3
-  mean-frag-len: "estimate"
+  mean-frag-len: 450
   
   # read preprocessing options
   merge: False

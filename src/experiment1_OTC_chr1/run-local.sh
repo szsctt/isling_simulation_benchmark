@@ -13,10 +13,9 @@ snakemake \
  --cores ${CORES} \
  --jobs 1 \
  --restart-times 3 \
- --keep-going \
  --use-singularity \
  --scheduler greedy \
- --singularity-args '-B $(realpath ../../..)' \
+ --singularity-args '-B $(realpath ../../../..)' \
  --rerun-incomplete
 
 

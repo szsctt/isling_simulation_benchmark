@@ -23,12 +23,14 @@ OTC_conds_dir <-"../out/experiment1_OTC_chr1/OTC-condition-breakdown/"
 
 ```
 
+This notebook contains analysis of the data simulated to compare isling against other tools.  There are three main sections. First is an experiment comparing viral integration tools in two simulated scenarios: AAV2 and rAAV(OTC) integration. Next, an exploration of the OTC scenario, with different chromsomes into which integrations were simulated and levels of fold-coverage.  Finally, a runtime analysis with varying fold-coverage and viral load (number of integrations and episomes).
+
 
 # AAV and OTC integration
 
-I simulated data as before - with an OTC and AAV condition - and compared the performance of various viral integration tools in various ways.  I simulated integrations into either chromosome 1, or all of hg38.  I used hg38 for analysis in the intergration tools.
+First, we explore simulated integrations with an rAAV(OTC) and AAV condition - and compared the performance of various viral integration. 
 
-For simulation, we had the following conditions:
+For simulation, we had the following parameters:
 ```{r include=FALSE}
 sim_conds <- importSimulationConditions(AAV_OTC_dir)
 ```
@@ -38,14 +40,24 @@ sim_conds
 ```
 
 
-On the analysis side, we had the following analysis conditions
+On the analysis side, we had the following analysis parameters
 ```{r include=FALSE}
 analysis_conds <- importAnalysisConditions(AAV_OTC_dir) %>% 
   select(-one_of("adapter_1", "adapter_2"))
 ```
 
 ```{r}
-analysis_conds 
+analysis_conds  %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "analysis") ~ analysis_condition == "analysis1",
+    TRUE ~ TRUE
+  )) %>% 
+  arrange(experiment, analysis_condition) %>% 
+  mutate(tool = case_when(
+    tool == "pipeline" ~ "isling",
+    TRUE ~ tool
+  )) %>% 
+  select(-detection_mode, -flank_region_size, -sensitivity_level, -min_contig_length, -blastn_evalue_thrd, -similarity_thrd, -chop_read_length, -minIdentity, -score_ints_type)
 ```
 
 
@@ -162,18 +174,16 @@ cowplot::save_plot("../figures/figure1.5dist.png", p2)
 
 ```
 
-The results were as follows:
+The results were as follows (this is figure 2 from the manuscript):
 
 ```{r}
 print(p2)
 ```
 
 
-
-
 ## Tables
 
-Make some tables so we can pull some numbers for the text
+This section contains tables which display the results plotted above.
 
 ### Jaccard
 
@@ -189,7 +199,7 @@ jac_table %>%
   write_tsv("../tables/AAV_OTC_jaccard.tsv")
 ```
 
-Computing the mean, standard deviation and standard error of the mean:
+Computing the mean, standard deviation and standard error of the mean for these data:
 
 
 ```{r}
@@ -217,7 +227,7 @@ jac_summary %>%
 
 ### TPR, PPV
 
-Doing the same thing for the true positive rate and positive predictive value - here are the results for each replicate:
+Doing the same thing for the true positive rate and positive predictive value - the results for each replicate:
 
 ```{r}
 scores_table <- scores_plot %>% 
@@ -229,6 +239,7 @@ scores_table %>%
   write_tsv("../tables/AAV_OTC_scores.tsv")
 
 ```
+
 And here are the summary statistics (combining across replicates):
 
 
@@ -264,6 +275,7 @@ jac_summary %>%
   write_tsv("../tables/supp-table-2.tsv")
   
 ```
+
 ### Length of output intervals
 
 We also looked at the lengths of the intervals which are the coordinates output for the integration sites for each tool.  ViFi tended to output really broad coordinates, and the following table shows this:
@@ -295,7 +307,7 @@ length_table %>%
 
 ## Statistical tests
 
-Since we our measurements are not independent (we measured each tool on the same data), and we can't assume our data are normally distributed (the Jaccard statistic ranges between 0 and 1), we should use a non-parametric test (specifically, the Kruskal-Willis test).
+Since we our measurements are not independent (we measured each tool on the same data), and we can't assume our data are normally distributed (for example, the Jaccard statistic ranges between 0 and 1 so is unlikely to be normally distributed), we use a non-parametric test (specifically, the Kruskal-Willis test).
 
 ### Jaccard
 
@@ -309,7 +321,7 @@ jac_table %>%
 ```
 
 
-We can also check which pairs are different using Dunn's test.  We correct the p-values for multiple comparisions using the Benjamini-Hochberg method.
+We also check which pairs are different using Dunn's test.  We correct the p-values for multiple comparisions using the Benjamini-Hochberg method.
 
 ```{r}
 jac_table %>% 
@@ -320,7 +332,7 @@ jac_table %>%
 ### Positive preditictive value
 
 
-Again, we use the Kruskal-Wallis test to check if the Positive predictive values are different between the tools.
+Again, we use the Kruskal-Wallis test to check if the positive predictive values are different between the tools.
 
 
 ```{r}
@@ -361,7 +373,7 @@ scores_table %>%
 
 ### Lengths
 
-Let's again compare the lengths between tools using the Kruskal-Wallis test:
+Again, we compare the lengths between tools using the Kruskal-Wallis test:
 
 ```{r}
 found_scores %>% 
@@ -376,7 +388,7 @@ found_scores %>%
 ```
 
 
-And doing some post-tests (Dunn's):
+And also perform post-tests (Dunn's):
 
 ```{r}
 found_scores %>% 
@@ -393,13 +405,45 @@ found_scores %>%
 
 # Fold-coverage and chromosome
 
-Within the OTC condition, I also explored the effect of increasing fold coverage and changing the host chromosome.
+The next experiment was to explore the effect of varying the fold-coverage and host reference in the rAAV(OTC) condition from above.  These results are displayed in Figure 3 in the manuscript.
+
+## Parameters
+
+The following table shows the parameters used to simulate these data:
 
 
+```{r include=FALSE}
+sim_conds <- importSimulationConditions(OTC_conds_dir)
+```
+
+```{r}
+sim_conds
+```
+
+The following parameters were used to analyse these data:
+
+```{r include=FALSE}
+analysis_conds <- importAnalysisConditions(OTC_conds_dir) %>% 
+  select(-one_of("adapter_1", "adapter_2"))
+```
+
+```{r}
+analysis_conds  %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "analysis") ~ analysis_condition == "analysis1",
+    TRUE ~ TRUE
+  )) %>% 
+  arrange(experiment, analysis_condition) %>% 
+  mutate(tool = case_when(
+    tool == "pipeline" ~ "isling",
+    TRUE ~ tool
+  )) %>% 
+  select(-detection_mode, -flank_region_size, -sensitivity_level, -min_contig_length, -blastn_evalue_thrd, -similarity_thrd, -chop_read_length, -minIdentity, -score_ints_type)
+```
 
 ## Plot
 
-If we combine the jaccard, PPV and TPR, we get the following:
+The data look like this:
 
 ```{r include=FALSE}
 
@@ -436,7 +480,7 @@ p2[[4]] %>%
 
 ## Tables
 
-Again, put the data here to potentially pull numbers for the text.
+This section contains the data plotted above in tabular form.
 
 ### Jaccard
 
@@ -540,26 +584,28 @@ int_stats %>%
 
 ## False positives at 100X coverage?
 
+There appear to be some false positives at high coverage in the isling output. But are they really false positives?
+Check one of the results at 100X coverage to see what some of the false positives are.  Our hypothesis  is that they're just discordant pairs with a long fragment length
 
-Check one of the results at 100X coverage to see what some of the false positives are - my guess is that they're just discordant pairs with a long fragment length
 
-
-```{r}
+```{r include=FALSE}
 
 high_fcov_found <- read_tsv('../out/experiment1_OTC_chr1/OTC-condition-breakdown/chr-fcov/scored_ints/chr-fcov_analysis1.cond27.rep0.hg38.OTC.post.found-results.tsv')
-
-high_fcov_found %>% 
-  filter(d_shortest > 5) %>% 
-  select(chr, start, stop, ori, d_shortest)
-
 
 
 ```
 
 
+```{r}
+high_fcov_found %>% 
+  filter(d_shortest > 5) %>% 
+  select(chr, start, stop, ori, d_shortest)
+```
+
+
 Most of the distances found simulated sites to found ones ('d_shortest') and vice-versa are short, indicating that these are probably not really false positives, but they're just outside our threshold for what we're calling a true positive.  
 
-I will make a table with the median distance for each condition/tool.  This is likely because of discordant pairs - can also make a table with how many output integration have same read ID as a simulated integration.  First do the median thing.
+To examine this in a different way, we plot the mean and median distance between simulated integrations and output ones for each tool in each simulated condition.
 
 
 
@@ -613,7 +659,7 @@ dist_summary %>%
 ```
 
 
-First, plot the mean and median distance from each simulated integration to the nearest output integration.  A high mean/median distance would indicate a lot of false negatives (missed integrations).
+Next, plot the mean and median distance from each simulated integration to the nearest output integration.  A high mean/median distance would indicate a lot of false negatives (missed integrations).
 
 ```{r}
 dist_summary %>% 
@@ -636,9 +682,9 @@ dist_summary %>%
 
 # Runtime
 
-I also used simulated data to investigate th runtime of isling.
+Finally, we also used simulated data to investigate the runtime of isling and other tools.
 
-I looked at how the runtime varied as I changed two variables (one at a time): viral load and fold coverage. 
+We examined how the runtime varied as two variables were changed (one at a time): viral load and fold coverage. 
 
 
 ```{r include=FALSE}
@@ -706,7 +752,7 @@ times <- times %>%
 
 ## Figure
 
-The data looks like this:
+The data looks like this (this is figure 5 in the manuscript):
 
 
 ```{r}
@@ -815,10 +861,6 @@ The main thing of interest in this experiment was the difference in runtime betw
 
 
 First, test the differences in runtime for each tool for different fold coverages:
-```{r}
-times %>% 
-```
-
 
 
 ```{r}

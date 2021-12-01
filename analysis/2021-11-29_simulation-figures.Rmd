@@ -1,0 +1,847 @@
+---
+title: "R Notebook"
+output: html_notebook:
+  code_folding: hide
+---
+
+
+
+```{r include=F}
+knitr::opts_chunk$set(echo = FALSE, warning=F)
+library(tidyverse)
+library(rstatix)
+
+source("sim_functions.R")
+source("import_datasets.R")
+
+dir.create("../figures")
+dir.create("../tables")
+
+AAV_OTC_dir <- "../out/experiment1_OTC_chr1/AAV-OTC"
+score_types <- c("shortest")
+OTC_conds_dir <-"../out/experiment1_OTC_chr1/OTC-condition-breakdown/"
+
+```
+
+
+# AAV and OTC integration
+
+I simulated data as before - with an OTC and AAV condition - and compared the performance of various viral integration tools in various ways.  I simulated integrations into either chromosome 1, or all of hg38.  I used hg38 for analysis in the intergration tools.
+
+For simulation, we had the following conditions:
+```{r include=FALSE}
+sim_conds <- importSimulationConditions(AAV_OTC_dir)
+```
+
+```{r}
+sim_conds
+```
+
+
+On the analysis side, we had the following analysis conditions
+```{r include=FALSE}
+analysis_conds <- importAnalysisConditions(AAV_OTC_dir) %>% 
+  select(-one_of("adapter_1", "adapter_2"))
+```
+
+```{r}
+analysis_conds 
+```
+
+
+```{r include=FALSE}
+#jac, found_scores, sim_scores, jac_plot, sim_plot, found_plot, scores_plot
+AAV_OTC <- import_AAV_OTC()
+jac <- AAV_OTC[[1]]
+found_scores <- AAV_OTC[[2]]
+sim_scores <- AAV_OTC[[3]]
+jac_plot <- AAV_OTC[[4]]
+sim_plot <- AAV_OTC[[5]]
+found_plot <- AAV_OTC[[6]]
+scores_plot <- AAV_OTC[[7]]
+
+
+scoring_dist <- 5
+jaccard_pad <- 0
+dist_add <- 0.5
+plot_score_type <- "d_shortest"
+analysis_condition_plot <- "isling1"
+tool_order <- c("isling", "Polyidus", "Seeksv", "ViFi", "VSeq-Toolkit")
+condition_plot <- "cond0"
+num_y_breaks <- 2
+
+
+jac_plots <- list()
+for (e in unique(jac_plot$experiment)) {
+  jac_plots[[e]] <- jac_plot %>% 
+    filter(experiment == e) %>% 
+    ggplot(aes(x = tool, y = jaccard, color = tool)) +
+    geom_boxplot(width=0.5) +
+    theme_classic() +
+    theme(axis.text.x = element_blank(),
+          legend.position = "none")  +
+    ylab("Jaccard") +
+    xlab("Tool")
+}
+
+#print(jac_plots[[e]])
+
+sim_plots <- list()
+for (e in unique(sim_plot$experiment)) {
+  sim_plots[[e]] <- sim_plot %>% 
+    filter(experiment == e) %>%
+    mutate(plot_score_type := !!ensym(plot_score_type) + dist_add) %>% 
+    ggplot(aes(x = !!ensym(plot_score_type), color = tool)) +
+    geom_freqpoly(bins = 100) +
+    geom_vline(xintercept = scoring_dist) +
+    theme_classic() +
+    theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          strip.background = element_blank(),
+          strip.text.y = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_x_log10() +
+    facet_grid(rows = vars(tool)) +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+    ylab("Count")
+}
+#print(sim_plots[[e]])
+
+found_plots <- list()
+for (e in unique(found_plot$experiment)) {
+  found_plots[[e]] <- found_plot %>% 
+    filter(experiment == e) %>% 
+    mutate(plot_score_type := !!ensym(plot_score_type) + dist_add) %>% 
+    ggplot(aes(x = !!ensym(plot_score_type), color = tool)) +
+    geom_freqpoly(bins = 100) +
+    geom_vline(xintercept = scoring_dist) +
+    theme_classic() +
+    theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          strip.background = element_blank(),
+          strip.text.y = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_x_log10() +
+    facet_grid(rows = vars(tool)) +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = num_y_breaks)) +
+    ylab("Count")
+}
+#print(found_plots[[e]])
+
+
+scores_plots <- list()
+for (e in unique(scores_plot$experiment)) {
+  scores_plots[[e]] <- scores_plot %>% 
+    filter(experiment == e) %>% 
+    ggplot(aes(x = PPV, y = TPR, color = tool)) +
+    geom_point() +
+    theme_classic() +
+    theme(legend.position = "none",
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlim(0, 1) +
+    ylim(0, 1)
+  
+}
+#print(scores_plots[[e]])
+
+experiments <- unique(scores_plot$experiment)
+
+plotlist <- list()
+for (e in experiments) {
+  plotlist[[glue("jac_{e}")]] <- jac_plots[[e]]
+  plotlist[[glue("sim_{e}")]] <- sim_plots[[e]]
+  plotlist[[glue("found_{e}")]] <- found_plots[[e]]
+  plotlist[[glue("score_{e}")]] <- scores_plots[[e]]
+}
+
+p <- cowplot::plot_grid(plotlist=plotlist, nrow = length(experiments), labels="AUTO")
+legend <- cowplot::get_legend(plotlist[[glue("score_{e}")]] + theme(legend.position = "bottom"))
+p2 <- cowplot::plot_grid(p, legend, ncol = 1, rel_heights = c(1, 0.05))
+cowplot::save_plot("../figures/figure1.5dist.pdf", p2)
+cowplot::save_plot("../figures/figure1.5dist.png", p2)
+
+```
+
+The results were as follows:
+
+```{r}
+print(p2)
+```
+
+
+
+
+## Tables
+
+Make some tables so we can pull some numbers for the text
+
+### Jaccard
+
+A table of the Jaccard statistic for each tool, replicate and experiment:
+
+```{r}
+jac_table <- jac_plot %>% 
+  select(experiment, tool, condition, replicate,jaccard, intersection, union, host_name, virus_name, analysis_host, analysis_virus, analysis_condition)
+
+jac_table
+
+jac_table %>% 
+  write_tsv("../tables/AAV_OTC_jaccard.tsv")
+```
+
+Computing the mean, standard deviation and standard error of the mean:
+
+
+```{r}
+jac_summary <- jac_plot %>% 
+  group_by(experiment, tool, condition, host_name, virus_name, analysis_host, analysis_virus, analysis_condition) %>% 
+  summarise(
+    n = n(),
+    mean_jac = mean(jaccard),
+    sd_jac = sd(jaccard),
+    sem_jac = sd(jaccard)/sqrt(n()),
+    mean_intersect = mean(intersection),
+    sd_intersect = sd(intersection),
+    sem_intersect = sd(intersection)/sqrt(n()),
+    mean_union = mean(union),
+    sd_union = sd(union),
+    sem_union = sd(union)/sqrt(n())
+  ) 
+
+jac_summary
+
+jac_summary %>% 
+  write_tsv("../tables/AAV_OTC_jaccard_summary.tsv")
+```
+
+
+### TPR, PPV
+
+Doing the same thing for the true positive rate and positive predictive value - here are the results for each replicate:
+
+```{r}
+scores_table <- scores_plot %>% 
+  select(experiment, tool, replicate, fp:TPR, window, condition, analysis_host, analysis_virus, analysis_condition)
+
+scores_table
+
+scores_table %>% 
+  write_tsv("../tables/AAV_OTC_scores.tsv")
+
+```
+And here are the summary statistics (combining across replicates):
+
+
+```{r}
+scores_summary <- scores_plot %>% 
+  group_by(experiment, tool, window, condition, analysis_host, analysis_virus, analysis_condition) %>% 
+  summarise(
+    n = n(),
+    mean_TPR = mean(TPR),
+    sd_TPR = sd(TPR),
+    sem_TPR = sd(TPR)/sqrt(n()),
+    mean_PPV = mean(PPV),
+    sd_PPV = sd(PPV),
+    sem_PPV = sd(PPV)/sqrt(n())
+  )
+
+scores_summary
+
+scores_summary %>% 
+  write_tsv("../tables/AAV_OTC_scores_summary.tsv")
+```
+
+```{r}
+
+
+jac_summary %>% 
+  left_join(scores_summary, by=c("experiment", "tool",  "condition", "analysis_host", "analysis_virus", "n")) %>% 
+  rename(Tool = tool) %>% 
+  rename(Virus = virus_name) %>% 
+  rename(`Host (simulation)` = host_name) %>% 
+  rename(`Host (analysis)` = analysis_host) %>% 
+  select(Tool, Virus, `Host (simulation)`, `Host (analysis)`, n, mean_jac :sem_union, mean_TPR:sem_PPV) %>% 
+  write_tsv("../tables/supp-table-2.tsv")
+  
+```
+### Length of output intervals
+
+We also looked at the lengths of the intervals which are the coordinates output for the integration sites for each tool.  ViFi tended to output really broad coordinates, and the following table shows this:
+
+```{r}
+# we also want to know the lengths of output intervals to show that they're really long for ViFi
+
+length_table <- found_plot %>% 
+  mutate(interval_len = stop_1-start_1) %>% 
+  group_by(experiment, analysis_condition, condition, analysis_host, analysis_virus, tool) %>% 
+  summarise(mean = mean(interval_len),
+            sd = sd(interval_len),
+            n = n()) %>% 
+  rename(Virus = analysis_virus) %>% 
+  rename(Tool = tool) %>% 
+  rename(`Mean length (bp)` = mean) %>% 
+  rename(`Length standard deviation (bp)` = sd) %>% 
+  rename(`Number of integration sites` = n) %>% 
+  select(Virus, Tool, `Mean length (bp)`, `Length standard deviation (bp)`,`Number of integration sites`) 
+
+length_table
+
+length_table %>% 
+  write_tsv("../tables/supp-table-3.tsv")
+
+
+```
+
+
+## Statistical tests
+
+Since we our measurements are not independent (we measured each tool on the same data), and we can't assume our data are normally distributed (the Jaccard statistic ranges between 0 and 1), we should use a non-parametric test (specifically, the Kruskal-Willis test).
+
+### Jaccard
+
+This test tells us if the Jaccard statistics for each tool are different.  The results are:
+
+
+```{r}
+jac_table %>% 
+  group_by(experiment) %>% 
+  kruskal_test(jaccard ~ tool)
+```
+
+
+We can also check which pairs are different using Dunn's test.  We correct the p-values for multiple comparisions using the Benjamini-Hochberg method.
+
+```{r}
+jac_table %>% 
+  group_by(experiment) %>% 
+  dunn_test(jaccard ~ tool, p.adjust.method="BH")
+```
+
+### Positive preditictive value
+
+
+Again, we use the Kruskal-Wallis test to check if the Positive predictive values are different between the tools.
+
+
+```{r}
+scores_table %>% 
+  group_by(experiment) %>% 
+  kruskal_test(PPV ~ tool)
+```
+
+
+And Dunn's test to check the pairwise comparisons between positive predictive values.
+
+```{r}
+scores_table %>% 
+  group_by(experiment) %>% 
+  dunn_test(PPV ~ tool, p.adjust.method="BH")
+```
+
+### True positive rate
+
+
+We also perform the Kruskal-Wallis test on the true positive rates:
+
+```{r}
+scores_table %>% 
+  group_by(experiment) %>% 
+  kruskal_test(TPR ~ tool)
+```
+
+
+And the post test:
+
+
+```{r}
+scores_table %>% 
+  group_by(experiment) %>% 
+  dunn_test(TPR ~ tool, p.adjust.method="BH")
+```
+
+### Lengths
+
+Let's again compare the lengths between tools using the Kruskal-Wallis test:
+
+```{r}
+found_scores %>% 
+  mutate(interval_len = stop_1-start_1) %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "isling") ~ str_detect(analysis_condition, analysis_condition_plot),
+    TRUE ~ TRUE
+  )) %>% 
+  ungroup() %>% 
+  group_by(experiment) %>% 
+  kruskal_test(interval_len ~ tool)
+```
+
+
+And doing some post-tests (Dunn's):
+
+```{r}
+found_scores %>% 
+  mutate(interval_len = stop_1-start_1) %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "isling") ~ str_detect(analysis_condition, analysis_condition_plot),
+    TRUE ~ TRUE
+  )) %>% 
+  ungroup() %>% 
+  group_by(experiment) %>% 
+  dunn_test(interval_len ~ tool, p.adjust.method="BH")
+```
+
+
+# Fold-coverage and chromosome
+
+Within the OTC condition, I also explored the effect of increasing fold coverage and changing the host chromosome.
+
+
+
+## Plot
+
+If we combine the jaccard, PPV and TPR, we get the following:
+
+```{r include=FALSE}
+
+
+OTC_conds <- import_OTC_conds()
+jac <- OTC_conds[[1]]
+int_scores <- OTC_conds[[2]]
+found_scores <- OTC_conds[[3]]
+sim_scores <- OTC_conds[[4]]
+
+isling_cond_plot <- "analysis1|isling1"
+
+p2 <- makeFigue2(isling_cond_plot)
+
+```
+
+
+
+
+```{r}
+
+#print(p2[[1]])
+
+p2[[2]] %>% 
+  write_tsv("../tables/OTC_condions_jaccard_5bp.tsv")
+p2[[3]] %>% 
+  write_tsv("../tables/OTC_condions_PPV_5bp.tsv")
+p2[[4]] %>% 
+  write_tsv("../tables/OTC_condions_TPR_5bp.tsv")
+
+
+```
+
+
+## Tables
+
+Again, put the data here to potentially pull numbers for the text.
+
+### Jaccard
+
+The Jaccard statistic data from the plot is below:
+
+```{r}
+p2[[2]]
+```
+
+
+And the raw data (before computing the mean, etc):
+
+```{r}
+jac_stats <- jac %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "analysis") ~ str_detect(analysis_condition, isling_cond_plot),
+    TRUE ~ TRUE
+  )) %>% 
+  filter(pad == 0) %>% 
+  select(experiment, analysis_tool, replicate, host_name, fcov, intersection:n_intersections) %>% 
+    mutate(analysis_tool = case_when(
+      analysis_tool == "polyidus" ~ "Polyidus",
+      analysis_tool == "seeksv" ~ "Seeksv",
+      analysis_tool == "vifi" ~ "ViFi",
+      analysis_tool == "vseq-toolkit" ~ "VSeq-Toolkit",
+      TRUE ~ analysis_tool
+    ))
+jac_stats
+```
+
+
+### Scoring
+
+The summary statistics for the positive predictive value:
+
+```{r}
+p2[[3]]
+```
+
+
+And for the true positive rate
+
+```{r}
+p2[[4]]
+```
+
+
+And the raw results:
+
+```{r}
+int_stats <- int_scores %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "analysis") ~ str_detect(analysis_condition, isling_cond_plot),
+    TRUE ~ TRUE
+  )) %>% 
+  filter(window == 5) %>% 
+  select(experiment, tool, host_name, fcov, replicate, fp:TPR)
+
+int_stats
+  
+```
+
+
+## Statistical tests
+
+It's a bit harder to do any statistical tests for this data, since we have varied the tool, chromosome and fold-coverage.  I'm not aware of any non-parametric tests that can do all of these comparisons together.
+
+Instead, we can do multiple Kruskal-Wallis tests for each chromosome and fold-coverage, and then adjust the p-values using the Benjamini-Hochberg method.
+
+### Jaccard
+
+Doing this for the Jaccard statistic:
+
+```{r}
+jac_stats %>% 
+  group_by(fcov, host_name) %>% 
+  kruskal_test(jaccard ~ analysis_tool) %>% 
+  mutate(p.adj = p.adjust(p, method = "BH"))
+```
+
+Same for the positive predictive values:
+
+```{r}
+int_stats %>% 
+  group_by(fcov, host_name) %>% 
+  kruskal_test(PPV ~ tool) %>% 
+  mutate(p.adj = p.adjust(p, method = "BH"))
+```
+
+and the true positive rates:
+
+
+```{r}
+int_stats %>% 
+  group_by(fcov, host_name) %>% 
+  kruskal_test(TPR ~ tool) %>% 
+  mutate(p.adj = p.adjust(p, method = "BH"))
+```
+
+
+
+## False positives at 100X coverage?
+
+
+Check one of the results at 100X coverage to see what some of the false positives are - my guess is that they're just discordant pairs with a long fragment length
+
+
+```{r}
+
+high_fcov_found <- read_tsv('../out/experiment1_OTC_chr1/OTC-condition-breakdown/chr-fcov/scored_ints/chr-fcov_analysis1.cond27.rep0.hg38.OTC.post.found-results.tsv')
+
+high_fcov_found %>% 
+  filter(d_shortest > 5) %>% 
+  select(chr, start, stop, ori, d_shortest)
+
+
+
+```
+
+
+Most of the distances found simulated sites to found ones ('d_shortest') and vice-versa are short, indicating that these are probably not really false positives, but they're just outside our threshold for what we're calling a true positive.  
+
+I will make a table with the median distance for each condition/tool.  This is likely because of discordant pairs - can also make a table with how many output integration have same read ID as a simulated integration.  First do the median thing.
+
+
+
+
+```{r include=FALSE}
+found_scores_summary <- found_scores %>% 
+  group_by(unique, analysis_condition, experiment, condition, tool) %>% 
+  summarise(
+    mean_found_to_sim = mean(d_shortest),
+    median_found_to_sim = median(d_shortest),
+    sd_found_to_sim = sd(d_shortest)
+  )
+
+sim_scores_summary <- sim_scores %>% 
+    group_by(unique, analysis_condition, experiment, condition, tool) %>% 
+   summarise(
+    mean_sim_to_found = mean(d_shortest),
+    median_sim_to_found = median(d_shortest),
+    sd_sim_to_found = sd(d_shortest)
+  ) 
+
+dist_summary <- left_join(found_scores_summary, sim_scores_summary, by=c("analysis_condition", "unique", "experiment", "condition", "tool"))
+
+```
+
+
+First, plot the mean and median distance from each found integration to the nearest simulated integration.  A high mean/median distance would indicate a lot of false positives.
+
+```{r}
+sim_cond_2 <- jac %>% 
+  select(condition, host_name, fcov) %>% 
+  distinct()
+
+
+dist_summary %>% 
+  ungroup() %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "isling|analysis") ~ str_detect(analysis_condition,  "analysis1|isling1"),
+    TRUE ~ TRUE
+  )) %>% 
+  select(experiment, condition, tool, mean_found_to_sim, median_found_to_sim) %>% 
+  pivot_longer(mean_found_to_sim:median_found_to_sim, names_to = "type", values_to="value") %>% 
+  mutate(type = str_replace(type, "_found_to_sim", "")) %>% 
+  left_join(sim_cond_2, by="condition") %>% 
+  ggplot(aes(x = fcov, y=value, color=type)) +
+    geom_point() +
+  geom_line() +
+    facet_grid(tool ~ host_name) +
+  scale_x_log10() +
+  labs(x = "Fold coverage", y="Distance (bp)", title="Distance from output to nearest simulated")
+```
+
+
+First, plot the mean and median distance from each simulated integration to the nearest output integration.  A high mean/median distance would indicate a lot of false negatives (missed integrations).
+
+```{r}
+dist_summary %>% 
+  ungroup() %>% 
+  filter(case_when(
+    str_detect(analysis_condition, "isling|analysis") ~ str_detect(analysis_condition,  "analysis1|isling1"),
+    TRUE ~ TRUE
+  )) %>% 
+  select(experiment, condition, tool, mean_sim_to_found, median_sim_to_found) %>% 
+  pivot_longer(mean_sim_to_found:median_sim_to_found, names_to = "type", values_to="value") %>% 
+  mutate(type = str_replace(type, "_found_to_sim", "")) %>% 
+  left_join(sim_cond_2, by="condition") %>% 
+  ggplot(aes(x = fcov, y=value, color=type)) +
+    geom_point() +
+  geom_line() +
+    facet_grid(tool ~ host_name) +
+  scale_x_log10() +
+  labs(x = "Fold coverage", y="Distance (bp)", title="Distance from simulated to nearest output")
+```
+
+# Runtime
+
+I also used simulated data to investigate th runtime of isling.
+
+I looked at how the runtime varied as I changed two variables (one at a time): viral load and fold coverage. 
+
+
+```{r include=FALSE}
+results_dir <- "../out/experiment2_time/"
+experiments <- c("coverage", 'viral_load')
+
+files <- list.files(results_dir, recursive = TRUE, pattern="_runtime.tsv")
+
+files <- files[ basename(dirname(files)) %in% experiments]
+
+files <- files[dirname(dirname(files)) == "."]
+
+
+coltypes <- cols(
+  tool = col_character(),
+  dataset = col_character(),
+  sample = col_character(),
+  replicate = col_double(),
+  exit_value = col_double(),
+  user_time = col_double(),
+  system_time = col_double(),
+  elapsed_time = col_character(),
+  CPU = col_character(),
+  shared_text = col_double(),
+  unshared_data = col_double(),
+  max_rss = col_double(),
+  fs_inputs = col_double(),
+  fs_outputs = col_double(),
+  major_page_faults = col_double(),
+  minor_page_faults = col_double(),
+  swaps = col_double(),
+  command = col_character()
+)
+
+times <- tibble(
+  filename = file.path(results_dir, files),
+  experiment = dirname(files),
+  data = map(filename, ~read_tsv(., col_types=coltypes))
+) %>% 
+  unnest(data) %>% 
+  mutate(duration_elapsed_time = case_when(
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\.\\d{2}") ~ lubridate::as.duration(lubridate::ms(elapsed_time)),
+    str_detect(elapsed_time, "\\d{0,2}:\\d{2}\\:\\d{2}") ~ lubridate::as.duration(lubridate::hms(elapsed_time)),
+    TRUE ~ lubridate::as.duration(NA)
+  )) %>% 
+  rename(time_rep = replicate)
+
+# add simulation conditions
+conds <- importSimulationConditions(results_dir)
+
+times <- left_join(times, conds, by=c("experiment", "sample")) %>% 
+  mutate(tool = str_replace(tool, "polyidus", "Polyidus")) %>% 
+  mutate(tool = str_replace(tool, "seeksv", "Seeksv")) %>% 
+  mutate(tool = str_replace(tool, "vifi", "ViFi")) %>% 
+  mutate(tool = str_replace(tool, "vseq-toolkit", "VSeq-Toolkit"))  
+```
+
+
+```{r}
+times <- times %>% 
+  mutate(base_filename = basename(filename)) %>% 
+  filter(base_filename %in% c( "coverage_runtime.tsv", "viral_load_runtime.tsv"))
+
+```
+
+## Figure
+
+The data looks like this:
+
+
+```{r}
+tool_order <- c("isling", "Polyidus", "Seeksv", "ViFi", "VSeq-Toolkit")
+
+viral_load <- times %>% 
+  filter(experiment == "viral_load") %>% 
+  mutate(int_num = as_factor(int_num)) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(int_num, epi_num, tool) %>% 
+  summarise(n = n(),
+            mean_time = mean(duration_elapsed_time),
+            sem_time = sd(duration_elapsed_time)/sqrt(n),
+            min = mean_time - sem_time,
+            max = mean_time + sem_time) %>% 
+  ungroup() %>% 
+   ggplot(aes(x = int_num, y = mean_time, color=tool, group = tool)) +
+  geom_point()  +
+  geom_line() +
+  geom_linerange(aes(ymin = min, ymax = max)) +
+  facet_wrap(vars(epi_num)) +
+  theme_classic()  + 
+  theme(
+    strip.background = element_blank(),
+    strip.text.y = element_blank(),
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    #    axis.title.y = element_blank(),
+  )  +
+  xlab("Number of integrations") +
+  ylab("Runtime (s)") +
+  scale_y_log10()
+
+
+#print(viral_load + theme(legend.position = "bottom"))
+
+coverage <- times %>% 
+  filter(experiment == "coverage") %>% 
+  mutate(fcov = as.factor(fcov)) %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  mutate(tool = forcats::fct_relevel(tool, tool_order)) %>% 
+  group_by(fcov, tool) %>% 
+  summarise(n = n(),
+            mean_time = mean(duration_elapsed_time),
+            sem_time = sd(duration_elapsed_time)/sqrt(n),
+            min = mean_time - sem_time,
+            max = mean_time + sem_time) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = fcov, y = mean_time, color=tool, group = tool)) +
+  geom_point()  +
+  geom_line() +
+  geom_linerange(aes(ymin = min, ymax = max)) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  ) +
+  xlab("Fold coverage") +
+  ylab("Runtime (s)") +
+  scale_y_log10()
+
+#print(coverage + theme(legend.position = "bottom"))
+
+legend <- cowplot::get_legend(coverage + theme(legend.position = "bottom"))
+
+figure_3 <- cowplot::plot_grid(coverage, viral_load, labels="AUTO")
+figure_3 <- cowplot::plot_grid(figure_3, legend, ncol=1, rel_heights = c(1, 0.05))
+print(figure_3)
+
+cowplot::save_plot("../figures/figure5.pdf", figure_3)
+
+```
+
+
+## Tables
+
+Here are the summary statistics for these data:
+
+```{r}
+times_summary <- times %>% 
+  group_by(dataset, int_num, fcov, epi_num, tool) %>% 
+    summarise(n = n(),
+            mean_time = mean(duration_elapsed_time),
+            sem_time = sd(duration_elapsed_time)/sqrt(n),
+            ) 
+
+times_summary %>% 
+  write_tsv("../tables/runtimes.tsv")
+
+times_summary
+```
+
+And the raw data from which the summary statistics were computed:
+
+```{r}
+times %>% 
+  select(experiment, tool, int_num, epi_num, fcov,  replicate, random_seed, time_rep, duration_elapsed_time,  exit_value, command, ) %>% 
+  rename(simulation_replicate = replicate) %>% 
+  rename(runtime_replicate = time_rep) %>% 
+  arrange(experiment, desc(tool), int_num, epi_num, fcov, simulation_replicate, runtime_replicate)
+```
+## Statistical tests
+
+The main thing of interest in this experiment was the difference in runtime between different tools.  Do the same thing as for above - compare the differences between tools for each condition, and adjust the p-values for multiple comparisons.
+
+
+First, test the differences in runtime for each tool for different fold coverages:
+```{r}
+times %>% 
+```
+
+
+
+```{r}
+times %>% 
+  filter(experiment == "coverage") %>% 
+  mutate(tool = as.factor(tool)) %>% 
+  group_by(fcov) %>% 
+  kruskal_test(duration_elapsed_time ~ tool) %>% 
+  mutate(p.adj = p.adjust(p, method="BH"))
+```
+Also look at the differences for viral load
+```{r}
+times %>% 
+  filter(experiment == "viral_load") %>% 
+  group_by(int_num, epi_num) %>% 
+  kruskal_test(duration_elapsed_time ~ tool) %>% 
+  mutate(p.adj = p.adjust(p, method="BH"))
+```
+
+
+# Session info
+
+```{r}
+sessionInfo()
+```
+

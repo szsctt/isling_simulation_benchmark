@@ -613,7 +613,7 @@ importDistScoreExperiment <- function(exp_path, type) {
     summary_suffix <- ".sim-results.tsv"
     score_type_sub <- '.sim-results'
   }
-  scored_ints_folder <- "scored_ints"
+  scored_ints_folder <- "bedtools_closest"
   
   # get folders to read files from
   folders <- list.dirs(exp_path)
@@ -656,23 +656,25 @@ importDistScoreExperiment <- function(exp_path, type) {
   
 }
 
+
 importDistFile <- function(filename) {
-  # colspec <- cols(
-  #   chr_1 = col_character(),
-  #   start_1 = col_integer(),
-  #   stop_1 = col_integer(),
-  #   chr_2 = col_character(),
-  #   start_2 = col_integer(),
-  #   stop_2 = col_integer(),
-  #   shortest = col_integer(),
+   colspec <- cols(
+     chr_1 = col_character(),
+     start_1 = col_integer(),
+     stop_1 = col_integer(),
+     chr_2 = col_character(),
+     start_2 = col_integer(),
+     stop_2 = col_integer(),
+     d_shortest = col_integer()
+   )
   #   coords_mean = col_double(),
   #   coords_min = col_double(),
   #   midpoint = col_double()
   # )
   cat("importing file ", filename, "\n")
   
-  #return(read_tsv(filename, col_types = colspec))
-  return(read_tsv(filename))
+  return(read_tsv(filename, col_names = names(colspec$cols), col_types = colspec))
+  #return(read_tsv(filename))
   
 }
 

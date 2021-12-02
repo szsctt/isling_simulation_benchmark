@@ -1,7 +1,6 @@
 ---
 title: "R Notebook"
-output: html_notebook:
-  code_folding: hide
+output: html_notebook
 ---
 
 

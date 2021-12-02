@@ -25,8 +25,8 @@ echo "simulating and analysing data"
 bash src/experiment1_OTC_chr1/run_exp1_local.sh $CORES
 
 # generate figures and tables
-echo "generating tables and figures"
-bash src/experiment1_OTC_chr1/make_figures.sh
+#echo "generating tables and figures"
+#bash src/experiment1_OTC_chr1/make_figures.sh
 
 # do runtime stuff
 cd src/experiment2_time
@@ -34,5 +34,6 @@ echo "checking runtime"
 ./run_time_local.sh $CORES
 cd ../..
 
-# make figures
-bash src/experiment1_OTC_chr1/example_rmd.sh $CORES
+# make figures and tables
+echo "generating tables and figures"
+bash src/experiment1_OTC_chr1/make_figures.sh

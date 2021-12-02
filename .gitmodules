@@ -1,6 +1,6 @@
 [submodule "intvi_simultion"]
 	path = intvi_simulation
-	url = https://github.com/szsctt/intvi_simulation.git
+	url = https://github.com/aehrc/vector-integration-simulation-pipeline.git
 [submodule "intvi_other-tools"]
 	path = intvi_other-tools
 	url = https://github.com/szsctt/intvi_other-tools.git
